@@ -37,6 +37,10 @@ import { usesGoblinModel } from '../data/kecoon-model.js';
 import { MAX_MOB_VISUALS, MOB_DRAW_DISTANCE } from '../data/mob-draw-distance.js';
 import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
 import {
+  QUALITY_PROFILES, effectivePixelRatio,
+  type QualityLevel, type QualityProfile,
+} from '../data/quality-profile.js';
+import {
   FOLIAGE_BASE_SCALE, type FoliageItem, type FoliageKind,
 } from '../data/moradon-foliage.js';
 import type { GameplayPoint } from './coords.js';
@@ -155,6 +159,37 @@ export class ThreeWorldRenderer {
   private tmp = new Vector3();
 
   private sun: DirectionalLight;
+
+  /* ═══ P2.30 — ÇİZİM KALİTESİ ═══
+     Varsayılan MOBİL. P2.29'daki geometri kesiminden sonra da takılma
+     sürünce darboğazın piksel ve geçiş sayısında olduğu anlaşıldı. */
+  private quality: QualityProfile = QUALITY_PROFILES.mobile;
+
+  get qualityLevel(): QualityLevel { return this.quality.level; }
+
+  /** Kaliteyi değiştirir ve renderer'a uygular. MSAA hariç her şey
+   *  anında geçerlidir; MSAA bağlam kurulumunda sabittir ve sayfa
+   *  yenilenene kadar değişmez (bu AÇIKÇA raporlanır). */
+  setQuality(level: QualityLevel): { applied: true; msaaNeedsReload: boolean } {
+    const prev = this.quality;
+    this.quality = QUALITY_PROFILES[level];
+    this.applyQuality();
+    return { applied: true, msaaNeedsReload: prev.antialias !== this.quality.antialias };
+  }
+
+  private applyQuality(): void {
+    if (!this.renderer) return;
+    this.renderer.setPixelRatio(
+      effectivePixelRatio(this.quality, globalThis.devicePixelRatio ?? 1),
+    );
+    this.renderer.shadowMap.enabled = this.quality.shadows;
+    this.sun.castShadow = this.quality.shadows;
+    this.sun.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
+    const span = this.quality.shadowSpan;
+    this.sun.shadow.camera.left = -span; this.sun.shadow.camera.right = span;
+    this.sun.shadow.camera.top = span; this.sun.shadow.camera.bottom = -span;
+    this.sun.shadow.camera.updateProjectionMatrix();
+  }
   private grid: GridHelper;
   private playerRoot = new Group();
   private targetRing: Mesh;
@@ -245,13 +280,16 @@ export class ThreeWorldRenderer {
     /* ---- ışık (§11): mobil dostu; PBR / post-processing YOK ---- */
     const ambient = new AmbientLight(0xb9c6d0, 1.15);
     this.sun = new DirectionalLight(0xfff2d8, 1.45);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
+    /* P2.30 — gölge PROFİLDEN. Varsayılan mobil profilde KAPALI:
+       gölge atan her nesne ikinci kez çiziliyordu. */
+    this.sun.castShadow = this.quality.shadows;
+    this.sun.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
     /* Gölge kamerası OYUNCUYU TAKİP EDER (aşağıda `updateSun`).
        Sabit kalsaydı dünya (1240, 1650) civarında olduğu için zemin gölge
        haritasının DIŞINDA kalır ve tamamen karanlık görünürdü. */
-    this.sun.shadow.camera.left = -SHADOW_SPAN; this.sun.shadow.camera.right = SHADOW_SPAN;
-    this.sun.shadow.camera.top = SHADOW_SPAN; this.sun.shadow.camera.bottom = -SHADOW_SPAN;
+    const span = this.quality.shadowSpan;
+    this.sun.shadow.camera.left = -span; this.sun.shadow.camera.right = span;
+    this.sun.shadow.camera.top = span; this.sun.shadow.camera.bottom = -span;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 3000;
     this.sun.shadow.normalBias = 0.8;
     this.scene.add(ambient, this.sun, this.sun.target);
@@ -362,11 +400,13 @@ export class ThreeWorldRenderer {
     /* ---- WebGL YALNIZ canvas verilirse (§25) ---- */
     if (canvas) {
       this.renderer = new WebGLRenderer({
-        canvas, antialias: true, alpha: false, powerPreference: 'high-performance',
+        /* P2.30 — MSAA profilden. Mobilde kapalı: mobil GPU'da pahalı
+           ve yüksek piksel oranıyla zaten gereksiz. */
+        canvas, antialias: this.quality.antialias, alpha: false,
+        powerPreference: 'high-performance',
       });
-      this.renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio ?? 1));   // §22
+      this.applyQuality();
       this.renderer.setSize(width, height, false);
-      this.renderer.shadowMap.enabled = true;
     }
   }
 
@@ -689,7 +729,7 @@ export class ThreeWorldRenderer {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
     this.applyCameraTuning();
-    this.renderer?.setPixelRatio(Math.min(2, globalThis.devicePixelRatio ?? 1));
+    this.renderer?.setPixelRatio(effectivePixelRatio(this.quality, globalThis.devicePixelRatio ?? 1));
     this.renderer?.setSize(this.width, this.height, false);
   }
 
@@ -734,47 +774,53 @@ export class ThreeWorldRenderer {
     this.mobClipRows.length = 0;
     this.mobDeathActive = 0;
     this.mobVisualsActive = 0;
-    /* P2.29 — ÖNCE SIRALA, SONRA KES. Mesafe kesimi tek başına yetmiyor:
-       kalabalık bir noktada 1400 birimlik daire 79 moba denk geliyor.
-       En yakın `MAX_MOB_VISUALS` tanesi çizilir; savaştığın mob her
-       zaman bu kümededir. */
-    const visible = frame.mobs
-      .filter((m) => {
-        if (m.corpseFaded) return false;
-        const dx = m.worldX - p.worldX;
-        const dy = m.worldY - p.worldY;
-        return dx * dx + dy * dy <= MOB_DRAW_DISTANCE * MOB_DRAW_DISTANCE;
-      })
+    /* ═══════════ P2.29.1 — KES AMA SİLME ═══════════
+       P2.29'da mesafe kesimi eklendi ve DAHA KÖTÜ oldu: "bir adım
+       atınca donuyor". Sebep `VisualRegistry.endFrame()`: bir karede
+       DOKUNULMAYAN her görseli SİLER. Kesim yüzünden sınırı geçen mob
+       hemen siliniyor, geri girince `cloneSkinned()` ile yeniden
+       kuruluyordu — 11 605 verteksli iskeletli mesh klonu, her karede
+       birkaç tane. Sınırda sürekli kur/yık.
+
+       DOĞRUSU: HER mobun görseli havuzda KALIR (dokunulur, silinmez);
+       yalnız uzaktakiler GİZLENİR ve animasyonu İŞLENMEZ.
+         · gizli nesne three tarafından çizilmez → üçgen yükü yok
+         · mixer güncellenmez → iskelet hesabı yok
+         · klon yeniden kurulmaz → kur/yık maliyeti yok
+
+       Kesim ölçüsü: en geniş kamera (kuş bakışı 750 × zoom 2,2 = 1650,
+       fov 40°) köşegende 1223 birim kapsar; `MOB_DRAW_DISTANCE` onun
+       üstünde. Sert tavan kümelenmeye karşı: kalabalık bir noktada
+       1400 birimlik daire 79 moba denk geliyor (ölçüldü).
+
+       GAMEPLAY ETKİLENMEZ — mob AI, respawn ve savaş dünyada sürer. */
+    const ranked = frame.mobs
+      .filter((m) => !m.corpseFaded)
       .map((m) => ({
         m,
-        d: (m.worldX - p.worldX) ** 2 + (m.worldY - p.worldY) ** 2,
+        d2: (m.worldX - p.worldX) ** 2 + (m.worldY - p.worldY) ** 2,
       }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, MAX_MOB_VISUALS)
-      .map((e) => e.m);
-    for (const m of visible) {
-      /* P2.9 — ceset süresi dolduysa görsel ÜRETİLMEZ ve dokunulmaz;
-         `endFrame()` onu kendiliğinden söker. Gameplay listesi değişmez. */
-      /* ═══ P2.29 — MESAFE KESİMİ ═══
-         Oyun testi bulgusu: biraz ilerleyince oyun donuyordu. Sebep
-         haritadaki 184 mobun TAMAMININ her karede canlı iskeletli mesh
-         olarak durmasıydı — ekran dışındakiler dahil. Goblin modeli
-         mutanttan %54 ağır olduğu için (17 404 / 11 271 üçgen) yük
-         iki buçuk milyon üçgene çıkmıştı.
+      .sort((a, b) => a.d2 - b.d2);
+    const cut = MOB_DRAW_DISTANCE * MOB_DRAW_DISTANCE;
 
-         Kesim mesafesi ÖLÇÜLDÜ, uydurulmadı: en geniş kamera
-         (kuş bakışı, mesafe 750 × zoom 2,2 = 1650, fov 40°) köşegende
-         1223 birim kapsıyor. `MOB_DRAW_DISTANCE` onun biraz üstünde.
-
-         GAMEPLAY ETKİLENMEZ: mob AI, respawn ve savaş dünyada
-         çalışmaya devam eder; yalnız görseli çizilmez. */
-      this.mobVisualsActive += 1;
+    for (let i = 0; i < ranked.length; i++) {
+      const { m, d2 } = ranked[i]!;
       const key = mobVisualKey(m.uid, m.generation);
+      /* HER mob dokunulur: havuz kararlı kalır, silme/yeniden kurma yok. */
       const g = this.mobs.touch(key);
+      const shown = i < MAX_MOB_VISUALS && d2 <= cut;
+      g.visible = shown;
+      if (!shown) continue;
+      /* İSKELET KLONU İLK GÖRÜNÜŞTE kurulur, açılışta değil.
+         Aksi hâlde ilk karede 184 `cloneSkinned()` birden çalışır
+         (her biri 11 605 verteks) ve oyun açılışta donar. Kurulan
+         klon SİLİNMEZ; mob uzaklaşınca yalnız gizlenir. */
       if (g.children.length === 0) this.fillMobVisual(g, m, key);
+      this.mobVisualsActive += 1;
       g.position.set(m.worldX, groundElevationAt(m.worldX, m.worldY), m.worldY);
       this.updateMobVisual(g, m, key, dt, frame.player);
     }
+
     for (const key of this.mobs.endFrame()) {
       this.mobMotion.delete(key);
       this.mobRigs.delete(key);

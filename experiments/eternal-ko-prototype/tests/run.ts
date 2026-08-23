@@ -73,6 +73,9 @@ import {
 } from '../data/mob-draw-distance.js';
 import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
 import {
+  QUALITY_ORDER, QUALITY_PROFILES, effectivePixelRatio, nextQuality, pixelCount,
+} from '../data/quality-profile.js';
+import {
   GENIE_PANEL, GENIE_SET_TABS, GENIE_SKILL_SLOTS, GENIE_SLIDERS, GENIE_TOGGLES,
   SLIDER_TRACK, genieHitTest,
 } from '../ui/genie-panel.js';
@@ -11833,6 +11836,74 @@ test('§99 kesim GAMEPLAY’i etkilemez', () => {
     .map((m) => Math.hypot(m.worldX - S.world.worldX, m.worldY - S.world.worldY))
     .some((d) => d > MOB_DRAW_DISTANCE);
   ok(far, 'kesim mesafesinin dışında mob olmalı (senaryo geçersiz)');
+});
+
+/* ================= P2.30 — ÇİZİM KALİTESİ ================= */
+console.log('P2.30 — mobil kalite profili:');
+
+test('§100 VARSAYILAN profil MOBİL — üç pahalı ayar da kapalı', () => {
+  const m = QUALITY_PROFILES.mobile;
+  ok(!m.antialias, 'mobilde MSAA kapalı olmalı');
+  ok(!m.shadows, 'mobilde gölge kapalı olmalı');
+  ok(m.maxPixelRatio <= 1.5, `piksel oranı yüksek: ${m.maxPixelRatio}`);
+});
+
+test('§100 profiller MONOTON — mobil en ucuz, yüksek en pahalı', () => {
+  eq(QUALITY_ORDER.join(','), 'mobile,balanced,high', 'sıra:');
+  let prevRatio = 0;
+  for (const lvl of QUALITY_ORDER) {
+    const p = QUALITY_PROFILES[lvl];
+    ok(p.maxPixelRatio >= prevRatio, `${lvl} piksel oranı geriye gidiyor`);
+    prevRatio = p.maxPixelRatio;
+  }
+  /* Gölge yalnız yukarı doğru AÇILMALI. */
+  ok(!QUALITY_PROFILES.mobile.shadows, 'mobil gölgesiz');
+  ok(QUALITY_PROFILES.high.shadows, 'yüksek gölgeli');
+  /* Döngü başa dönmeli. */
+  eq(nextQuality('high'), 'mobile', 'döngü:');
+});
+
+test('§100 piksel oranı bir TAVAN — cihazınkini YÜKSELTMEZ', () => {
+  const m = QUALITY_PROFILES.mobile;
+  eq(effectivePixelRatio(m, 3), m.maxPixelRatio, 'yüksek cihaz kırpılmalı:');
+  eq(effectivePixelRatio(m, 1), 1, 'düşük cihaz yükseltilmemeli:');
+  /* Bozuk değerler oyunu düşürmemeli. */
+  eq(effectivePixelRatio(m, 0), 1, 'sıfır oran:');
+  eq(effectivePixelRatio(m, Number.NaN), 1, 'NaN oran:');
+});
+
+test('§100 mobil profil piksel yükünü GERÇEKTEN düşürür', () => {
+  /* Bulgu: 620×1100 mantıksal ekran, cihaz oranı 3, eski tavan 2 →
+     1240×2200 = 2,7 milyon piksel her kare. */
+  const before = pixelCount(QUALITY_PROFILES.high, 620, 1100, 3);
+  const after = pixelCount(QUALITY_PROFILES.mobile, 620, 1100, 3);
+  ok(after < before / 2, `piksel yükü yeterince düşmedi: ${before} → ${after}`);
+  ok(after < 1_200_000, `mobil profil hâlâ ağır: ${after} piksel`);
+});
+
+test('§99.1 KESİM SİLMEZ, GİZLER — sınırda kur/yık olmaz', () => {
+  /* P2.29'un ilk hâli daha kötüydü: "bir adım atınca donuyor".
+     `VisualRegistry.endFrame()` dokunulmayan görseli SİLER; kesim
+     yüzünden sınırı geçen mob siliniyor, geri girince iskeletli mesh
+     yeniden klonlanıyordu.
+
+     Kural: HER mob DOKUNULUR (havuz kararlı), yalnız uzaktakiler
+     GİZLENİR. Kaynak metni bunu korur — ileride biri `continue` ile
+     dokunmayı atlarsa test düşer. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'ThreeWorldRenderer.ts'), 'utf8');
+  const loop = src.slice(src.indexOf('P2.29.1'), src.indexOf('this.mobs.endFrame()'));
+  ok(loop.length > 0, 'mob döngüsü bulunamadı');
+  /* `touch` gizlemeden ÖNCE çağrılmalı. */
+  const touchAt = loop.indexOf('this.mobs.touch(key)');
+  const shownAt = loop.indexOf('const shown =');
+  ok(touchAt >= 0 && shownAt >= 0, 'touch/shown bulunamadı');
+  ok(touchAt < shownAt, 'touch gizleme kararından SONRA çağrılıyor — havuz churn eder');
+  /* Gizli mob için `continue` var ama `touch`tan SONRA olmalı. */
+  ok(/g\.visible = shown;\s*\n\s*if \(!shown\) continue;/.test(loop),
+    'gizleme ile atlama ardışık değil');
+  /* Klon TEMBEL olmalı: `fillMobVisual` gizleme kontrolünden sonra. */
+  const fillAt = loop.indexOf('this.fillMobVisual');
+  ok(fillAt > shownAt, 'klon açılışta kuruluyor — 184 klon birden donma yapar');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

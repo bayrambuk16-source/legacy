@@ -13,6 +13,7 @@ import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import { PLAYER_SPEED_OPTIONS, PROTO, TUNING_DEFAULTS, type TuningValues } from '../config.js';
 import { DEATH_EXP_PENALTY, PrototypeState } from '../state.js';
+import { nextQuality } from '../data/quality-profile.js';
 import {
   resolveJoystick, type JoystickInput, type MoveVector,
 } from '../world/WorldMovementSystem.js';
@@ -408,6 +409,12 @@ export class WorldPrototypeScene implements Scene {
 
   /** P2.15 — DEV: kaydı sil ve baştan başla. Oyun testinde temiz bir
    *  başlangıca dönmek için tek yol; production'da bu düğme yoktur. */
+  /** P2.30 — DEV: çizim kalitesi. Varsayılan mobil; yükseğe alıp
+   *  farkı görmek için. */
+  private qualityBtn(): Btn {
+    return { id: 'dev_quality', x: 44, y: DEV_TOGGLE_TOP + 160, w: 300, h: 34, label: 'KALİTE' };
+  }
+
   private wipeSaveBtn(): Btn {
     return { id: 'dev_wipe', x: 44, y: DEV_TOGGLE_TOP + 120, w: 300, h: 34, label: 'KAYDI SİL' };
   }
@@ -818,6 +825,16 @@ export class WorldPrototypeScene implements Scene {
     if (this.hit(p, this.infiniteMpBtn())) {
       this.S.infiniteMp = !this.S.infiniteMp;
       this.say(`Sonsuz MP: ${this.S.infiniteMp ? 'AÇIK' : 'KAPALI'}`);
+      return true;
+    }
+    /* P2.30 — kalite döngüsü. MSAA bağlam kurulumunda sabit olduğu
+       için değişimi AÇIKÇA bildirilir; yanıltıcı "uygulandı" demiyoruz. */
+    if (this.hit(p, this.qualityBtn())) {
+      const r = this.three?.setQuality(nextQuality(this.three.qualityLevel));
+      const lvl = this.three?.qualityLevel ?? 'mobile';
+      this.say(r?.msaaNeedsReload === true
+        ? `Kalite: ${lvl} (kenar yumuşatma için yenile)`
+        : `Kalite: ${lvl}`);
       return true;
     }
     if (this.hit(p, this.wipeSaveBtn())) {
@@ -2036,6 +2053,12 @@ export class WorldPrototypeScene implements Scene {
     g.text(`${ll.label}: ${this.S.worldLoot.tuning.lootLifetimeSec}s`
       + `  (${LOOT_LIFETIME_OPTIONS.join('/')})`,
       ll.x + ll.w / 2, ll.y + ll.h / 2, { align: 'center', size: 11, color: '#a8c090' });
+    const qb = this.qualityBtn();
+    g.rect(qb.x, qb.y, qb.w, qb.h, '#1b2634', 0.95);
+    g.rect(qb.x, qb.y, qb.w, 2, '#6f8fd0');
+    g.text(`${qb.label}: ${this.three?.qualityLevel ?? '—'}`,
+      qb.x + 12, qb.y + qb.h / 2 - 7, { size: 12, bold: true, color: '#9fb4d8' });
+
     const wb = this.wipeSaveBtn();
     g.rect(wb.x, wb.y, wb.w, wb.h, '#2a1512', 0.95);
     g.rect(wb.x, wb.y, wb.w, 2, '#c96a5a');
