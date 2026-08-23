@@ -31,6 +31,7 @@ import {
   skillPoolRects, statRows,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
+import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
 } from '../ui/camera-zoom.js';
@@ -93,6 +94,9 @@ const NAV_RESERVE = 92;
 /** P2.6.1 — HUD varlıklarının genel opaklığı. Maket dokulu bir zemine
  *  çizilmişti; düz arazide altın işlemeler çiğ kalıyor. Tek sayı. */
 const HUD_ALPHA = 0.88;
+
+/** Oto giy bildiriminin ekranda kalma süresi (sn). */
+const POWER_TOAST_SEC = 3;
 const MAX_SET_SKILLS = GENIE_SET_MAX;
 const LOG_LINES = 5;
 /** DEV panelinde telemetri listesinin ALTINDA başlayan toggle kolonu. */
@@ -259,6 +263,8 @@ export class WorldPrototypeScene implements Scene {
   private forgeSel: number | null = null;
   /** Son deneme sonucunun kısa özeti (panelde gösterilir). */
   private forgeMsg = '';
+  /** P2.13 — güç skoru bildirimi: `+20 Up` şeridi. Süre dolunca kaybolur. */
+  private powerToast: { name: string; before: number; after: number; t: number } | null = null;
   private genieTab: 'general' | 'sets' | 'bar' = 'general';
   private editingSet: SetId = 0;
   /** Aktif bar sekmesinde düzenlenen slot. */
@@ -1187,6 +1193,18 @@ export class WorldPrototypeScene implements Scene {
     }, dt);
 
     if (this.noticeTimer > 0) this.noticeTimer -= dt;
+    /* P2.13 — oto giy olayını yakala ve bildirim şeridini süre ile söndür. */
+    const up = this.S.lastUpgrade;
+    if (up) {
+      this.powerToast = {
+        name: up.displayName, before: up.scoreBefore, after: up.scoreAfter, t: POWER_TOAST_SEC,
+      };
+      this.S.lastUpgrade = null;
+    }
+    if (this.powerToast) {
+      this.powerToast.t -= dt;
+      if (this.powerToast.t <= 0) this.powerToast = null;
+    }
     if (!this.S.player.alive) {
       this.S.player.reviveForRetry();
       this.say('Yeniden doğdun');
@@ -1566,8 +1584,27 @@ export class WorldPrototypeScene implements Scene {
       g.rect(HUD_GENIE.x, HUD_GENIE.y, HUD_GENIE.w, HUD_GENIE.h, '#0b0908', 0.45);
     }
 
+    /* ---- güç skoru (sürekli görünür) ---- */
+    const power = this.S.autoGear.score();
+    g.text(`GÜÇ ${formatPower(power)}`, PROTO.screenW / 2, 96,
+      { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
+
+    /* ---- oto giy bildirimi ---- */
+    if (this.powerToast) {
+      const t = this.powerToast;
+      const alpha = Math.min(1, t.t / 0.4);
+      g.rect(PROTO.screenW / 2 - 120, 112, 240, 34, '#100d08', 0.9 * alpha);
+      g.rect(PROTO.screenW / 2 - 120, 112, 240, 2, '#7fa85c', alpha);
+      g.text(t.name, PROTO.screenW / 2 - 110, 118,
+        { size: 11, bold: true, color: '#e8e0d0', alpha });
+      g.text(`${formatPower(t.before)} → ${formatPower(t.after)}`,
+        PROTO.screenW / 2 - 110, 132, { size: 10, color: '#8d8272', alpha });
+      g.text(formatPowerDelta(t.before, t.after), PROTO.screenW / 2 + 110, 122,
+        { align: 'right', size: 15, bold: true, color: '#7fa85c', alpha });
+    }
+
     if (this.noticeTimer > 0) {
-      g.text(this.notice, PROTO.screenW / 2, 150, { align: 'center', size: 15, color: '#e8d9a0' });
+      g.text(this.notice, PROTO.screenW / 2, 158, { align: 'center', size: 15, color: '#e8d9a0' });
     }
 
     /* ---- joystick ---- */

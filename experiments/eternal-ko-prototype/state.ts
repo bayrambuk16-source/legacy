@@ -28,6 +28,7 @@ import { ArcherBuildResolver } from './world/BuildResolver.js';
 import { KoArcherPhysicalStrategy } from '../../src/game/systems/combat/KoArcherPhysicalStrategy.js';
 import { EquipService } from './world/EquipService.js';
 import { ForgeSystem } from './world/ForgeSystem.js';
+import { AutoGearSystem, type EquipUpgradeEvent } from './world/AutoGearSystem.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
 import { PlayerAnimator } from './world/PlayerAnimation.js';
@@ -115,6 +116,10 @@ export class PrototypeState {
   readonly timing = new ArcherCombatTimingProfile();
   /** P2.8 — Örs. Yükseltmenin TEK mutasyon kapısı. */
   forge!: ForgeSystem;
+  /** P2.13 — oto giy / oto sat / güç skoru. */
+  autoGear!: AutoGearSystem;
+  /** Son oto giy olayı — HUD bildirimi bunu okur, sonra temizler. */
+  lastUpgrade: EquipUpgradeEvent | null = null;
   /** Oyuncu görsel durum makinesi — saldırı animasyonu YALNIZ buradan tetiklenir. */
   readonly anim = new PlayerAnimator();
 
@@ -385,6 +390,7 @@ export class PrototypeState {
       rng, loot: this.loot, inventory: this.inventory, player: this.player,
       ground: this.worldLoot,
       autoLoot: () => this.lootPolicy.autoLoot,
+      onItemAcquired: (id) => { this.lastUpgrade = this.autoGear?.tryUpgrade(id) ?? null; },
     });
     /* P1.4 §3 — ATTACK MOVE: ActionLock aktifken hız çarpanı uygulanır (0 / 60 / 100 %).
        Joystick girdisi KAYBOLMAZ; yalnız katedilen mesafe ölçeklenir. Çarpan
@@ -415,6 +421,11 @@ export class PrototypeState {
     /* P2.9 — P2.4D "KAPI 1" AÇILDI: DEV respawn ezmesi artık varsayılan
        olarak KURULMAZ. Süre slotun kendi `respawnSec` değerinden okunur
        (Moradon'da 20 sn). Ezme yalnız DEV panelinden bilinçli açılır. */
+    /* P2.13 — oto giy / oto sat. Güç skoru tek karar kaynağıdır. */
+    this.autoGear = new AutoGearSystem({
+      inventory: this.inventory, equip: this.equipService,
+      equipment: this.equipment, stats: this.stats, player: this.player,
+    });
     this.mobs.ai.respawnOverrideSec = null;
     this.mobs.populate();
 

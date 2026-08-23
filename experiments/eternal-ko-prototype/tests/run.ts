@@ -51,6 +51,10 @@ import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
 import { ARCHER_SOURCE_ITEMS, archerSourceItem } from '../data/archer-source-items.js';
 import { ALLOC_BOX, ALLOC_ROWS, allocButtons, parseAllocId } from '../ui/character-panel.js';
 import {
+  POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerBase, powerScore,
+} from '../data/power-score.js';
+import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
+import {
   FOLIAGE_BASE_SCALE, FOLIAGE_MODEL_KEY, FOLIAGE_SEED, SPAWN_CLEAR, SLOT_MARGIN,
   buildFoliage, type FoliageKind,
 } from '../data/moradon-foliage.js';
@@ -6676,6 +6680,10 @@ console.log('P1.8 — drop → envanter → equip:');
 
 test('§38 UÇTAN UCA: mob kill → Auto Loot ON → envanter instance → equip', () => {
   const S = protoState(1940);
+  /* P2.13 — bu test MANUEL kuşanma yolunu sınıyor. Oto giy açıkken düşen
+     eşya anında kuşanılıyor ve çantada görünmüyor; kurulum bu yüzden oto
+     giyi KAPATIR. Oto giy davranışı §76'da ayrıca sınanır. */
+  S.autoGear.settings.autoEquip = false;
   S.lootPolicy.setMode('auto');
   S.mobs.mobs.length = 0;
   S.worldLoot.clear();
@@ -10331,6 +10339,139 @@ test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
     }
   }
   ok(closest >= 400, `en yakın slot çifti ${Math.round(closest)} birim`);
+});
+
+/* ================= P2.13 — GÜÇ SKORU · OTO GİY · OTO SAT ================= */
+console.log('P2.13 — güç skoru, oto giy, oto sat:');
+
+test('§76 güç skoru MONOTON: daha iyi stat daha yüksek skor', () => {
+  const base = { attack: 20, defense: 10, maxHp: 200, maxMp: 100, dex: 80, sta: 70 };
+  const s0 = powerScore(base);
+  for (const key of ['attack', 'defense', 'maxHp', 'maxMp', 'dex', 'sta'] as const) {
+    const up = { ...base, [key]: base[key] + 10 };
+    ok(powerScore(up) > s0, `${key} artınca skor artmalı`);
+  }
+  /* Sıfır stat → sıfır skor (bölme/NaN kazası olmasın). */
+  eq(powerScore({ attack: 0, defense: 0, maxHp: 0, maxMp: 0, dex: 0, sta: 0 }), 0, 'boş skor:');
+  /* Skor TAM SAYI olmalı — kesirli güç göstermek anlamsız. */
+  ok(Number.isInteger(s0), 'skor tam sayı olmalı');
+});
+
+test('§76 skor KALİBRASYONU uç noktaları tutuyor', () => {
+  /* Sv1 çıplak ≈ 50, Sv20 tam takım +8 ≈ 650k (kullanıcı hedefi).
+     Sapma payı geniş: eğri hissi taşır, ölçü değildir. */
+  const S1 = new PrototypeState(2800);
+  const f1 = S1.stats.finalStats();
+  const bare = powerScore({
+    attack: f1.attack, defense: f1.defense, maxHp: f1.maxHp, maxMp: f1.maxMp,
+    dex: S1.stats.effectiveDex(), sta: S1.stats.effectiveSta(),
+  });
+  ok(bare >= 40 && bare <= 90, `Sv1 çıplak skor ${bare} — 50 civarı beklenir`);
+  eq(POWER_SCORE_MIN, 50, 'hedef alt uç:');
+  ok(POWER_EXPONENT > 1, 'üs 1\'den büyük olmalı (üstel eğri)');
+  /* Biçimleme: büyük sayılar kısaltılır. */
+  eq(formatPower(650000), '650k', 'kısaltma:');
+  eq(formatPower(1500000), '1.50M', 'milyon kısaltma:');
+  eq(formatPowerDelta(100, 120), '+20', 'artış:');
+  eq(formatPowerDelta(120, 100), '-20', 'düşüş:');
+});
+
+test('§76 OTO GİY: yalnız skoru YÜKSELTEN eşya kuşanılır', () => {
+  const S = protoState(2801);
+  S.autoGear.settings.autoEquip = true;
+  /* Zayıf bir yay ekle — başlangıç yayından kötü olmalı. */
+  const weak = allDefinitions()
+    .filter((d) => d.category === 'weapon')
+    .sort((a, b) => a.stats.attack - b.stats.attack)[0]!;
+  const strong = allDefinitions()
+    .filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
+
+  const before = S.autoGear.score();
+  const weakAdd = S.inventory.add(weak.definitionRef, { upgradeLevel: 0 });
+  const weakEv = weakAdd.ok ? S.autoGear.tryUpgrade(weakAdd.instance.instanceId) : null;
+  /* Zayıf eşya kuşanılmışsa skoru DÜŞÜRMEMİŞ olmalı. */
+  if (weakEv !== null) ok(weakEv.scoreAfter > weakEv.scoreBefore, 'zayıf eşya skoru düşürdü');
+  ok(S.autoGear.score() >= before, 'oto giy skoru DÜŞÜRMEMELİ');
+
+  const mid = S.autoGear.score();
+  const strongAdd = S.inventory.add(strong.definitionRef, { upgradeLevel: 8 });
+  const ev = strongAdd.ok ? S.autoGear.tryUpgrade(strongAdd.instance.instanceId) : null;
+  ok(ev !== null, 'güçlü yay kuşanılmalıydı');
+  ok(ev!.scoreAfter > ev!.scoreBefore, 'skor artmalı');
+  ok(S.autoGear.score() > mid, 'toplam skor artmalı');
+});
+
+test('§77 KİLİT = KORUMA — kilitli eşya ASLA satılmaz', () => {
+  const S = protoState(2802);
+  const add = S.inventory.add(allDefinitions()[0]!.definitionRef, { upgradeLevel: 0 });
+  ok(add.ok, 'eşya eklenmeli');
+  const id = add.ok ? add.instance.instanceId : 0;
+  S.inventory.get(id)!.locked = true;
+  const coins = S.player.coins;
+  const r = S.autoGear.sell(id);
+  ok(!r.ok && r.reason === 'locked', 'kilitli eşya satılmamalı');
+  eq(S.player.coins, coins, 'altın değişmemeli:');
+  ok(S.inventory.get(id) !== undefined, 'eşya envanterde kalmalı');
+  ok(!S.autoGear.canAutoSell(id), 'oto satışa uygun görülmemeli');
+});
+
+test('§77 KUŞANILI eşya satılmaz', () => {
+  const S = protoState(2803);
+  const weapon = S.equipment.equippedInstance('weapon')!;
+  const r = S.autoGear.sell(weapon.instanceId);
+  ok(!r.ok && r.reason === 'equipped', 'kuşanılı eşya satılmamalı');
+  ok(S.equipment.equippedInstance('weapon') !== undefined, 'yay kuşanılı kalmalı');
+});
+
+test('§77 OTO SAT varsayılan KAPALI — eşya yok eden sistem sessizce açılmaz', () => {
+  eq(AUTO_GEAR_DEFAULTS.autoSell, false, 'oto sat varsayılanı:');
+  eq(AUTO_GEAR_DEFAULTS.autoEquip, true, 'oto giy varsayılanı:');
+  eq(AUTO_GEAR_DEFAULTS.protectConsumables, true, 'tüketilebilir koruması:');
+  const S = protoState(2804);
+  const r = S.autoGear.sellAllEligible();
+  eq(r.sold, 0, 'kapalıyken hiçbir şey satılmamalı:');
+});
+
+test('§77 ONAY KUYRUĞU: oto giy sonrası çıkan eşya SATILMAZ, bekler', () => {
+  const S = protoState(2805);
+  S.autoGear.settings.autoEquip = true;
+  S.autoGear.settings.autoSell = true;
+  S.autoGear.settings.sellBelowClass = 'UNIQUE';        // her şey satılabilir
+  const strong = allDefinitions()
+    .filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
+  const old = S.equipment.equippedInstance('weapon')!.instanceId;
+  const add = S.inventory.add(strong.definitionRef, { upgradeLevel: 8 });
+  const ev = add.ok ? S.autoGear.tryUpgrade(add.instance.instanceId) : null;
+  ok(ev !== null, 'güçlü yay kuşanılmalıydı');
+  eq(ev!.replacedInstanceId, old, 'çıkan eşya:');
+  /* KULLANICI KARARI: onay bekler, hemen satılmaz. */
+  ok(S.autoGear.isPending(old), 'çıkan eşya onay kuyruğunda olmalı');
+  const sweep = S.autoGear.sellAllEligible();
+  ok(S.inventory.get(old) !== undefined, `onay bekleyen eşya süpürmede satıldı (${sweep.sold})`);
+  /* Oyuncu "TUT" derse kuyruktan çıkar. */
+  S.autoGear.keep(old);
+  ok(!S.autoGear.isPending(old), 'TUT sonrası kuyrukta kalmamalı');
+});
+
+test('§77 satış fiyatı KAYNAKTAN türer, yükseltme fiyatı büyütür', () => {
+  const S = protoState(2806);
+  const def = allDefinitions().find((d) => Content.item(d.definitionRef)?.vendorBuy ?? 0 > 0)
+    ?? allDefinitions()[0]!;
+  const a0 = S.inventory.add(def.definitionRef, { upgradeLevel: 0 });
+  const a8 = S.inventory.add(def.definitionRef, { upgradeLevel: 8 });
+  if (!a0.ok || !a8.ok) return;
+  const p0 = S.autoGear.sellPrice(a0.instance);
+  const p8 = S.autoGear.sellPrice(a8.instance);
+  ok(p8 > p0, `+8 daha pahalı olmalı: ${p0} → ${p8}`);
+  /* Satış gerçekten altın veriyor mu? */
+  const before = S.player.coins;
+  const r = S.autoGear.sell(a0.instance.instanceId);
+  if (r.ok) {
+    eq(S.player.coins, before + r.coins, 'altın eklenmeli:');
+    eq(S.inventory.get(a0.instance.instanceId), undefined, 'satılan eşya gitmeli:');
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

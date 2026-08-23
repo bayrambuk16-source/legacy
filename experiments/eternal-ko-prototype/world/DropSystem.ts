@@ -86,6 +86,9 @@ export interface DropSystemDeps {
   ground: WorldLootSystem;
   /** Auto Loot açık mı? OYUNCU TERCİHİ — Genie durumundan bağımsız. */
   autoLoot: () => boolean;
+  /** P2.13 — envantere yeni eşya girdi. Oto giy kancası; bağlanmazsa
+   *  drop davranışı P2.12 ile birebir aynıdır. */
+  onItemAcquired?: (instanceId: number) => void;
 }
 
 /** Parşömen düşme şansı (mob başına). PROJECT LEGACY KARARI — kaynaktan
@@ -186,6 +189,10 @@ export class DropSystem {
       const add = this.deps.inventory.add(itemRef, { quantity });
       if (add.ok) {
         this.totals.toInventory += quantity;
+        /* P2.13 — OTO GİY. Düşen eşya güç skorunu yükseltiyorsa kuşanılır.
+           Karar `AutoGearSystem`e aittir; burada yalnız haber verilir.
+           Bağlı değilse (test kurulumları) hiçbir şey olmaz. */
+        this.deps.onItemAcquired?.(add.instance.instanceId);
         return {
           itemRef, itemName, quantity, kind: 'item', from,
           delivery: 'AUTO_INVENTORY', ownerPlayerId: owner, lootUid: null,
