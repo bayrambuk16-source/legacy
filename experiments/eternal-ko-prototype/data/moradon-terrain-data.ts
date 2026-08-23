@@ -6,7 +6,12 @@
 /** Izgara düğüm sayısı (kenar başına). */
 export const MORADON_GRID = 129;
 /** Düğüm aralığı, world birimi. */
-export const MORADON_NODE_STEP = 20;
+/** Düğüm aralığı, world birimi.
+ *  P2.19.1 — 20'den 40'a çıkarıldı. Harita ölçeği ikiye katlanınca
+ *  (P2.12) BU SABİT UNUTULMUŞTU: arazi 128 × 20 = 2560 birimi kaplıyor,
+ *  dünya ise 5120 idi. Haritanın yarısı arazisiz kalmıştı — zeminin
+ *  "olmaması" bundandı. Artık 128 × 40 = 5120, dünyayla birebir. */
+export const MORADON_NODE_STEP = 40;
 /** Yükseklik değerleri, satır-major (row = worldY/step, col = worldX/step),
  *  float32 little-endian, base64. Değerler WORLD birimindedir (×5 uygulanmış). */
 export const MORADON_HEIGHT_B64 =

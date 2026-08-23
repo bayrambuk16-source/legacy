@@ -201,6 +201,22 @@ export class PrototypeState {
     return res;
   }
 
+  /* ═══════════ P2.19.1 — SAVAŞTA YÖN HEDEFE KİLİTLİ ═══════════
+     Oyun testi bulgusu: karakter saldırırken bile Genie'nin döndüğü
+     yöne bakıyordu. Sebep: `facingAngle` YALNIZ hareket vektöründen
+     geliyordu; Genie farm merkezine yürüyünce yön oraya kayıyor ve
+     atış animasyonu bitince orada kalıyordu.
+
+     Kural: SEÇİLİ HEDEF VARSA yön hedefe bakar. Hareket yönü yalnız
+     hedefsizken geçerlidir. Bu bir GÖRÜNÜM kuralıdır — menzil, isabet
+     ve hasar yönden ETKİLENMEZ. */
+  faceTarget(target: WorldMob | null): void {
+    if (!target || target.hp <= 0) return;
+    const a = this.angleTo(target);
+    this.world.facingAngle = a;
+    this.anim.lockCombatFacing(a);
+  }
+
   /** Hedefe bakış açısı (yoksa mevcut yön korunur). */
   private angleTo(target: WorldMob | null): number {
     if (!target) return this.world.facingAngle;

@@ -33,7 +33,8 @@ import {
   canTraverse, isCellBlocked, isWalkable,
 } from '../data/moradon-walkmask.js';
 import { MORADON_HEIGHT_FIXTURE } from '../data/moradon-meta-data.js';
-import { groundElevationAt } from '../render3d/terrain.js';
+import { MORADON_TERRAIN_SPAN } from '../data/moradon-terrain.js';
+import { buildTerrainGeometry, groundElevationAt } from '../render3d/terrain.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
   hitTest as invHitTest, invButtons, invCloseButton, targetSlotFor,
@@ -10330,6 +10331,10 @@ test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () 
      `moradon-walkmask-data.ts`). Biri değişip diğeri kalırsa maske dünyayla
      hizasını kaybeder ve mob/bitki duvara doğar. Test bunu bağlar. */
   eq(MORADON_CELL_SIZE, KO_TO_WORLD_SCALE, 'hücre kenarı = dünya ölçeği:');
+  /* P2.19.1 — ARAZİ DE DÜNYAYI KAPSAMALI. Ölçek ikiye katlandığında
+     `MORADON_NODE_STEP` unutulmuştu: arazi 2560 birimi kaplıyor, dünya
+     5120 idi ve haritanın YARISI arazisiz kalıyordu. Test bunu bağlar. */
+  eq(MORADON_TERRAIN_SPAN, MORADON_WORLD_WIDTH, 'arazi kaplama = dünya genişliği:');
   eq(MORADON_MASK_CELLS * MORADON_CELL_SIZE, MORADON_WORLD_WIDTH, 'maske genişliği:');
   eq(WORLD_BOUNDS.width, MORADON_WORLD_WIDTH, 'sınır genişliği:');
   /* Kale yarıçapı haritanın beşte biri kalmalı (kullanıcı kararı). */
@@ -10857,6 +10862,71 @@ test('§83 kamera modu GAMEPLAY’i etkilemez', () => {
   ok(!/from\s+'three/.test(src), 'kamera modu three import etmemeli');
   ok(!/Math\.random/.test(src), 'Math.random kullanmamalı');
   ok(!/world\/|attackRange|aggro/.test(src), 'gameplay sistemine dokunmamalı');
+});
+
+test('§84 arazi mesh\'i UV TAŞIR — doku olmadan görünmez', () => {
+  /* Zemin dokusu atanıyordu ama görünmüyordu: `buildTerrainGeometry()`
+     UV üretmiyordu ve materyalin `map`i hiçbir şey yapmıyordu. */
+  const geo = buildTerrainGeometry();
+  const uv = geo.getAttribute('uv');
+  ok(uv !== undefined, 'UV attribute yok — doku görünmez');
+  const pos = geo.getAttribute('position')!;
+  eq(uv!.count, pos.count, 'UV sayısı verteks sayısıyla eşleşmeli:');
+  /* UV 0..1 aralığında olmalı; döşeme `Texture.repeat` ile yapılır. */
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < uv!.count * 2; i++) {
+    const v = (uv!.array as ArrayLike<number>)[i]!;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  ok(min >= 0 && max <= 1, `UV aralık dışı: ${min}..${max}`);
+  eq(min, 0, 'UV alt uç:');
+  eq(max, 1, 'UV üst uç:');
+});
+
+test('§85 SAVAŞTA YÖN HEDEFE KİLİTLİ — Genie yönüne dönmez', () => {
+  /* Oyun testi bulgusu: karakter saldırırken bile Genie'nin yürüdüğü
+     yöne bakıyordu. Hedef varken yön HEDEFE bakmalı. */
+  const S = protoState(3100);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 200, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  /* Önce ters yöne yürü — yön oraya kaysın. */
+  S.movement.move(S.world, { x: -1, y: 0, magnitude: 1 }, 0.5);
+  const away = S.world.facingAngle;
+  ok(Math.abs(Math.abs(away) - Math.PI) < 0.2, `ters yöne bakmalıydı: ${away.toFixed(2)}`);
+  /* Hedefe kilitle. */
+  S.faceTarget(mob as never);
+  ok(Math.abs(S.world.facingAngle) < 0.2, `hedefe dönmeliydi: ${S.world.facingAngle.toFixed(2)}`);
+  /* Atış animasyonu BİTTİKTEN sonra da hedefe bakmaya devam etmeli. */
+  ok(!S.anim.isActing, 'animasyon boşta olmalı');
+  ok(Math.abs(S.anim.angle) < 0.2, `kilit sonrası yön kaydı: ${S.anim.angle.toFixed(2)}`);
+  /* Kilit çözülünce hareket yönüne döner. `moveFacing` animasyon
+     katmanında güncellenir (`anim.update`), hareket sisteminde değil —
+     bu yüzden bir animasyon karesi ilerletilir. */
+  S.anim.releaseCombatFacing();
+  S.movement.move(S.world, { x: -1, y: 0, magnitude: 1 }, 0.2);
+  /* `moveFacing` animasyon katmanında güncellenir (hareket sisteminde
+     değil), bu yüzden bir kare ilerletilir. */
+  S.anim.update(1 / 60, true, S.world.travelled, S.world.facingAngle, true);
+  ok(Math.abs(Math.abs(S.anim.angle) - Math.PI) < 0.3,
+    `kilit çözülünce harekete dönmeli: ${S.anim.angle.toFixed(2)}`);
+});
+
+test('§85 yön GÖRÜNÜMDÜR — hasar ve menzil ETKİLENMEZ', () => {
+  const S = protoState(3101);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 100, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  /* Sırtı dönükken de saldırı kabul edilmeli (yön bir kapı DEĞİL). */
+  S.world.facingAngle = Math.PI;
+  const res = S.performBasic(mob as never);
+  ok(res.ok, 'yön saldırıyı engellememeli');
+  /* Ölü hedefe kilit UYGULANMAZ. */
+  const before = S.world.facingAngle;
+  mob.hp = 0;
+  S.faceTarget(mob as never);
+  eq(S.world.facingAngle, before, 'ölü hedefe dönmemeli:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

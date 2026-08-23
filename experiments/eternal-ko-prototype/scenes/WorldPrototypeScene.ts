@@ -1179,6 +1179,17 @@ export class WorldPrototypeScene implements Scene {
       this.movementSource = 'NONE';
       this.S.movement.move(this.S.world, mv, dt);      // moving=false için
     }
+    /* P2.19.1 — SAVAŞTA YÖN HEDEFE KİLİTLİ. Hareketten SONRA uygulanır:
+       hareket sistemi `facingAngle`i vektörden yazar, hedef varsa onu
+       hedefe çeviririz. Hedef yoksa kilit çözülür ve yön yine harekete
+       döner. */
+    {
+      const t = this.S.targets.current(this.ents(), this.S.world.worldX, this.S.world.worldY, {
+        pickRadius: this.S.ranges.pickRadius, dropDistance: this.S.ranges.targetDropDistance,
+      });
+      if (t) this.S.faceTarget(t);
+      else this.S.anim.releaseCombatFacing();
+    }
     this.S.player.update(dt);
     this.S.updateInfiniteMp();      // TEST: sonsuz MP (varsayılan kapalı)
     this.S.combat.update(dt);

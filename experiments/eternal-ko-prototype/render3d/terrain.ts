@@ -37,12 +37,20 @@ export function buildTerrainGeometry(): BufferGeometry {
   const n = MORADON_GRID;
   const step = MORADON_NODE_STEP;
   const positions = new Float32Array(n * n * 3);
+  /* P2.19.1 — UV KOORDİNATI. Bunlar olmadan materyalin `map`i hiçbir şey
+     yapmaz: zemin dokusu atanıyor ama görünmüyordu. UV 0..1 aralığında
+     bütün araziyi kaplar; döşeme sayısı `Texture.repeat` ile ayarlanır
+     (bkz. `ThreeWorldRenderer.applyGroundTexture`). */
+  const uvs = new Float32Array(n * n * 2);
   for (let row = 0; row < n; row++) {
     for (let col = 0; col < n; col++) {
       const i = (row * n + col) * 3;
       positions[i] = col * step;                       // world X
       positions[i + 1] = terrainNodeHeight(col, row);  // yükseklik (Y-up)
       positions[i + 2] = row * step;                   // world Y → sahne Z
+      const u = (row * n + col) * 2;
+      uvs[u] = col / (n - 1);
+      uvs[u + 1] = row / (n - 1);
     }
   }
   const quads = (n - 1) * (n - 1);
@@ -57,6 +65,7 @@ export function buildTerrainGeometry(): BufferGeometry {
   }
   const geo = new BufferGeometry();
   geo.setAttribute('position', new BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new BufferAttribute(uvs, 2));
   geo.setIndex(new BufferAttribute(indices, 1));
   geo.computeVertexNormals();
   geo.computeBoundingSphere();

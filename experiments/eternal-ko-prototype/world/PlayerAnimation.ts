@@ -93,8 +93,19 @@ export class PlayerAnimator {
   /** Oynatılan atlas klibi. */
   get clip(): ArcherClip { return STATE_CLIP[this.stateValue]; }
 
-  /** Çizimde kullanılacak bakış açısı: saldırıda HEDEF, aksi halde HAREKET. */
-  get angle(): number { return this.isActing ? this.aimFacing : this.moveFacing; }
+  /** P2.19.1 — SAVAŞ KİLİDİ. Hedef seçiliyken yön hedefe bakar; atış
+   *  animasyonu bitince hareket yönüne DÖNMEZ. `null` = kilit yok. */
+  private combatLock: number | null = null;
+
+  lockCombatFacing(angle: number): void { this.combatLock = angle; }
+  releaseCombatFacing(): void { this.combatLock = null; }
+
+  /** Çizimde kullanılacak bakış açısı.
+   *  Sıra: saldırı anı → savaş kilidi → hareket yönü. */
+  get angle(): number {
+    if (this.isActing) return this.aimFacing;
+    return this.combatLock ?? this.moveFacing;
+  }
   get movementFacing(): number { return this.moveFacing; }
   get combatFacing(): number { return this.aimFacing; }
 
@@ -286,6 +297,7 @@ export class PlayerAnimator {
     this.dead = false;
     this.moveFacing = 0;
     this.aimFacing = 0;
+    this.combatLock = null;
     this.deathX = null;
     this.deathY = null;
     this.triggers.attack = 0;

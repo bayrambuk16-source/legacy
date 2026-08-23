@@ -22,17 +22,21 @@ export const MORADON_OBJECT_EVENTS = [
 
 /** TEST REFERANSI — doğrudan kaynak GLB vertekslerinden alınmış ızgara düğümü
  *  yükseklikleri. `heightAt()` bunlarla BİT DÜZEYİNDE eşleşmelidir. */
+/* P2.19.1 — KOORDİNATLAR ×2. Harita ölçeği ikiye katlandığında (P2.12)
+   `MORADON_NODE_STEP` de 20'den 40'a çıktı. Fixture "şu IZGARA DÜĞÜMÜ şu
+   world noktasında ve şu yükseklikte" der; düğümler ve YÜKSEKLİKLER
+   değişmedi, yalnız world karşılıkları iki katına çıktı. */
 export const MORADON_HEIGHT_FIXTURE = [
   { worldX: 0, worldY: 0, height: 5.877471754111438e-38 },
-  { worldX: 60, worldY: 60, height: 5.513169288635254 },
-  { worldX: 800, worldY: 200, height: 5.687803268432617 },
-  { worldX: 1280, worldY: 640, height: -12.809043884277344 },
-  { worldX: 1760, worldY: 880, height: 8.058695793151855 },
-  { worldX: 1280, worldY: 1280, height: 36.09010314941406 },
-  { worldX: 900, worldY: 1400, height: 5.513169288635254 },
-  { worldX: 1520, worldY: 1760, height: 43.57904052734375 },
-  { worldX: 400, worldY: 2000, height: 5.513169288635254 },
-  { worldX: 2200, worldY: 2200, height: 85.74927520751953 },
-  { worldX: 2560, worldY: 2560, height: 85.74927520751953 },
-  { worldX: 0, worldY: 1280, height: -53.88268280029297 },
+  { worldX: 120, worldY: 120, height: 5.513169288635254 },
+  { worldX: 1600, worldY: 400, height: 5.687803268432617 },
+  { worldX: 2560, worldY: 1280, height: -12.809043884277344 },
+  { worldX: 3520, worldY: 1760, height: 8.058695793151855 },
+  { worldX: 2560, worldY: 2560, height: 36.09010314941406 },
+  { worldX: 1800, worldY: 2800, height: 5.513169288635254 },
+  { worldX: 3040, worldY: 3520, height: 43.57904052734375 },
+  { worldX: 800, worldY: 4000, height: 5.513169288635254 },
+  { worldX: 4400, worldY: 4400, height: 85.74927520751953 },
+  { worldX: 5120, worldY: 5120, height: 85.74927520751953 },
+  { worldX: 0, worldY: 2560, height: -53.88268280029297 },
 ] as const;
