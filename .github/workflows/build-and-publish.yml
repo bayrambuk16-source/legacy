@@ -1,1 +1,40 @@
-
+﻿name: build-and-publish
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bagimliliklar
+        run: npm install --ignore-scripts=false
+      - name: Vendor bagla
+        run: node tools/link-vendor.mjs
+      - name: Tip kontrolu
+        run: npx tsc -p tsconfig.proto.json
+      - name: Testler
+        run: npx tsx experiments/eternal-ko-prototype/tests/run.ts
+      - name: Derle
+        run: node tools/build.mjs --entry experiments/eternal-ko-prototype/main.ts --out dist/eternal-ko.js --preview dist/index.html --manifest experiments/eternal-ko-prototype/data/proto-assets.ts --title "Project Legacy"
+      - name: Yayin klasoru
+        run: mkdir -p _site && cp dist/index.html _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
