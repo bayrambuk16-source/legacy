@@ -95,9 +95,14 @@ export const BURST_RANGES = [140, 180, 240, 300, 380];
 
 export const GENIE_DEFAULTS: GenieSettings = {
   attackRange: 450,
-  farmBoundaryEnabled: true,
+  /* P2.10 — FARM ÇEMBERİ VARSAYILAN OLARAK KAPALI.
+     Moradon artık haritanın tamamına yayılmış 23 slot taşıyor; 650 birimlik
+     bir çember oyuncuyu doğuş köşesine hapsediyordu. Sınır sistemi
+     SİLİNMEDİ — DEV panelinden açılabilir ve dar bir alanda farm etmek
+     isteyen için hâlâ çalışır. */
+  farmBoundaryEnabled: false,
   farmBoundaryRadius: 650,
-  showFarmBoundary: true,
+  showFarmBoundary: false,
   targetPriority: 'nearest',
   hpPotionRef: DEFAULT_HP_POTION_REF,
   hpThresholdPct: 0.4,

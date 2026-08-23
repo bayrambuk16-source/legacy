@@ -16,7 +16,8 @@
  *  Moradon'da `canTraverse()`ye (supercover, endpoint-only DEĞİL), test
  *  dünyasında sabit `true`ya çözülür. */
 import type { Obstacle, WorldBounds } from '../world/types.js';
-import { MORADON_WORLD_BOUNDS, MORADON_WORLD_SPAWN } from './moradon-coords.js';
+import { MORADON_WORLD_BOUNDS } from './moradon-coords.js';
+import { MORADON_PLAY_SPAWN } from './moradon-farm-slots.js';
 import { canTraverse, isInsidePlayableArea } from './moradon-walkmask.js';
 
 /** Aktif harita. 'test' yapılırsa P1.6 dünyası aynen geri gelir. */
@@ -93,11 +94,16 @@ export const WORLD_BOUNDS: WorldBounds =
     : TEST_WORLD_BOUNDS;
 
 /** Aktif doğuş noktası.
- *  Moradon'da KAYNAK: `start_positions` zone 21 → KO 306/352 → world 1530/1760.
- *  Bu KAPANMIŞ bir karardır; `regene0` ilk doğuş adayı DEĞİLDİR (P2.4D). */
+ *
+ *  P2.10 — MORADON'DA OYNANIŞ DEĞERİ KULLANILIR (`MORADON_PLAY_SPAWN`,
+ *  güneybatı köşesi), kaynak değeri (`MORADON_WORLD_SPAWN`, KO 306/352)
+ *  DEĞİL. Bu bilinçli bir override'dır: oyuncu köşeden başlayıp haritanın
+ *  içine ilerlesin, seviye gradyanı kurulabilsin diye. Kaynak sabiti
+ *  `moradon-coords.ts` içinde yerinde duruyor ve KO'nun ne dediğini
+ *  söylemeye devam ediyor. */
 export const SPAWN_POINT =
   ACTIVE_MAP === 'moradon'
-    ? { x: MORADON_WORLD_SPAWN.x, y: MORADON_WORLD_SPAWN.y }
+    ? { x: MORADON_PLAY_SPAWN.x, y: MORADON_PLAY_SPAWN.y }
     : TEST_SPAWN_POINT;
 
 /** Aktif dairesel engeller. Moradon'da BOŞ — engel authority'si maskededir. */

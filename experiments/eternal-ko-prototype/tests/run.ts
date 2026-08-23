@@ -56,7 +56,9 @@ import {
   ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN, applyZoom, clampZoom, pinchDistance, pinchZoom,
 } from '../ui/camera-zoom.js';
 import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
-import { MORADON_POPULATION, MORADON_RESPAWN_SEC } from '../data/moradon-farm-slots.js';
+import {
+  KEEP_RADIUS, MORADON_PLAY_SPAWN, MORADON_POPULATION, MORADON_RESPAWN_SEC, SLOT_RECT,
+} from '../data/moradon-farm-slots.js';
 import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
 import { UI_ASSETS } from '../data/proto-assets.js';
 /* MORADON_WORLD_SPAWN ve SPAWN_POINT dosyanın ilerisinde ZATEN import edilir
@@ -1505,6 +1507,7 @@ test('Genie: GERÇEK mob üzerinde Set 2 → Set 1 geçişi mesafeyle çalışı
 
 test('Genie: GERÇEK mob hem Attack Range hem Farm Boundary kuralına tabidir', () => {
   const S = protoState(67);
+  S.genie.settings.farmBoundaryEnabled = true;        // P2.10: varsayılan kapalı
   const mob = staticMob(S, { offsetX: 0, hp: 1e12 });
   S.genie.start(S.world);
   eq(S.genie.canTarget(mob as never, S.world), true, 'yanındayken hedeflenebilir:');
@@ -1673,9 +1676,12 @@ test('Farm Boundary KAPALIYKEN yalnız Attack Range geçerlidir', () => {
   eq(S.genie.canTarget(far as never, S.world), true, 'yaklaşınca hedeflenebilir:');
 });
 
+/* P2.10 — farm çemberi varsayılan olarak KAPALI. Sistem duruyor ve DEV
+   panelinden açılabiliyor; aşağıdaki testler onu AÇIKÇA açar. */
 test('hedef Farm Boundary dışına KAÇARSA Genie kovalamayı bırakır', () => {
   const S = protoState(75);
   S.mobs.mobs.length = 0;
+  S.genie.settings.farmBoundaryEnabled = true;      // P2.10: varsayılan kapalı
   S.genie.settings.farmBoundaryRadius = 500;
   const mob = mockMob(S.world.worldX + 80, S.world.worldY, 40, 999999);
   S.mobs.mobs.push(mob as never);
@@ -1708,8 +1714,10 @@ test('menzil seçenekleri ve varsayılanlar', () => {
   eq(FARM_BOUNDARY_RANGES.join(','), '350,500,650,800,1000', 'Farm Boundary seçenekleri:');
   eq(GENIE_DEFAULTS.attackRange, 450, 'varsayılan Attack Range:');
   eq(GENIE_DEFAULTS.farmBoundaryRadius, 650, 'varsayılan Farm Boundary:');
-  eq(GENIE_DEFAULTS.farmBoundaryEnabled, true, 'sınır açık:');
-  eq(GENIE_DEFAULTS.showFarmBoundary, true, 'sınır görünür:');
+  /* P2.10 — çember VARSAYILAN OLARAK KAPALI: Moradon haritaya yayıldı,
+     650 birimlik çember oyuncuyu köşeye hapsediyordu. Sistem duruyor. */
+  eq(GENIE_DEFAULTS.farmBoundaryEnabled, false, 'sınır varsayılan kapalı:');
+  eq(GENIE_DEFAULTS.showFarmBoundary, false, 'halka varsayılan gizli:');
 });
 
 test('KABUL SENARYOSU: Attack 450 + Boundary 650', () => {
@@ -4527,6 +4535,7 @@ console.log('\n[P1.5] farm boundary:');
 
 test('§28 boundary DIŞINDAKİ mob 250 birimde bile hedeflenmez', () => {
   const S = farmRig(608, 200);                          // küçük sınır
+  S.genie.settings.farmBoundaryEnabled = true;          // P2.10: açıkça aç
   const mob = addMob(S, 250, 0);                        // oyuncuya yakın, sınır DIŞI
   S.genie.start(S.world);
   const out = farmRun(S, 2.0);
@@ -4854,8 +4863,8 @@ test('§2 profiller: TEK durum makinesi, ÜÇ parametre seti', () => {
 test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİR', () => {
   /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
      Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
-  eq(FARM_AREA_SLOTS.length, 10, 'slot sayısı:');
-  eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, 10, 'id benzersiz:');
+  eq(FARM_AREA_SLOTS.length, 23, 'slot sayısı:');
+  eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, FARM_AREA_SLOTS.length, 'id benzersiz:');
   for (const s of FARM_AREA_SLOTS) {
     ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
     const p = slotPlacement(s);
@@ -5546,6 +5555,7 @@ test('ölü/dying moba gelen ikinci ok targetDead döner, HP\'ye dokunmaz', () =
 
 test('CANLI boundary küçültme: hedef düşer, oyuncu sınır DIŞINA çıkmaz', () => {
   const S = farmRig(1750, 650);
+  S.genie.settings.farmBoundaryEnabled = true;        // P2.10: varsayılan kapalı
   S.tuning.set('playerSpeed', 120);
   const mob = addMob(S, 300, 0, 1e12);
   S.genie.start(S.world);
@@ -8611,8 +8621,8 @@ test('P2.4C — AKTİF HARİTA MORADON, arşiv dünyası KORUNDU', () => {
      arşiv dünyasının kaybolmadığını göstermektir. */
   eq(WORLD_BOUNDS.width, MORADON_WORLD_BOUNDS.width, 'aktif WORLD_BOUNDS genişlik:');
   eq(WORLD_BOUNDS.height, MORADON_WORLD_BOUNDS.height, 'aktif WORLD_BOUNDS yükseklik:');
-  eq(SPAWN_POINT.x, MORADON_WORLD_SPAWN.x, 'aktif SPAWN_POINT X:');
-  eq(SPAWN_POINT.y, MORADON_WORLD_SPAWN.y, 'aktif SPAWN_POINT Y:');
+  eq(SPAWN_POINT.x, MORADON_PLAY_SPAWN.x, 'aktif SPAWN_POINT X:');
+  eq(SPAWN_POINT.y, MORADON_PLAY_SPAWN.y, 'aktif SPAWN_POINT Y:');
   /* Arşiv dünyası yerinde: anahtar geri çevrilirse aynen döner. */
   eq(TEST_WORLD_BOUNDS.width, 2480, 'arşiv genişlik:');
   eq(TEST_WORLD_BOUNDS.height, 3300, 'arşiv yükseklik:');
@@ -8623,7 +8633,7 @@ test('P2.4C — AKTİF HARİTA MORADON, arşiv dünyası KORUNDU', () => {
   eq(S.world.worldY, TEST_SPAWN_POINT.y, 'enjekte dünyanın spawn Y\'i:');
   /* Varsayılan (enjeksiyonsuz) durum CANLI dünyayı kullanır. */
   const live = new PrototypeState(2441);
-  eq(live.world.worldX, MORADON_WORLD_SPAWN.x, 'varsayılan durum Moradon\'da doğar:');
+  eq(live.world.worldX, MORADON_PLAY_SPAWN.x, 'varsayılan durum köşede doğar:');
   eq(S.mobs.mobs.length, 8, 'farm slotları DEĞİŞMEDİ:');
 });
 
@@ -8632,7 +8642,7 @@ test('Moradon koordinat katmanı YALNIZ harita anahtarından okunur', () => {
      bağlanmamıştı). P2.4C'de TEK bir dosya import eder: harita anahtarının
      kendisi (`world-map.ts`). Gameplay otoriteleri hâlâ okuyamaz — koordinat
      temeli tek bir kapıdan girer. */
-  const ALLOWED = ['world-map.ts'];
+  const ALLOWED = ['world-map.ts', 'moradon-farm-slots.ts'];
   const base = join(PROTO_ROOT);
   const offenders: string[] = [];
   const scan = (dir: string): void => {
@@ -9252,46 +9262,69 @@ test('§50 harita anahtarı MORADON — sınır, doğuş, engel authority’si',
   eq(ACTIVE_MAP, 'moradon', 'aktif harita:');
   eq(WORLD_BOUNDS.width, 2560, 'dünya genişliği:');
   eq(WORLD_BOUNDS.height, 2560, 'dünya yüksekliği:');
-  eq(SPAWN_POINT.x, MORADON_WORLD_SPAWN.x, 'doğuş X:');
-  eq(SPAWN_POINT.y, MORADON_WORLD_SPAWN.y, 'doğuş Y:');
+  /* P2.10 — doğuş OYNANIŞ değeridir (güneybatı köşesi), kaynak değeri
+     (`MORADON_WORLD_SPAWN`) yerinde durur ama artık kullanılmaz. */
+  eq(SPAWN_POINT.x, MORADON_PLAY_SPAWN.x, 'doğuş X:');
+  eq(SPAWN_POINT.y, MORADON_PLAY_SPAWN.y, 'doğuş Y:');
+  ok(MORADON_WORLD_SPAWN.x === 1530, 'kaynak değeri korunmalı');
   /* İKİ engel sistemi AYNI ANDA çalışmaz: Moradon'da authority maskededir,
      dairesel engel listesi BOŞ olmalı. */
   eq(ACTIVE_OBSTACLES.length, 0, 'Moradon’da dairesel engel:');
 });
 
-test('§50 farm slotları YÜRÜNEBİLİR ve doğuşla AYNI bileşende', () => {
-  const cs = MORADON_CELL_SIZE;
-  const n = MORADON_MASK_CELLS;
-  /* Doğuştan erişilebilir hücreler (4-bağlantı). */
-  const seen = new Uint8Array(n * n);
-  const start = Math.floor(SPAWN_POINT.y / cs) * n + Math.floor(SPAWN_POINT.x / cs);
-  const queue = [start];
-  seen[start] = 1;
-  for (let i = 0; i < queue.length; i++) {
-    const k = queue[i]!;
-    const gx = k % n, gy = (k - gx) / n;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const nx = gx + dx, ny = gy + dy;
-      if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
-      const nk = ny * n + nx;
-      if (seen[nk] || isCellBlocked(nx, ny)) continue;
-      seen[nk] = 1; queue.push(nk);
+test('§50 farm slotları YÜRÜNEBİLİR, KALE ALANI dışında, SEVİYE artan', () => {
+  /* P2.10 — collision engelleri kapalı olduğu için "aynı bileşen" ölçüsü
+     artık ayırt edici değil; yerine üç gerçek kural sınanır. */
+  for (const slot of FARM_AREA_SLOTS) {
+    const p = slotPlacement(slot);
+    /* 1) Dikdörtgenin DÖRT köşesi de açık — duvarlar geri açılsa bile. */
+    for (const [x, y] of [[p.minX, p.minY], [p.maxX - 1, p.minY],
+      [p.minX, p.maxY - 1], [p.maxX - 1, p.maxY - 1]] as const) {
+      ok(isWalkable(x, y), `${slot.id} köşesi kapalı: ${x},${y}`);
+    }
+    /* 2) KALE ALANI: doğuş çevresinde mob YOK. */
+    const d = Math.hypot(slot.homeX - MORADON_PLAY_SPAWN.x, slot.homeY - MORADON_PLAY_SPAWN.y);
+    ok(d >= KEEP_RADIUS, `${slot.id} kale alanında (${Math.round(d)} < ${KEEP_RADIUS})`);
+  }
+  /* 3) SEVİYE GRADYANI: uzaklaştıkça mob seviyesi artmalı. En yakın üç
+     slotun ortalama seviyesi, en uzak üçünkinden DÜŞÜK olmalı. */
+  const withLevel = FARM_AREA_SLOTS.map((s) => ({
+    d: Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y),
+    level: Content.monster(s.monsterRef)!.level,
+  })).sort((a, b) => a.d - b.d);
+  const avg = (xs: number[]): number => xs.reduce((t, v) => t + v, 0) / xs.length;
+  const near = avg(withLevel.slice(0, 3).map((x) => x.level));
+  const far = avg(withLevel.slice(-3).map((x) => x.level));
+  ok(far > near * 2, `gradyan zayıf: yakın ${near.toFixed(1)} · uzak ${far.toFixed(1)}`);
+});
+
+test('§50 slotlar haritaya YAYILMIŞ ve birbirinden AYRIK', () => {
+  /* Çember kaldırıldı: slotlar doğuşun etrafında toplanmamalı. */
+  const ds = FARM_AREA_SLOTS.map((s) =>
+    Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y));
+  ok(Math.max(...ds) > 2000, `en uzak slot yalnız ${Math.round(Math.max(...ds))} birimde`);
+  /* Dikdörtgenler ÇAKIŞMAMALI — mob başka slotun alanında doğmasın. */
+  for (let i = 0; i < FARM_AREA_SLOTS.length; i++) {
+    for (let j = i + 1; j < FARM_AREA_SLOTS.length; j++) {
+      const a = slotPlacement(FARM_AREA_SLOTS[i]!), b = slotPlacement(FARM_AREA_SLOTS[j]!);
+      const over = a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+      ok(!over, `${FARM_AREA_SLOTS[i]!.id}/${FARM_AREA_SLOTS[j]!.id} dikdörtgenleri çakışıyor`);
     }
   }
+  /* Slot içi mobların ARASI açık olmalı: dikdörtgen kenarı / hücre sayısı. */
   for (const slot of FARM_AREA_SLOTS) {
-    ok(isWalkable(slot.homeX, slot.homeY), `${slot.id} ev noktası kapalı hücrede`);
-    ok(seen[Math.floor(slot.homeY / cs) * n + Math.floor(slot.homeX / cs)] === 1,
-      `${slot.id} doğuş noktasından ERİŞİLEMEZ`);
+    const p = slotPlacement(slot);
+    const pts = Array.from({ length: p.count }, (_, i) => instanceSpawnPoint(slot, i, 1));
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        ok(Math.hypot(pts[i]!.x - pts[j]!.x, pts[i]!.y - pts[j]!.y) > 25,
+          `${slot.id}: ${i}/${j} örnekleri dip dibe`);
+      }
+    }
   }
-  /* P1.6 kuralı korunmalı: aggroRadius + roamRadius < ev–doğuş mesafesi. */
-  for (const slot of FARM_AREA_SLOTS) {
-    if (slot.aiType === 'NORMAL') continue;
-    const d = Math.hypot(slot.homeX - SPAWN_POINT.x, slot.homeY - SPAWN_POINT.y);
-    const reach = (slot.aggroRadius ?? MOB_AI_PROFILES[slot.aiType].aggroRadius)
-      + (slot.roamRadius ?? MOB_AI_PROFILES[slot.aiType].roamRadius);
-    ok(reach < d, `${slot.id} doğuş noktasını kapsıyor (${reach} >= ${Math.round(d)})`);
-  }
+  eq(SLOT_RECT, 200, 'slot dikdörtgen kenarı:');
 });
+
 
 test('§50 adım kapısı TEK ve oyuncu/mob için AYNI', () => {
   /* Kaynak taraması: iki sistem de `worldStepAllowed` almalı, kendi
@@ -9724,7 +9757,7 @@ console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
 
 test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
   const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
-  eq(S.mobs.slotConfigs().length, 10, 'canlı slot sayısı:');
+  eq(S.mobs.slotConfigs().length, 23, 'canlı slot sayısı:');
   eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
   ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
   /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */

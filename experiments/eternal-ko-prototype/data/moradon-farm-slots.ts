@@ -1,104 +1,115 @@
-/** MORADON FARM SLOTLARI — KANONİK ÇOK-MOBLU (P2.9)
+/** MORADON YERLEŞİMİ — KÖŞE DOĞUŞ + HARİTAYA YAYILMIŞ SLOTLAR (P2.10)
  *
- *  ══════════════ P2.4B SÖZLEŞMESİ CANLI OYUNDA ══════════════
- *  Bu tablo, P2.4B'de kurulup yalnız test fixture'ında kanıtlanan kanonik
- *  slot sistemini CANLI oyuna getirir:
+ *  ══════════════ DOĞUŞ NOKTASI BİLİNÇLİ OLARAK TAŞINDI ══════════════
+ *  P2.4C'de doğuş `start_positions` kaynağından türetilmişti (KO 306/352 →
+ *  world 1530/1760) ve "kapanmış karar" diye işaretlenmişti. P2.10'da bu
+ *  karar OYNANIŞ GEREKÇESİYLE değiştirildi: doğuş haritanın GÜNEYBATI
+ *  köşesine alındı. Sebep — oyuncu bir köşeden başlayıp haritanın içine
+ *  doğru ilerlemeli; merkezden başlayınca her yön aynı oluyor ve seviye
+ *  gradyanı kurulamıyor. Köşe ileride KALE olacak.
  *
- *      1 SLOT = 1 MOB TÜRÜ + 1 DİKDÖRTGEN + 5..8 BAĞIMSIZ ÖRNEK
+ *  Kaynak değer SİLİNMEDİ: `MORADON_WORLD_SPAWN` (moradon-coords.ts) yerinde
+ *  duruyor ve KO'nun ne dediğini söylemeye devam ediyor. Buradaki değer
+ *  Project Legacy'nin OYNANIŞ kararıdır; ikisi AYRI kavramdır.
  *
- *  Her örneğin kendi uid'i, generation'ı, HP'si, konumu, AI durumu ve KENDİ
- *  respawn sayacı vardır. Bir örneğin ölümü slotu sıfırlamaz.
+ *  ══════════════ KALE ALANI — MOB YOK ══════════════
+ *  Doğuş çevresinde `KEEP_RADIUS` kadar mob YOKTUR. Yarıçap haritanın beşte
+ *  biridir (2560 / 5 ≈ 512) — kullanıcı kararı. Yeni oyuncu üstüne mob
+ *  gelmeden nefes alır; ileride kale yapıları bu alana kurulur.
  *
- *  ══════════════ DİKDÖRTGENLER ELLE SEÇİLMEDİ ══════════════
- *  Yürünebilirlik maskesi taranarak bulundu: her dikdörtgenin 70×70 world
- *  birimlik alanının TAMAMI doğuş noktasından erişilebilir açık hücredir.
- *  Merkezler birbirinden en az 140 birim ayrıktır — slotlar dip dibe değildir.
- *  Hepsi Genie'nin varsayılan Farm Boundary yarıçapının (650) yakınındadır;
- *  en uzağı 683 birimdedir ve DEV panelinden yarıçap büyütülebilir.
+ *  ══════════════ SEVİYE GRADYANI MESAFEDEN TÜRER ══════════════
+ *  Slotlar doğuşa uzaklığa göre sıralanır ve 11 mob türü seviye sırasına
+ *  göre bu sıraya dağıtılır: en yakın slotta Sv1, en uzakta Sv15.
  *
- *  ══════════════ RESPAWN 20 SANİYE ══════════════
- *  `respawnSec` her slotta 20'dir ve artık gerçekten OKUNUR: P2.4D'nin
- *  "KAPI 1"i açıldı — `PrototypeState` DEV ezmesini (`respawnOverrideSec`)
- *  artık varsayılan olarak KURMUYOR, dolayısıyla slot değeri geçerli.
+ *  ══════════════ YERLEŞİM "NİZAMİ" DEĞİLDİR ══════════════
+ *  Dikdörtgenler ızgaraya dizilmedi. Aday havuzu TOHUMLU bir karıştırmayla
+ *  tarandı ve aralarında en az 300 birim bulunanlar seçildi. Tohum sabit
+ *  olduğu için yerleşim her derlemede AYNIDIR (test edilebilir), ama gözle
+ *  bakınca düzensiz görünür.
  *
- *  ══════════════ DOĞUŞ NOKTASI TEKRAR ETMEZ ══════════════
- *  Örnek `(slotId, instanceIndex, generation)` üçlüsünden deterministik bir
- *  noktada doğar. Generation her respawn'da arttığı için mob AYNI YERE
- *  düşmez; kendi hücresinde birkaç birim kayar. Bu P2.4B'de kurulmuştu ama
- *  legacy tekil slotlarda dikdörtgen tek noktaya çöktüğü için görünmüyordu. */
+ *  ══════════════ DİKDÖRTGENLER TAMAMEN AÇIK ══════════════
+ *  Her slotun 200×200'lük alanının TAMAMI collision maskesine göre açıktır.
+ *  Engeller şu an kapalı olsa bile (`MORADON_COLLISION_ACTIVE = false`) bu
+ *  kural korundu: duvarlar geri açıldığında hiçbir mob duvarda kalmaz. */
 
 import { defineMobSlot, type MobSpawnSlot } from './mob-slot-schema.js';
 
-/** Bütün slotların respawn süresi (sn) — kullanıcı kararı. */
+/** OYNANIŞ doğuş noktası — güneybatı köşesi. Kaynak değeri EZMEZ. */
+export const MORADON_PLAY_SPAWN = { x: 340, y: 2220 } as const;
+
+/** Kale alanı yarıçapı — bu mesafede mob YOK. */
+export const KEEP_RADIUS = 512;
+
+/** Slot dikdörtgeninin kenarı. 200 birim: 5-8 mob içeride birbirine
+ *  yapışmadan dağılır (hücre ızgarası 3×3 → hücre başına ~66 birim). */
+export const SLOT_RECT = 200;
+
+/** Respawn süresi (sn) — kullanıcı kararı. */
 export const MORADON_RESPAWN_SEC = 20;
 
 const SMALL = { sheet: 'kurt', tint: '#e8e0d0', scale: 0.52 } as const;
 const SWAMP = { sheet: 'kurt', tint: '#9fb08a', scale: 0.62 } as const;
 const BOSS = { sheet: 'kurt', tint: '#c9a05a', scale: 0.78 } as const;
 
-/** Dikdörtgen + tür + population. Sıra doğuş noktasına yakınlıktandır:
- *  ilk slotlar yakın ve zayıf, son slotlar uzak ve güçlü. */
-export const MORADON_FARM_SLOTS: readonly MobSpawnSlot[] = [
-  /* ---- YAKIN (2) — düşük seviye, NORMAL ---- */
-  defineMobSlot({
-    id: 'mo_01', displayName: 'Toprak Solucanı', monsterRef: 750,
-    area: { minX: 1620, maxX: 1690, minY: 1660, maxY: 1730 }, count: 5,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 30, visual: SMALL,
-  }),
-  defineMobSlot({
-    id: 'mo_02', displayName: 'Çalı Sıçanı', monsterRef: 850,
-    area: { minX: 1430, maxX: 1500, minY: 1850, maxY: 1920 }, count: 5,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 30, visual: SMALL,
-  }),
+interface Placement {
+  x: number; y: number; ref: number; count: number; name: string;
+  ai: 'NORMAL' | 'AGGRESSIVE' | 'ELITE';
+  art: { sheet: 'kurt'; tint: string; scale: number };
+}
 
-  /* ---- ORTA (4) ---- */
-  defineMobSlot({
-    id: 'mo_03', displayName: 'Yaban Sıçanı', monsterRef: 851,
-    area: { minX: 1310, maxX: 1380, minY: 1930, maxY: 2000 }, count: 6,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 30, visual: SMALL,
-  }),
-  /* İLK SALDIRGAN SLOT — doğuş noktasına 277 birim. P1.6 kuralı korunur:
-     aggroRadius + roamRadius < ev–doğuş mesafesi (150 + 30 = 180 < 277). */
-  defineMobSlot({
-    id: 'mo_04', displayName: 'Kan Solucanı', monsterRef: 752,
-    area: { minX: 1710, maxX: 1780, minY: 1550, maxY: 1620 }, count: 5,
-    aiType: 'AGGRESSIVE', respawnSec: MORADON_RESPAWN_SEC,
-    aggroRadius: 150, roamRadius: 30, visual: SMALL,
-  }),
-  defineMobSlot({
-    id: 'mo_05', displayName: 'Leş Böceği', monsterRef: 754,
-    area: { minX: 1340, maxX: 1410, minY: 2070, maxY: 2140 }, count: 6,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: SWAMP,
-  }),
-  defineMobSlot({
-    id: 'mo_06', displayName: 'Yamyam Goblin', monsterRef: 150,
-    area: { minX: 1850, maxX: 1920, minY: 1520, maxY: 1590 }, count: 6,
-    aiType: 'AGGRESSIVE', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: SWAMP,
-  }),
+/** Ham yerleşim — maske taramasının çıktısı. `x`/`y` dikdörtgenin SOL ÜST
+ *  köşesidir; kenar `SLOT_RECT`. Yorumdaki mesafe doğuş noktasınadır. */
+const PLACEMENT: readonly Placement[] = [
+  /* ---- BANT 1 · Sv1-2 · 600-900 ---- */
+  { x: 840, y: 2020, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 600, y: 1500, ref: 750, count: 5, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 40, y: 1300, ref: 850, count: 6, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
 
-  /* ---- UZAK (4) — güçlü ---- */
-  defineMobSlot({
-    id: 'mo_07', displayName: 'Bataklık Yaratığı', monsterRef: 255,
-    area: { minX: 1840, maxX: 1910, minY: 1380, maxY: 1450 }, count: 6,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: SWAMP,
-  }),
-  defineMobSlot({
-    id: 'mo_08', displayName: 'Bataklık Devi', monsterRef: 250,
-    area: { minX: 1970, maxX: 2040, minY: 1600, maxY: 1670 }, count: 6,
-    aiType: 'AGGRESSIVE', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: SWAMP,
-  }),
-  defineMobSlot({
-    id: 'mo_09', displayName: 'Bataklık Reisi', monsterRef: 252,
-    area: { minX: 1980, maxX: 2050, minY: 1460, maxY: 1530 }, count: 5,
-    aiType: 'ELITE', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: BOSS,
-  }),
-  defineMobSlot({
-    id: 'mo_10', displayName: 'Kan Solucanı', monsterRef: 752,
-    area: { minX: 2110, maxX: 2180, minY: 1590, maxY: 1660 }, count: 8,
-    aiType: 'NORMAL', respawnSec: MORADON_RESPAWN_SEC, roamRadius: 32, visual: SMALL,
-  }),
-] as const;
+  /* ---- BANT 2 · Sv4-5 · 1000-1350 ---- */
+  { x: 600, y: 1180, ref: 752, count: 6, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 920, y: 1100, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 440, y: 900, ref: 851, count: 5, name: 'Yaban Sıçanı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 120, y: 780, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
 
-/** Toplam population — 10 slot, 58 mob. */
+  /* ---- BANT 3 · Sv6-7 · 1400-1950 ---- */
+  { x: 720, y: 780, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1760, y: 1900, ref: 150, count: 6, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
+  { x: 1120, y: 820, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
+  { x: 520, y: 540, ref: 754, count: 7, name: 'Leş Böceği', ai: 'NORMAL', art: SWAMP },
+  { x: 80, y: 460, ref: 754, count: 5, name: 'Leş Böceği', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1960, y: 1460, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
+  { x: 800, y: 340, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
+  { x: 240, y: 180, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'AGGRESSIVE', art: SWAMP },
+
+  /* ---- BANT 4 · Sv8-9 · 1950-2350 ---- */
+  { x: 1560, y: 660, ref: 755, count: 8, name: 'Kapkaççı', ai: 'NORMAL', art: SWAMP },
+  { x: 1320, y: 460, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1120, y: 140, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
+  { x: 1440, y: 140, ref: 255, count: 5, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
+
+  /* ---- BANT 5 · Sv11-15 · en uzak köşe ---- */
+  { x: 1720, y: 300, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 2000, y: 420, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'NORMAL', art: BOSS },
+  { x: 2280, y: 580, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+  { x: 2120, y: 140, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+];
+
+/** Kanonik slot tablosu — haritanın tamamına yayılmış. */
+export const MORADON_FARM_SLOTS: readonly MobSpawnSlot[] = PLACEMENT.map((p, i) =>
+  defineMobSlot({
+    id: `mo_${String(i + 1).padStart(2, '0')}`,
+    displayName: p.name,
+    monsterRef: p.ref,
+    area: { minX: p.x, maxX: p.x + SLOT_RECT, minY: p.y, maxY: p.y + SLOT_RECT },
+    count: p.count,
+    aiType: p.ai,
+    respawnSec: MORADON_RESPAWN_SEC,
+    /* Roam yarıçapı dikdörtgenin çeyreği: mob kendi alanında gezer ama
+       komşu slotun içine taşmaz. */
+    roamRadius: SLOT_RECT / 4,
+    visual: p.art,
+  }));
+
+/** Toplam population. */
 export const MORADON_POPULATION = MORADON_FARM_SLOTS
   .reduce((n, s) => n + (s.count ?? 1), 0);
