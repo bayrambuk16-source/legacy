@@ -57,6 +57,7 @@ export interface ProtoConstants {
   startLevel: number;
   startPotions: Array<{ itemRef: number; quantity: number }>;
   monsterHpMultiplier: number;
+  expMultiplier: number;
   monsterDamageMultiplier: number;
 }
 
@@ -110,4 +111,11 @@ export const PROTO: ProtoConstants = {
      atışta ölür, kaynak temposu budur. Mob HASARI çarpanına DOKUNULMADI. */
   monsterHpMultiplier: 1,
   monsterDamageMultiplier: 8,
+  /* P2.14 — EXP ÇARPANI (kullanıcı kararı, kaynaktan gelmez).
+     Ölçüm: kaynak eğrisiyle Lv1→20 yalnız 106 kill ≈ 19 dakika sürüyordu.
+     KO'nun Lv1-20 bandı zaten hızlıdır (asıl duvar Lv20+), ama Moradon
+     tavanı 20 olduğu için oyunun TAMAMI o hızlı banda düşüyor.
+     0.4 ile süre ~45-50 dakikaya çıkar. Seviye farkı cezasıyla birlikte
+     (bkz. `EXP_LEVEL_GAP`) gerçek tempo daha da uzar. */
+  expMultiplier: 0.4,
 };

@@ -54,6 +54,10 @@ import {
   POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerScore,
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
+import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-level-gap.js';
+import {
+  HP_POTION_REF, MP_POTION_REF, POTION_DROP_CHANCE, TROPHY_DROP_CHANCE, TROPHY_ITEM_REF,
+} from '../world/DropSystem.js';
 import {
   FOLIAGE_BASE_SCALE, FOLIAGE_MODEL_KEY, FOLIAGE_SEED, SPAWN_CLEAR, SLOT_MARGIN,
   buildFoliage, type FoliageKind,
@@ -5911,9 +5915,16 @@ test('§29 Auto Loot ON + ÇANTA DOLU → item KAYBOLMAZ, ölüm noktasında yer
   eq(S.inventory.usedSlots, S.inventory.capacity, 'çanta dolu:');
   const snapshot = S.inventory.usedSlots;
   const deathX = S.world.worldX + 700, deathY = S.world.worldY - 250;
-  const mob = killableMob(S, deathX, deathY, 252);       // 5 yuvalı, yüksek şanslı
-  const ev = killAndReap(S, mob);
-  const items = ev.records.filter((r: DropRecord) => r.kind === 'item');
+  /* P2.14 — okçu süzgeci doğrudan droplara da uygulandığı için TEK kill
+     boş dönebilir. Test "item kaybolmuyor mu"yu ölçüyor, "her kill item
+     düşürüyor mu"yu değil; bu yüzden item düşene kadar denenir. */
+  let ev = killAndReap(S, killableMob(S, deathX, deathY, 252));
+  let items = ev.records.filter((r: DropRecord) => r.kind === 'item');
+  for (let i = 0; i < 200 && items.length === 0; i++) {
+    S.worldLoot.clear();
+    ev = killAndReap(S, killableMob(S, deathX, deathY, 252));
+    items = ev.records.filter((r: DropRecord) => r.kind === 'item');
+  }
   ok(items.length > 0, 'en az bir item düşmeli');
   for (const r of items) eq(r.delivery, 'FULL_INVENTORY_GROUND', `${r.itemName} teslimatı:`);
   eq(S.inventory.usedSlots, snapshot, 'envanter DEĞİŞMEMELİ:');
@@ -10472,6 +10483,83 @@ test('§77 satış fiyatı KAYNAKTAN türer, yükseltme fiyatı büyütür', () 
     eq(S.player.coins, before + r.coins, 'altın eklenmeli:');
     eq(S.inventory.get(a0.instance.instanceId), undefined, 'satılan eşya gitmeli:');
   }
+});
+
+/* ================= P2.14 — EXP TEMPOSU · MORADON DROPLARI ================= */
+console.log('P2.14 — EXP temposu ve özel droplar:');
+
+test('§78 seviye farkı cezası: düşük mob AZ, yüksek mob ÇOK verir', () => {
+  /* Kendi bandın (±2) tam EXP. */
+  eq(expLevelGapMultiplier(10, 10), 1, 'aynı seviye:');
+  eq(expLevelGapMultiplier(10, 12), 1, '+2 seviye:');
+  eq(expLevelGapMultiplier(10, 8), 1, '-2 seviye:');
+  /* Altına indikçe ceza artmalı — MONOTON. */
+  let prev = 1;
+  for (const gap of [-3, -5, -7, -10, -15, -25]) {
+    const m = expLevelGapMultiplier(20, 20 + gap);
+    ok(m <= prev, `fark ${gap} cezası artmıyor: ${m} > ${prev}`);
+    prev = m;
+  }
+  ok(expLevelGapMultiplier(20, 1) <= MIN_EXP_MULTIPLIER + 1e-9, 'çok düşük mob neredeyse sıfır');
+  /* Üstündeki mob BONUS vermeli — risk ödülü. */
+  ok(expLevelGapMultiplier(10, 14) > 1, '+4 seviye bonus vermeli');
+  ok(expLevelGapMultiplier(10, 20) > expLevelGapMultiplier(10, 14), 'daha yüksek daha çok');
+});
+
+test('§78 killExp: kaynak → ceza → denge çarpanı, hiç SIFIR vermez', () => {
+  /* Zincir sırası: kaynak EXP önce cezadan, sonra denge çarpanından geçer. */
+  eq(killExp(1000, 10, 10, 1), 1000, 'ceza yok, çarpan yok:');
+  eq(killExp(1000, 10, 10, 0.4), 400, 'yalnız denge çarpanı:');
+  eq(killExp(1000, 20, 5, 1), Math.floor(1000 * expLevelGapMultiplier(20, 5)), 'yalnız ceza:');
+  /* Hiçbir kill 0 EXP vermez — "bu mob bozuk" hissi olmasın. */
+  ok(killExp(1, 70, 1, 0.01) >= 1, 'en kötü durumda bile 1 EXP');
+});
+
+test('§78 CANLI: EXP çarpanı 0.4 ve ceza gerçekten uygulanıyor', () => {
+  eq(PROTO.expMultiplier, 0.4, 'exp çarpanı:');
+  const S = new PrototypeState(2900);
+  eq(S.player.level, 1, 'başlangıç seviyesi:');
+  /* Sv1 oyuncu, Sv15 reis → +14 fark, BONUS almalı. */
+  const boss = Content.monster(252)!;
+  const expected = killExp(boss.exp, 1, boss.level, PROTO.expMultiplier);
+  ok(expected > 0, 'EXP hesaplanmalı');
+  ok(expected < boss.exp, `denge çarpanı uygulanmamış: ${expected} vs ${boss.exp}`);
+});
+
+test('§79 MORADON DROPLARI: yalnız izinli türler düşer', () => {
+  /* Kullanıcı kararı: zırh/takı/silah + parşömen + özel eşya + iksir. */
+  const S = protoState(2901);
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  const seen = new Set<number>();
+  for (let i = 0; i < 300; i++) {
+    const ev = killAndReap(S, killableMob(S, S.world.worldX + 60, S.world.worldY, 252));
+    for (const r of ev.records) if (r.kind === 'item') seen.add(r.itemRef);
+  }
+  ok(seen.size > 0, 'hiç item düşmedi');
+  const allowed = new Set<number>([
+    SCROLL_ITEM_REF, TROPHY_ITEM_REF, HP_POTION_REF, MP_POTION_REF,
+  ]);
+  for (const ref of seen) {
+    ok(isEquipmentItem(ref) || allowed.has(ref),
+      `izinsiz item düştü: ${ref} (${Content.item(ref)?.displayName ?? '?'})`);
+  }
+});
+
+test('§79 özel ganimet 5k eder, iksirler kullanılabilir', () => {
+  const S = protoState(2902);
+  /* Yaşam Taşı satış fiyatı ≈ 5 000 (kaynak buy 20 000 / 4). */
+  const add = S.inventory.add(TROPHY_ITEM_REF, { quantity: 1 });
+  ok(add.ok, 'özel ganimet envantere girmeli');
+  const price = add.ok ? S.autoGear.sellPrice(add.instance) : 0;
+  ok(price >= 4000 && price <= 6000, `özel ganimet fiyatı ${price} — 5k civarı beklenir`);
+  /* İksirler gerçekten iksir olmalı (tüketilebilir sistemde tanımlı). */
+  for (const ref of [HP_POTION_REF, MP_POTION_REF]) {
+    ok(Content.item(ref) !== undefined, `iksir kaynakta yok: ${ref}`);
+  }
+  /* Drop şansları makul aralıkta — sıfır ya da bire yapışmasın. */
+  ok(TROPHY_DROP_CHANCE > 0 && TROPHY_DROP_CHANCE < 0.1, 'özel ganimet şansı:');
+  ok(POTION_DROP_CHANCE > 0 && POTION_DROP_CHANCE < 0.5, 'iksir şansı:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

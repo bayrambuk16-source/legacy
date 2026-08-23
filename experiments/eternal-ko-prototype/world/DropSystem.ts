@@ -26,6 +26,7 @@ import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
 import type { Rng } from '../../../src/engine/rng.js';
 import { SCROLL_ITEM_REF } from './ForgeSystem.js';
+import { isEquipmentItem } from '../data/item-catalog.js';
 import {
   DROP_TUNING_V1, dropProfile, effectiveCoin,
   type DropTuning, type MonsterDropProfile,
@@ -95,6 +96,26 @@ export interface DropSystemDeps {
  *  gelmez. %6: yaklaşık 17 mobda bir parşömen, elitlerde iki katı. */
 export const SCROLL_DROP_CHANCE = 0.06;
 
+/* ═══════════ P2.14 — MORADON ÖZEL DROPLARI ═══════════
+   Kullanıcı kararı: Moradon'da yalnız şunlar düşsün —
+     · zırh / takı / silah   (katalog süzgeci, aşağıda)
+     · yükseltme parşömeni   (`SCROLL_DROP_CHANCE`)
+     · 5k eden özel bir eşya (`TROPHY_ITEM_REF`)
+     · düşük seviye HP/MP iksiri
+
+   Bunlar kaynak ganimet tablolarında YOKTUR; ayrı ve sabit şanslardır.
+   Uydurma satır eklemek yerine kural olarak dururlar. */
+
+/** Moradon'a özel değerli ganimet: "Yaşam Taşı".
+ *  Kaynak `vendorBuy` 20 000 → satış fiyatı formülümüzle 5 000. */
+export const TROPHY_ITEM_REF = 379006000;
+export const TROPHY_DROP_CHANCE = 0.03;
+
+/** Düşük seviye iksirler (kaynak: `ko-potions.ts` ilk kademe). */
+export const HP_POTION_REF = 389011000;   // Yaşam Suyu  +90
+export const MP_POTION_REF = 389016000;   // Ruh İksiri  +120
+export const POTION_DROP_CHANCE = 0.18;
+
 export class DropSystem {
   tuning: DropTuning = { ...DROP_TUNING_V1 };
   /** Son kill'in drop olayı (DEV telemetrisi). */
@@ -134,8 +155,13 @@ export class DropSystem {
       autoLoot,
     };
 
-    /* ── 2) ITEM'LER — her drop AYRI kayıt / AYRI teslimat (§17) ── */
+    /* ── 2) ITEM'LER — her drop AYRI kayıt / AYRI teslimat (§17) ──
+       P2.14 — OKÇU SÜZGECİ BURADA DA UYGULANIR. Grup üyeleri
+       `drop-profile.ts` içinde süzülüyordu ama DOĞRUDAN droplar (kind
+       'direct') o yoldan geçmiyor ve savaşçı silahı düşürebiliyordu.
+       Süzgeç tek yerde tanımlı (`isEquipmentItem`), burada uygulanır. */
     for (const d of rolled.drops) {
+      if (!isEquipmentItem(d.itemRef)) continue;
       ev.records.push(this.deliverItem(mob, d.itemRef, 1, d.from, autoLoot, owner));
     }
 
@@ -144,8 +170,18 @@ export class DropSystem {
        gelir: kaynak loot tablolarında böyle bir kayıt yoktur, uydurma bir
        satır eklemek yerine ayrı bir kural olarak durur. Elit moblar iki kat.
        Zar aynı tohumlu akıştandır. */
-    if (this.deps.rng() < SCROLL_DROP_CHANCE * (mob.monster.tier === 'elite' ? 2 : 1)) {
+    const eliteMult = mob.monster.tier === 'elite' ? 2 : 1;
+    if (this.deps.rng() < SCROLL_DROP_CHANCE * eliteMult) {
       ev.records.push(this.deliverItem(mob, SCROLL_ITEM_REF, 1, 'scroll', autoLoot, owner));
+    }
+    /* Özel ganimet — yalnız satılır, kuşanılmaz. */
+    if (this.deps.rng() < TROPHY_DROP_CHANCE * eliteMult) {
+      ev.records.push(this.deliverItem(mob, TROPHY_ITEM_REF, 1, 'scroll', autoLoot, owner));
+    }
+    /* İksir — HP ve MP eşit şansla, biri ya da diğeri. */
+    if (this.deps.rng() < POTION_DROP_CHANCE) {
+      const ref = this.deps.rng() < 0.5 ? HP_POTION_REF : MP_POTION_REF;
+      ev.records.push(this.deliverItem(mob, ref, 1, 'scroll', autoLoot, owner));
     }
 
     /* ── 3) COIN — envanter slotu KAPLAMAZ, tek authority (§14) ── */

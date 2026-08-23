@@ -84,6 +84,7 @@ export class PrototypeState {
   readonly balance = new BalanceProfile({
     monsterHpMultiplier: PROTO.monsterHpMultiplier,
     monsterDamageMultiplier: PROTO.monsterDamageMultiplier,
+    expMultiplier: PROTO.expMultiplier,
   });
   /** Eternal tarzı portrait bar: 5 aktif combat slotu (skill kitabında 15'in tamamı).
    *  ÖNEMLİ: davranışlar kaydedilmeden kurulursa slotlar boş kalır → constructor'da

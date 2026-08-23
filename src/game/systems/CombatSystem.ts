@@ -24,7 +24,7 @@ export class CombatSystem {
     private rng: Rng,
     private player: PlayerState,
     private stats: CharacterStats,
-    private balance: BalanceProfile,
+    readonly balance: BalanceProfile,
     loadout?: SkillLoadout,
   ) {
     const ctx: EffectContext = {

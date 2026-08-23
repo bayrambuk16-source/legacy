@@ -44,6 +44,7 @@ import {
 } from './CombatPipeline.js';
 import { elementOf } from '../data/archer-balance.js';
 import type { ArcherElement } from '../data/archer-balance.js';
+import { killExp } from '../data/exp-level-gap.js';
 
 export type WorldAttackFail = 'noTarget' | 'range' | 'notReady' | 'noWeapon' | 'dead';
 export type WorldAttackResult =
@@ -444,7 +445,13 @@ export class WorldCombatAdapter {
    *  / envanter dolu) yoktu. Artık drop ve coin tek authority olan
    *  `world/DropSystem.ts` içindedir. Burada YALNIZ deneyim kalır. */
   resolveKill(mob: WorldMob): KillEvent {
-    const exp = mob.monster.exp;
+    /* P2.14 — EXP artık iki filtreden geçer: seviye farkı cezası
+       (`data/exp-level-gap.ts`) ve denge çarpanı. Kaynak değer
+       `mob.monster.exp` olduğu gibi durur; kırpma burada yapılmaz,
+       saf katmanda yapılır. */
+    const exp = killExp(
+      mob.monster.exp, this.player.level, mob.monster.level, this.combat.balance.exp,
+    );
     this.player.addExp(exp);
     return { mob, exp };
   }
