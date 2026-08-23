@@ -57,6 +57,10 @@ import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-level-gap.js';
 import { PROTO_SAVE_VERSION, ProtoSaveSystem, type ProtoSaveData } from '../data/proto-save.js';
 import {
+  KEEP_MAX_OPTIONS, PENDING_BOX, PENDING_PAGE_SIZE, SELL_PANEL, TOGGLE_IDS,
+  bulkButtons, classButtons, keepMaxButtons, pendingRows, sellHitTest, toggleRects,
+} from '../ui/sell-panel.js';
+import {
   HP_POTION_REF, MP_POTION_REF, POTION_DROP_CHANCE, TROPHY_DROP_CHANCE, TROPHY_ITEM_REF,
 } from '../world/DropSystem.js';
 import {
@@ -10657,6 +10661,71 @@ test('§80 kayıt GAMEPLAY’i etkilemez — anlık görüntü KOPYADIR', () => 
   /* Snapshot alındıktan sonra envanter değişirse görüntü DEĞİŞMEMELİ. */
   S.inventory.add(SCROLL_ITEM_REF, { quantity: 3 });
   eq(snap.inventory.entries.length, before, 'görüntü sonradan değişmemeli:');
+});
+
+/* ================= P2.16 — SATIŞ EKRANI ================= */
+console.log('P2.16 — satış ve otomatik ayarlar ekranı:');
+
+test('§81 satış ekranı yerleşimi panel İÇİNDE ve ÇAKIŞMIYOR', () => {
+  const within = (r: { x: number; y: number; w: number; h: number }, n: string): void => {
+    ok(r.x >= SELL_PANEL.x && r.x + r.w <= SELL_PANEL.x + SELL_PANEL.w, `${n} yatay taşıyor`);
+    ok(r.y >= SELL_PANEL.y && r.y + r.h <= SELL_PANEL.y + SELL_PANEL.h, `${n} dikey taşıyor`);
+  };
+  for (const t of toggleRects()) within(t, `toggle ${t.id}`);
+  for (const b of classButtons()) within(b, b.id);
+  for (const b of keepMaxButtons()) within(b, b.id);
+  for (const b of bulkButtons()) within(b, b.id);
+  within(PENDING_BOX, 'onay kutusu');
+  for (const r of pendingRows(PENDING_PAGE_SIZE)) {
+    within(r.row, 'onay satırı'); within(r.keep, 'TUT'); within(r.sell, 'SAT');
+  }
+  /* Anahtarlar ile kalite düğmeleri çakışmamalı. */
+  const lastToggle = toggleRects()[toggleRects().length - 1]!;
+  ok(classButtons()[0]!.y >= lastToggle.y + lastToggle.h, 'anahtar/kalite çakışıyor');
+  ok(PENDING_BOX.y >= keepMaxButtons()[0]!.y + keepMaxButtons()[0]!.h, 'sınır/onay çakışıyor');
+});
+
+test('§81 dokunma çözümlemesi DOĞRU hedefi bulur', () => {
+  const mid = (r: { x: number; y: number; w: number; h: number }): [number, number] =>
+    [r.x + r.w / 2, r.y + r.h / 2];
+  for (const t of toggleRects()) {
+    const h = sellHitTest(...mid(t), 0);
+    ok(h !== null && h.kind === 'toggle' && h.id === t.id, `${t.id} çözülemedi`);
+  }
+  for (const b of classButtons()) {
+    const h = sellHitTest(...mid(b), 0);
+    ok(h !== null && h.kind === 'class' && h.cls === b.cls, `${b.id} çözülemedi`);
+  }
+  for (const b of keepMaxButtons()) {
+    const h = sellHitTest(...mid(b), 0);
+    ok(h !== null && h.kind === 'keepMax' && h.value === b.value, `${b.id} çözülemedi`);
+  }
+  const rows = pendingRows(3);
+  for (let i = 0; i < rows.length; i++) {
+    const k = sellHitTest(...mid(rows[i]!.keep), 3);
+    ok(k !== null && k.kind === 'pendingKeep' && k.index === i, `TUT ${i} çözülemedi`);
+    const sl = sellHitTest(...mid(rows[i]!.sell), 3);
+    ok(sl !== null && sl.kind === 'pendingSell' && sl.index === i, `SAT ${i} çözülemedi`);
+  }
+  /* Onay satırı YOKKEN o bölgeye dokunmak hiçbir şey tetiklemez. */
+  const empty = sellHitTest(...mid(rows[0]!.sell), 0);
+  ok(empty === null || empty.kind !== 'pendingSell', 'boş kuyrukta satış tetiklenmemeli');
+});
+
+test('§81 panel katmanı SAF — mutasyon ve three YOK', () => {
+  const src = readFileSync(join(PROTO_ROOT, 'ui', 'sell-panel.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/import\s+type[\s\S]*?;/g, '');
+  ok(!/from\s+'three/.test(src), 'panel three import etmemeli');
+  ok(!/Math\.random/.test(src), 'panel Math.random kullanmamalı');
+  ok(!/\.sell\(|\.keep\(|setSlot/.test(src), 'panel mutasyon çağırmamalı');
+  /* Ayar kimlikleri sistemdeki alanlarla AYNI olmalı — panel kendi adını
+     uydurursa ayar sessizce çalışmaz. */
+  for (const id of TOGGLE_IDS) {
+    ok(id in AUTO_GEAR_DEFAULTS, `ayar alanı yok: ${id}`);
+    eq(typeof AUTO_GEAR_DEFAULTS[id], 'boolean', `${id} boolean olmalı:`);
+  }
+  ok(KEEP_MAX_OPTIONS.includes(null), 'sınırsız seçeneği olmalı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

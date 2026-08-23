@@ -31,6 +31,10 @@ import {
   skillPoolRects, statRows,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
+import {
+  PENDING_BOX, PENDING_PAGE_SIZE, SELL_PANEL, TOGGLE_LABELS,
+  bulkButtons, classButtons, keepMaxButtons, pendingRows, sellHitTest, toggleRects,
+} from '../ui/sell-panel.js';
 import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
@@ -110,6 +114,22 @@ interface Btn { id: string; x: number; y: number; w: number; h: number; label: s
 /** `EquipService` reddetme sebebi → kullanıcı mesajı. Kural BURADA DEĞİL,
  *  serviste; bu tablo yalnız çeviridir. */
 /** Örs reddetme sebebi → kullanıcı mesajı. Kural serviste, bu tablo çeviri. */
+/** Satış reddi → mesaj. Kural `AutoGearSystem`te, bu tablo çeviri. */
+const SELL_FAIL: Record<string, string> = {
+  locked: 'Eşya kilitli — kilit KORUR',
+  equipped: 'Kuşanılı eşya satılmaz',
+  notFound: 'Eşya bulunamadı',
+  protected: 'Korumalı (parşömen/iksir)',
+  aboveThreshold: 'Kalite eşiğinin üstünde',
+  noPrice: 'Satış değeri yok',
+};
+
+/** Kalite kısa adı — satış ekranında yer dar. */
+const ITEM_CLASS_LABEL: Record<string, string> = {
+  LOW: 'Sıradan', MIDDLE: 'Kaliteli', HIGH: 'Nadir',
+  RARE: 'Destansı', UNIQUE: 'Efsanevi',
+};
+
 const FORGE_FAIL: Record<string, string> = {
   notFound: 'Eşya bulunamadı',
   noDefinition: 'Katalogda yok',
@@ -271,6 +291,9 @@ export class WorldPrototypeScene implements Scene {
   private forgeSel: number | null = null;
   /** Son deneme sonucunun kısa özeti (panelde gösterilir). */
   private forgeMsg = '';
+  /** P2.16 — oto sat ekranı. */
+  private sellOpen = false;
+  private sellMsg = '';
   /** P2.13 — güç skoru bildirimi: `+20 Up` şeridi. Süre dolunca kaybolur. */
   private powerToast: { name: string; before: number; after: number; t: number } | null = null;
   /** P2.15 — otomatik kayıt sayacı ve son kaydedilen seviye. */
@@ -595,6 +618,7 @@ export class WorldPrototypeScene implements Scene {
     if (this.charOpen) { this.handleCharacter(p); return; }
     if (this.skillOpen) { this.handleSkills(p); return; }
     if (this.forgeOpen) { this.handleForge(p); return; }
+    if (this.sellOpen) { this.handleSell(p); return; }
     for (const n of this.navButtons()) {
       if (!this.hit(p, n)) continue;
       this.host.audio.play('ui');
@@ -604,6 +628,7 @@ export class WorldPrototypeScene implements Scene {
       else if (n.id === 'nav_forge') {
         this.forgeOpen = true; this.forgePage = 0; this.forgeSel = null; this.forgeMsg = '';
       }
+      else if (n.id === 'nav_menu') { this.sellOpen = true; this.sellMsg = ''; }
       else this.say('Bu ekran sonraki görevde');
       return;
     }
@@ -1184,7 +1209,8 @@ export class WorldPrototypeScene implements Scene {
     }
 
     /* GENIE — ayar ekranı açıkken duraklar (kullanıcı ayar yaparken cast etmesin) */
-    if (!this.genieOpen && !this.invOpen && !this.charOpen && !this.skillOpen && !this.forgeOpen) {
+    if (!this.genieOpen && !this.invOpen && !this.charOpen && !this.skillOpen && !this.forgeOpen
+      && !this.sellOpen) {
       this.applyGenieActions(this.S.genie.update(dt, this.ents(), this.S.world));
     }
 
@@ -1268,6 +1294,7 @@ export class WorldPrototypeScene implements Scene {
     if (this.charOpen) this.renderCharacter(g);
     if (this.skillOpen) this.renderSkills(g);
     if (this.forgeOpen) this.renderForge(g);
+    if (this.sellOpen) this.renderSell(g);
   }
 
   private onScreen(sx: number, sy: number, pad = 160): boolean {
@@ -2556,6 +2583,146 @@ export class WorldPrototypeScene implements Scene {
       g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 8,
         { align: 'center', size: b.id === 'forge_do' ? 13 : 18, bold: true,
           color: active ? '#e8d9a0' : '#4a4239' });
+    }
+  }
+
+
+  /* ═══════════════ P2.16 — OTO SAT EKRANI ═══════════════
+     Ayarlar ve onay kuyruğu. Karar `AutoGearSystem` authority'sindedir;
+     bu metotlar yalnız iletir ve sonucu gösterir. */
+
+  private handleSell(p: PointerEventInfo): void {
+    const pend = this.S.autoGear.pendingSales().slice(0, PENDING_PAGE_SIZE);
+    const hit = sellHitTest(p.x, p.y, pend.length);
+    if (hit === null) return;
+    this.host.audio.play('ui');
+    const st = this.S.autoGear.settings;
+
+    if (hit.kind === 'toggle') {
+      st[hit.id] = !st[hit.id];
+      this.sellMsg = `${TOGGLE_LABELS[hit.id]}: ${st[hit.id] ? 'AÇIK' : 'KAPALI'}`;
+      return;
+    }
+    if (hit.kind === 'class') { st.sellBelowClass = hit.cls; this.sellMsg = ''; return; }
+    if (hit.kind === 'keepMax') { st.consumableKeepMax = hit.value; this.sellMsg = ''; return; }
+    if (hit.kind === 'pendingKeep') {
+      const inst = pend[hit.index];
+      if (inst) { this.S.autoGear.keep(inst.instanceId); this.sellMsg = 'Tutuldu'; }
+      return;
+    }
+    if (hit.kind === 'pendingSell') {
+      const inst = pend[hit.index];
+      if (!inst) return;
+      const r = this.S.autoGear.sell(inst.instanceId);
+      this.sellMsg = r.ok ? `Satıldı · +${r.coins} altın` : SELL_FAIL[r.reason ?? 'notFound'];
+      return;
+    }
+    if (hit.id === 'inv_close') { this.sellOpen = false; return; }
+    if (hit.id === 'sell_sweep') {
+      const r = this.S.autoGear.sellAllEligible();
+      this.sellMsg = st.autoSell
+        ? `${r.sold} eşya satıldı · +${r.coins} altın`
+        : 'Önce OTO SAT açılmalı';
+      return;
+    }
+    if (hit.id === 'sell_keep_all') {
+      for (const i of this.S.autoGear.pendingSales()) this.S.autoGear.keep(i.instanceId);
+      this.sellMsg = 'Bekleyenlerin hepsi tutuldu';
+      return;
+    }
+    if (hit.id === 'sell_all_pending') {
+      let n = 0, c = 0;
+      for (const i of this.S.autoGear.pendingSales()) {
+        const r = this.S.autoGear.sell(i.instanceId);
+        if (r.ok) { n += 1; c += r.coins; }
+      }
+      this.sellMsg = `${n} eşya satıldı · +${c} altın`;
+    }
+  }
+
+  private renderSell(g: DrawApi): void {
+    const st = this.S.autoGear.settings;
+    this.panelShell(g, 'SATIŞ VE OTOMATİK', `${this.S.player.coins} altın`);
+
+    /* ---- aç/kapa anahtarları ---- */
+    for (const t of toggleRects()) {
+      const on = st[t.id];
+      g.rect(t.x, t.y, t.w, t.h, on ? '#1c2a18' : '#141009', 0.95);
+      g.rect(t.x, t.y, 3, t.h, on ? '#7fa85c' : '#3a3128');
+      g.text(`${on ? '☑' : '☐'}  ${TOGGLE_LABELS[t.id]}`, t.x + 14, t.y + t.h / 2 - 7,
+        { size: 12, bold: true, color: on ? '#c8e0b0' : '#8d8272' });
+    }
+
+    /* ---- kalite eşiği ---- */
+    g.text('BU KALİTENİN ALTINDAKİLERİ SAT', SELL_PANEL.x + 20, SELL_PANEL.y + 212,
+      { size: 10, bold: true, color: '#8d8272' });
+    for (const b of classButtons()) {
+      const on = st.sellBelowClass === b.cls;
+      g.rect(b.x, b.y, b.w, b.h, on ? '#2c2417' : '#141009', 0.95);
+      g.rect(b.x, b.y, b.w, 2, on ? '#e08a3c' : '#3a3128');
+      g.text(b.cls === null ? 'KAPALI' : ITEM_CLASS_LABEL[b.cls],
+        b.x + b.w / 2, b.y + b.h / 2 - 7,
+        { align: 'center', size: 10, bold: true,
+          color: on ? '#e8d9a0' : (b.cls === null ? '#6f655a' : ITEM_CLASS_COLOR[b.cls]) });
+    }
+
+    /* ---- tüketilebilir üst sınırı ---- */
+    g.text('PARŞÖMEN/İKSİR ÜST SINIRI (fazlası satılır)',
+      SELL_PANEL.x + 20, SELL_PANEL.y + 278, { size: 10, bold: true, color: '#8d8272' });
+    for (const b of keepMaxButtons()) {
+      const on = st.consumableKeepMax === b.value;
+      const usable = st.protectConsumables;
+      g.rect(b.x, b.y, b.w, b.h, on ? '#2c2417' : '#141009', usable ? 0.95 : 0.5);
+      g.rect(b.x, b.y, b.w, 2, on ? '#e08a3c' : '#3a3128');
+      g.text(b.value === null ? 'SINIRSIZ' : String(b.value),
+        b.x + b.w / 2, b.y + b.h / 2 - 7,
+        { align: 'center', size: 11, bold: true,
+          color: usable ? (on ? '#e8d9a0' : '#8d8272') : '#4a4239' });
+    }
+
+    /* ---- onay kuyruğu ---- */
+    const pend = this.S.autoGear.pendingSales().slice(0, PENDING_PAGE_SIZE);
+    g.rect(PENDING_BOX.x, PENDING_BOX.y, PENDING_BOX.w, PENDING_BOX.h, '#0b0908', 0.95);
+    g.text(`ONAY BEKLEYEN  (${this.S.autoGear.pendingSales().length})`,
+      PENDING_BOX.x + 12, PENDING_BOX.y + 10, { size: 11, bold: true, color: '#8d8272' });
+    if (pend.length === 0) {
+      g.text('Oto giy sonrası çıkan eşyalar burada onay bekler.',
+        PENDING_BOX.x + PENDING_BOX.w / 2, PENDING_BOX.y + 60,
+        { align: 'center', size: 11, color: '#6f655a' });
+    }
+    pendingRows(pend.length).forEach((r, i) => {
+      const inst = pend[i]!;
+      const def = definitionOf(inst.itemRef);
+      const price = this.S.autoGear.sellPrice(inst);
+      g.rect(r.row.x, r.row.y, r.row.w, r.row.h, '#141009', 0.95);
+      g.rect(r.row.x, r.row.y, 3, r.row.h,
+        def ? ITEM_CLASS_COLOR[def.itemClass] : '#3a3128');
+      const name = def
+        ? (inst.upgradeLevel > 0 ? `${def.displayName} +${inst.upgradeLevel}` : def.displayName)
+        : `#${inst.itemRef}`;
+      g.text(name, r.row.x + 14, r.row.y + 10,
+        { size: 12, bold: true, color: def ? ITEM_CLASS_COLOR[def.itemClass] : '#8d8272' });
+      g.text(`${price} altın`, r.row.x + 14, r.row.y + 30, { size: 10, color: '#8d8272' });
+      for (const [b, label, col] of [
+        [r.keep, 'TUT', '#7fa85c'], [r.sell, 'SAT', '#e08a3c'],
+      ] as const) {
+        g.rect(b.x, b.y, b.w, b.h, '#1c1710', 0.95);
+        g.rect(b.x, b.y, b.w, 2, col);
+        g.text(label, b.x + b.w / 2, b.y + b.h / 2 - 7,
+          { align: 'center', size: 12, bold: true, color: col });
+      }
+    });
+
+    /* ---- toplu işlemler ---- */
+    for (const b of bulkButtons()) {
+      g.rect(b.x, b.y, b.w, b.h, '#1c1710', 0.95);
+      g.rect(b.x, b.y, b.w, 2, '#4a3f30');
+      g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 7,
+        { align: 'center', size: 11, bold: true, color: '#cfc7b6' });
+    }
+    if (this.sellMsg) {
+      g.text(this.sellMsg, SELL_PANEL.x + 20, SELL_PANEL.y + SELL_PANEL.h - 84,
+        { size: 11, color: '#e8d9a0' });
     }
   }
 
