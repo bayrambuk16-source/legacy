@@ -76,6 +76,8 @@ declare module 'three' {
     visible: boolean;
     castShadow: boolean;
     receiveShadow: boolean;
+    /* P2.11 — bitki örtüsü: kameranın dışındaki örnekler çizilmesin. */
+    frustumCulled: boolean;
     userData: Record<string, unknown>;
     matrixWorld: Matrix4;
     readonly quaternion: Quaternion;
