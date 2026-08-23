@@ -78,8 +78,9 @@ export type {
   PlayerView, ProjectileView, RenderStats, WorldFrame,
 };
 
-/** Gölge kamerasının oyuncu çevresinde kapsadığı yarı-genişlik. */
-const SHADOW_SPAN = 700;
+/* `SHADOW_SPAN` KALDIRILDI: gölge yarı-genişliği artık kalite
+   profilinden gelir (`quality.shadowSpan`), sabit değil. Sabit
+   dosyada ölü kalmıştı. */
 /** Güneşin oyuncuya göre yerel ofseti (gölge yönü sabit kalsın). */
 const SUN_OFFSET = { x: 500, y: 1000, z: 350 };
 
