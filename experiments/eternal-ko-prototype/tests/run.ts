@@ -51,7 +51,7 @@ import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
 import { ARCHER_SOURCE_ITEMS, archerSourceItem } from '../data/archer-source-items.js';
 import { ALLOC_BOX, ALLOC_ROWS, allocButtons, parseAllocId } from '../ui/character-panel.js';
 import {
-  POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerBase, powerScore,
+  POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerScore,
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import {
