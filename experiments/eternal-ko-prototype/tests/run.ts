@@ -11476,5 +11476,100 @@ test('§94 PAKETLEME KAPSAMI: her ikon build komutunda listelenen bir dosyada', 
   }
 });
 
+/* ================= P2.26 — ÖLÜM KİLİDİ · GENIE SÜREKLİLİĞİ ================= */
+console.log('P2.26 — ölüm kilidi ve Genie sürekliliği:');
+
+test('§95 ÖLÜ karakter saldıramaz — cast zinciri KESİLİR', () => {
+  /* Oyun testi bulgusu: ölüm ekranı açıkken TAMAM'a basılmadan saldırı
+     devam ediyordu. Ölüm yalnız ekranı açıyor, gameplay'i durdurmuyordu. */
+  const S = protoState(3500);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 100, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  /* Bir atış başlat, sonra öl. TEMEL SALDIRI hasarı CAST ANINDA
+     uygulanır (iki fazlı boru hattı yalnız skill oklarındadır), bu
+     yüzden ölçüm cast'ten SONRA alınır. */
+  ok(S.performBasic(mob as never).ok, 'saldırı başlamalı');
+  const before = mob.hp;
+  S.player.takeDamage(999999);
+  ok(!S.player.alive, 'ölmüş olmalı');
+  S.adapter.cancelAction();
+  /* Kesme sonrası eylem kilidi boş ve havada ok kalmamalı. */
+  ok(!S.adapter.actionBusy, 'eylem kilidi çözülmeli');
+  /* Zinciri sonuna kadar sür: hasar UYGULANMAMALI. */
+  for (let i = 0; i < 300; i++) S.stepCombat(1 / 60, S.entities());
+  eq(mob.hp, before, 'ölümden sonra hasar uygulanmamalı:');
+});
+
+test('§95 ölümden sonra saldırı REDDEDİLİR', () => {
+  const S = protoState(3501);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 100, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  S.player.takeDamage(999999);
+  const r = S.performBasic(mob as never);
+  ok(!r.ok, 'ölü karakter saldıramamalı');
+});
+
+test('§95 DİRİLİŞ sonrası saldırı yeniden çalışır', () => {
+  const S = protoState(3502);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 100, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  S.player.takeDamage(999999);
+  S.adapter.cancelAction();
+  S.reviveAtSpawn();
+  ok(S.player.alive, 'dirilmiş olmalı');
+  /* Doğuş noktasına ışınlandı; mobu yanına getir. */
+  mob.worldX = S.world.worldX + 100; mob.worldY = S.world.worldY;
+  mob.x = mob.worldX; mob.y = mob.worldY;
+  ok(S.performBasic(mob as never).ok, 'diriliş sonrası saldırı çalışmalı');
+});
+
+test('§95 havadaki oklar ölümde DÜŞER', () => {
+  const S = protoState(3503);
+  S.mobs.mobs.length = 0;
+  const mob = mockMob(S.world.worldX + 600, S.world.worldY, 45, 1e9);
+  S.mobs.mobs.push(mob as never);
+  S.infiniteMp = true;
+  S.performSkill(ARCHER.BESLI_SALVO, mob as never);
+  /* Oklar yolda: birkaç kare ilerlet ama IMPACT'e varmadan öl. */
+  S.stepCombat(1 / 60, S.entities());
+  S.player.takeDamage(999999);
+  S.adapter.cancelAction();
+  const hp = mob.hp;
+  for (let i = 0; i < 300; i++) S.stepCombat(1 / 60, S.entities());
+  eq(mob.hp, hp, 'düşen oklar hasar vermemeli:');
+});
+
+test('§96 GENIE panel açıkken DURMAZ — yalnız kendi ayar ekranı durdurur', () => {
+  /* Oyun testi isteği: çanta/karakter/örs açıkken bile farm sürsün.
+     Kural sahne katmanındadır; burada kuralın METNİ doğrulanır ki
+     ileride sessizce geri alınmasın. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  const m = /if \(!this\.genieOpen && !this\.deathOpen\) \{\s*\n\s*this\.applyGenieActions/.exec(src);
+  ok(m !== null, 'Genie yalnız kendi ayar ekranı ve ölümde durmalı');
+  /* Envanter/karakter/skill/örs/satış ekranları Genie'yi DURDURMAMALI. */
+  for (const flag of ['invOpen', 'charOpen', 'skillOpen', 'forgeOpen', 'sellOpen']) {
+    ok(!new RegExp(`!this\\.${flag}[^\\n]*applyGenieActions`).test(src)
+      && !new RegExp(`applyGenieActions[^\\n]*!this\\.${flag}`).test(src),
+    `${flag} Genie'yi durduruyor`);
+  }
+});
+
+test('§96 ÖLÜMDE hareket ve Genie kesilir — dünya AKMAYA devam eder', () => {
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  ok(/const dead = this\.deathOpen \|\| !this\.S\.player\.alive;/.test(src),
+    'ölüm kilidi tek yerde tanımlı olmalı');
+  ok(/if \(dead\) this\.S\.adapter\.cancelAction\(\);/.test(src),
+    'ölümde cast zinciri kesilmeli');
+  /* Mob AI ölümden ETKİLENMEMELİ — dünya donmaz. */
+  const S = protoState(3504);
+  S.player.takeDamage(999999);
+  const before = S.mobs.mobs.length;
+  for (let i = 0; i < 60; i++) S.mobs.update(1 / 60, S.world);
+  eq(S.mobs.mobs.length, before, 'mob listesi ölümden etkilenmemeli:');
+});
+
 console.log(`\n${pass} geçti, ${fail} kaldı`);
 if (fail > 0) process.exit(1);

@@ -24,12 +24,19 @@ import {
   HUD_TARGET_CARD, HUD_BARS,
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
+/* `character-panel.js` üç ekranın yerleşimini taşır: karakter, yetenek
+   ve örs. `*_ROWS` / `*_SLOTS` tabloları P2.25.2'de maketten ÖLÇÜLDÜ. */
 import {
   ALLOC_ROWS, FORGE_LIST_BOX, FORGE_PAGE_SIZE,
   FORGE_PREVIEW_BOX, allocButtons, parseAllocId,
   PANEL_FRAME, SKILL_PAGE_SIZE, charHitTest, forgeButtons, forgeHitTest, forgeRowRects,
   panelCloseButton, skillHitTest, skillPageButtons,
   statRows,
+  ALLOC_POINT_ROW, ALLOC_STAT_ROWS,
+  CHAR_IDENTITY_ROWS, CHAR_IDENTITY_W, CHAR_IDENTITY_X, CHAR_RESIST_ROWS,
+  CHAR_STAT_DIVIDER_X, CHAR_STAT_FIRST_Y, CHAR_STAT_ROW_H,
+  SKILL_BAR_H, SKILL_BAR_LABEL_Y, SKILL_BAR_SLOTS, SKILL_BAR_Y,
+  SKILL_PAGE_ROW, SKILL_POINT_ROW, SKILL_POOL_ICON_W, skillPoolCells,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
 import { MORADON_PLAY_SPAWN } from '../data/moradon-farm-slots.js';
@@ -1183,8 +1190,21 @@ export class WorldPrototypeScene implements Scene {
        otomatik vektörü UYGULANMAZ (Genie durdurulmaz, sadece o kare pas geçer).
        Joystick bırakılınca Genie kaldığı yerden yürümeye devam eder.
        Böylece "manuel + otomatik toplanıp çift hız" davranışı imkânsızdır. */
-    const mv = this.cameraRelative(resolveJoystick(this.stick));
-    const genieIntent = this.S.genie.movementIntent(this.ents(), this.S.world);
+    /* ═══ P2.26 — ÖLÜ KARAKTER HAREKET ETMEZ, SALDIRMAZ ═══
+       Oyun testi bulgusu: ölüm ekranı açıkken TAMAM'a basılmadan
+       saldırı devam ediyordu. Sebep: ölüm YALNIZ ekranı açıyordu,
+       gameplay döngüsünü durdurmuyordu. Joystick, Genie ve cast
+       zinciri çalışmaya devam ediyordu.
+
+       Ölü karakterin hareketi ve saldırısı kesilir; mob AI, ceset
+       süresi ve respawn AKMAYA DEVAM EDER (dünya durmaz). */
+    const dead = this.deathOpen || !this.S.player.alive;
+    const mv = dead
+      ? { x: 0, y: 0, magnitude: 0 }
+      : this.cameraRelative(resolveJoystick(this.stick));
+    const genieIntent = dead
+      ? { x: 0, y: 0, magnitude: 0 }
+      : this.S.genie.movementIntent(this.ents(), this.S.world);
     if (mv.magnitude > 0) {
       this.movementSource = 'MANUAL';
       this.S.movement.move(this.S.world, mv, dt);
@@ -1212,6 +1232,9 @@ export class WorldPrototypeScene implements Scene {
     this.S.player.update(dt);
     this.S.updateInfiniteMp();      // TEST: sonsuz MP (varsayılan kapalı)
     this.S.combat.update(dt);
+    /* Ölüyken devam eden cast/ok zinciri KESİLİR — havadaki oklar da
+       düşer, yoksa oyuncu öldükten sonra hasar vermeye devam eder. */
+    if (dead) this.S.adapter.cancelAction();
     this.S.adapter.updateAction(dt);     // attack recovery (cooldown DEĞİL)
     /* P1.4 — İKİ FAZLI COMBAT: release + projectile + IMPACT.
        Hasar YALNIZ burada uygulanır. Manuel oyuncu ve Genie AYNI yol (§14). */
@@ -1251,9 +1274,18 @@ export class WorldPrototypeScene implements Scene {
       this.host.fx.floatText(this.projX(victim.worldX), this.projY(victim.worldY) - 60, String(ev.damage), { color: ev.fxColor, size: 14 });
     }
 
-    /* GENIE — ayar ekranı açıkken duraklar (kullanıcı ayar yaparken cast etmesin) */
-    if (!this.genieOpen && !this.invOpen && !this.charOpen && !this.skillOpen && !this.forgeOpen
-      && !this.sellOpen) {
+    /* ═══ P2.26 — GENIE PANEL AÇIKKEN DE ÇALIŞIR ═══
+       Eskiden HERHANGİ bir panel açılınca Genie duruyordu: oyuncu
+       çantasını açtığında farm kesiliyor, mob geri kaçıyor, iksir
+       içilmiyordu. Oysa Genie'nin bütün amacı ilgilenmeden devam
+       edebilmek.
+
+       TEK İSTİSNA: Genie'nin KENDİ ayar ekranı. Orada set ve eşik
+       değiştirirken cast etmesi karışıklık yaratır — ayarı yaparken
+       sonucunu görmek yerine yarı yarıya eski davranışı görürsün.
+
+       ÖLÜM EKRANI da durdurur: ölü karakter saldıramaz. */
+    if (!this.genieOpen && !this.deathOpen) {
       this.applyGenieActions(this.S.genie.update(dt, this.ents(), this.S.world));
     }
 

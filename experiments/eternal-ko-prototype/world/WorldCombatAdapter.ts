@@ -188,6 +188,17 @@ export class WorldCombatAdapter {
   actionTimeOf(sourceRef: number): number { return this.timing?.actionTime(sourceRef) ?? 0; }
   updateAction(dt: number): void { this.action?.update(dt); }
 
+  /** P2.26 — DEVAM EDEN EYLEMİ KES. Ölüm anında çağrılır: eylem kilidi
+   *  sıfırlanır ve HAVADAKİ OKLAR düşürülür. Aksi hâlde oyuncu öldükten
+   *  sonra da hasar vermeye devam ediyordu (ölüm ekranında saldırı
+   *  bulgusu).
+   *
+   *  Mob AI, ceset süresi ve respawn ETKİLENMEZ — dünya durmaz. */
+  cancelAction(): void {
+    this.action?.reset();
+    this.pipeline.clearProjectiles();
+  }
+
   distance(p: PlayerWorldState, mob: WorldMob): number {
     return Math.hypot(mob.worldX - p.worldX, mob.worldY - p.worldY);
   }

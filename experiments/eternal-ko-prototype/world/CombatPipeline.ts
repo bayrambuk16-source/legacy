@@ -158,6 +158,9 @@ export class CombatPipeline {
   readonly pending: PendingCast[] = [];
   readonly projectiles: Projectile[] = [];
 
+  /** P2.26 — havadaki okları düşür (ölüm). Impact üretmezler. */
+  clearProjectiles(): void { this.projectiles.length = 0; }
+
   /** Cast kabul edildi: release kuyruğuna alınır. */
   accept(cast: Omit<PendingCast, 'id' | 'acceptedAt' | 'releaseAt'>): PendingCast {
     const p: PendingCast = {
