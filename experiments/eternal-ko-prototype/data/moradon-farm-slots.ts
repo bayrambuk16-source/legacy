@@ -41,6 +41,11 @@
  *  kural korundu: duvarlar geri açıldığında hiçbir mob duvarda kalmaz. */
 
 import { defineMobSlot, type MobSpawnSlot } from './mob-slot-schema.js';
+import { registerExtraMonsters } from './extra-monsters.js';
+
+/* P2.17 — SV16-20 MOBLARI. Slot tanımları `Content.monster()` doğrulaması
+   yapıyor; kayıt bu yüzden tablodan ÖNCE tanıtılmalı. */
+registerExtraMonsters();
 
 /** OYNANIŞ doğuş noktası — güneybatı köşesi. Kaynak değeri EZMEZ. */
 export const MORADON_PLAY_SPAWN = { x: 680, y: 4440 } as const;
@@ -95,11 +100,27 @@ const PLACEMENT: readonly Placement[] = [
   { x: 2240, y: 280, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
   { x: 2880, y: 280, ref: 255, count: 5, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
 
-  /* ---- BANT 5 · Sv11-15 · en uzak köşe ---- */
+  /* ---- BANT 5 · Sv11-15 ---- */
   { x: 3440, y: 600, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: BOSS },
   { x: 4000, y: 840, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'NORMAL', art: BOSS },
   { x: 4560, y: 1160, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
   { x: 4240, y: 280, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+
+  /* ---- BANT 6 · Sv16-20 · P2.17, EN UZAK BÖLGE ----
+     Karakter Sv20'ye çıkabiliyordu ama son beş seviyede avlanacak yeni
+     bir şey yoktu. Bu beş slot o boşluğu kapatır; kaynak K_MONSTER
+     tablosundan çıkarıldılar (bkz. `extra-monsters.ts`).
+
+     KONUMLAR 4374-5841 BİRİM UZAKLIKTA: seviye gradyanı MONOTON kalsın
+     diye mevcut en uzak slottan (Sv15, 5466) sonraki kuşağa yerleştiler.
+     Noktalar elle seçilmedi — yürünebilirlik maskesi taranarak 200×200'lük
+     alanı tamamen açık ve diğer slotlardan en az 420 birim uzak olanlar
+     bulundu. */
+  { x: 4360, y: 2140, ref: 105, count: 6, name: 'Kecoon Savaşçısı', ai: 'NORMAL', art: SWAMP },
+  { x: 4240, y: 1540, ref: 203, count: 6, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 4480, y: 640, ref: 301, count: 5, name: 'Dev Gavolt', ai: 'NORMAL', art: BOSS },
+  { x: 4900, y: 520, ref: 204, count: 5, name: 'Leş Kuşu', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 4660, y: 160, ref: 109, count: 5, name: 'Kecoon Kaptanı', ai: 'ELITE', art: BOSS },
 ];
 
 /** Kanonik slot tablosu — haritanın tamamına yayılmış. */

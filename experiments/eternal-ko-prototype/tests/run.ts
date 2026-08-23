@@ -54,6 +54,7 @@ import {
   POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerScore,
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
+import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
 import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-level-gap.js';
 import { PROTO_SAVE_VERSION, ProtoSaveSystem, type ProtoSaveData } from '../data/proto-save.js';
 import {
@@ -4915,7 +4916,8 @@ test('§2 profiller: TEK durum makinesi, ÜÇ parametre seti', () => {
 test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİR', () => {
   /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
      Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
-  eq(FARM_AREA_SLOTS.length, 23, 'slot sayısı:');
+  /* P2.17 — Sv16-20 bandı için beş slot eklendi (23 → 28). */
+  eq(FARM_AREA_SLOTS.length, 28, 'slot sayısı:');
   eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, FARM_AREA_SLOTS.length, 'id benzersiz:');
   for (const s of FARM_AREA_SLOTS) {
     ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
@@ -9840,7 +9842,7 @@ console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
 
 test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
   const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
-  eq(S.mobs.slotConfigs().length, 23, 'canlı slot sayısı:');
+  eq(S.mobs.slotConfigs().length, 28, 'canlı slot sayısı:');
   eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
   ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
   /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */
@@ -10333,7 +10335,7 @@ test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () 
 
 test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
   /* Nesne SAYILARI değişmedi; alan dört katına çıktı. Yoğunluk düşmeli. */
-  eq(FARM_AREA_SLOTS.length, 23, 'slot sayısı SABİT:');
+  eq(FARM_AREA_SLOTS.length, 28, 'slot sayısı:');
   const items = buildFoliage();
   ok(items.length > 700, `bitki sayısı düştü: ${items.length}`);
   /* En yakın iki nesne arası mesafe ARTMALI — eskiden 29 birimdi. */
@@ -10726,6 +10728,63 @@ test('§81 panel katmanı SAF — mutasyon ve three YOK', () => {
     eq(typeof AUTO_GEAR_DEFAULTS[id], 'boolean', `${id} boolean olmalı:`);
   }
   ok(KEEP_MAX_OPTIONS.includes(null), 'sınırsız seçeneği olmalı');
+});
+
+/* ================= P2.17 — SV16-20 MOBLARI ================= */
+console.log('P2.17 — Sv16-20 mob bandı:');
+
+test('§82 ek moblar KAYNAKTAN gelir ve DEPOYA tanıtılmış', () => {
+  eq(EXTRA_MONSTERS.length, 5, 'ek mob sayısı:');
+  const levels = EXTRA_MONSTERS.map((m) => m.level).sort((a, b) => a - b);
+  eq(levels.join(','), '16,17,18,19,20', 'seviye merdiveni:');
+  for (const m of EXTRA_MONSTERS) {
+    /* Depoya tanıtılmış olmalı — yoksa slot tanımı kaynağı bulamaz. */
+    const reg = Content.monster(m.sourceRef);
+    ok(reg !== undefined, `${m.sourceName} depoda yok`);
+    eq(reg!.level, m.level, `${m.sourceName} seviye:`);
+    eq(reg!.hp, m.hp, `${m.sourceName} HP:`);
+    eq(reg!.exp, m.exp, `${m.sourceName} EXP:`);
+    /* Değerler makul olmalı — bozuk ayrıştırma buradan yakalanır. */
+    ok(m.hp > 0 && m.hp < 5000, `${m.sourceName} HP saçma: ${m.hp}`);
+    ok(m.attack > 0 && m.attack < 200, `${m.sourceName} saldırı saçma: ${m.attack}`);
+    ok(m.attackDelayMs >= 500 && m.attackDelayMs <= 5000, `${m.sourceName} gecikme saçma`);
+  }
+});
+
+test('§82 SEVİYE MERDİVENİ kesintisiz: Sv1-20 arası boşluk YOK', () => {
+  const levels = new Set<number>();
+  for (const s of FARM_AREA_SLOTS) {
+    const m = Content.monster(s.monsterRef);
+    if (m) levels.add(m.level);
+  }
+  /* Her beş seviyelik bantta en az bir mob olmalı. */
+  for (const [lo, hi] of [[1, 5], [6, 10], [11, 15], [16, 20]] as const) {
+    const has = [...levels].some((l) => l >= lo && l <= hi);
+    ok(has, `Sv${lo}-${hi} bandında mob yok`);
+  }
+  ok(Math.max(...levels) >= 20, `en yüksek mob Sv${Math.max(...levels)} — Sv20 beklenir`);
+});
+
+test('§82 Sv16-20 slotları EN UZAK bantta, hepsi YÜRÜNEBİLİR', () => {
+  const highRefs = new Set(EXTRA_MONSTERS.map((m) => m.sourceRef));
+  const high = FARM_AREA_SLOTS.filter((s) => highRefs.has(s.monsterRef));
+  eq(high.length, 5, 'yüksek seviye slot sayısı:');
+  /* Yeni moblar mevcut Sv1-15 slotlarının ORTALAMASINDAN uzakta olmalı. */
+  const dist = (s: typeof high[number]): number =>
+    Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y);
+  const lowAvg = FARM_AREA_SLOTS
+    .filter((s) => !highRefs.has(s.monsterRef))
+    .reduce((t, s) => t + dist(s), 0) / (FARM_AREA_SLOTS.length - 5);
+  const highAvg = high.reduce((t, s) => t + dist(s), 0) / high.length;
+  ok(highAvg > lowAvg, `yüksek bant daha yakın: ${Math.round(highAvg)} < ${Math.round(lowAvg)}`);
+  /* Dikdörtgen köşeleri açık olmalı — duvarlar geri açılsa bile. */
+  for (const s of high) {
+    const p = slotPlacement(s);
+    for (const [x, y] of [[p.minX, p.minY], [p.maxX - 1, p.minY],
+      [p.minX, p.maxY - 1], [p.maxX - 1, p.maxY - 1]] as const) {
+      ok(isWalkable(x, y), `${s.id} köşesi kapalı: ${x},${y}`);
+    }
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

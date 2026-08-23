@@ -44,6 +44,26 @@
   "252": {
    "displayName": "Bataklık Reisi",
    "visualKey": "kurt_alfa"
+  },
+  "105": {
+   "displayName": "Kecoon Savaşçısı",
+   "visualKey": "kurt"
+  },
+  "203": {
+   "displayName": "Dev Bulcan",
+   "visualKey": "kurt_alfa"
+  },
+  "301": {
+   "displayName": "Dev Gavolt",
+   "visualKey": "kurt_alfa"
+  },
+  "204": {
+   "displayName": "Leş Kuşu",
+   "visualKey": "kurt"
+  },
+  "109": {
+   "displayName": "Kecoon Kaptanı",
+   "visualKey": "kurt_alfa"
   }
  },
  "zones": {

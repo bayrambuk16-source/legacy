@@ -95,6 +95,20 @@ class Repository {
     return added;
   }
   monster(sourceRef: number): GameMonster | undefined { return this.monsterByRef.get(sourceRef); }
+
+  /** EK MOB KAYITLARI (P2.17) — `registerSourceItems` ile aynı sözleşme:
+   *  generated dosyalar değişmez, var olan kayıt ezilmez, dönen sayı
+   *  gerçekten eklenen adettir. */
+  registerSourceMonsters(extra: readonly GameMonster[]): number {
+    let added = 0;
+    for (const m of extra) {
+      if (this.monsterByRef.has(m.sourceRef)) continue;
+      this.monsterByRef.set(m.sourceRef, m);
+      this.monsters.push(m);
+      added += 1;
+    }
+    return added;
+  }
   loot(id: string): LootTable | undefined { return this.lootById.get(id); }
   zone(id: string): GameZone | undefined { return this.zones.find((z) => z.id === id); }
   hub(): GameZone { return this.zones.find((z) => z.role === 'hub')!; }
