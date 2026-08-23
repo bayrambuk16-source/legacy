@@ -20,7 +20,8 @@ import type { EquipFail } from '../world/EquipService.js';
 import { OBSTACLES, ROADS, WORLD_BOUNDS } from '../data/world-map.js';
 import {
   HUD_EXP_BAR, HUD_EXP_FILL, HUD_EXP_TEXT, HUD_GENIE, HUD_JOY_BASE_W, HUD_JOY_KNOB_W, HUD_PAGE_DOTS,
-  HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN, HUD_TARGET_CARD, HUD_BARS,
+  HUD_CAMERA_BTN, HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN,
+  HUD_TARGET_CARD, HUD_BARS,
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
 import {
@@ -40,6 +41,9 @@ import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
 } from '../ui/camera-zoom.js';
 import { CAMERA_V1 } from '../render3d/CameraRig.js';
+import {
+  CAMERA_MODE_LABEL, approachYaw, baseTuning, modeYaw, nextMode, type CameraMode,
+} from '../ui/camera-mode.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
   hitTest as invHitTest, invButtons, invCloseButton, itemHeadline, targetSlotFor,
@@ -201,6 +205,9 @@ export class WorldPrototypeScene implements Scene {
   private pointers = new Map<number, { x: number; y: number }>();
   private pinch: PinchState | null = null;
   private zoom = ZOOM_DEFAULT;
+  /** P2.19 — kamera modu ve yumuşatılmış yaw. */
+  private camMode: CameraMode = 'overhead';
+  private camYaw = CAMERA_V1.yawDeg;
   private stickOrigin = { x: PROTO.joystickCenter.x, y: PROTO.joystickCenter.y };
 
   private notice = '';
@@ -247,7 +254,12 @@ export class WorldPrototypeScene implements Scene {
    *  DEĞİŞTİRMEZ. Yalnız DEV panelinden kamera döndürülürse devreye girer.
    *
    *  P2.0'da varsayılan yaw 45 idi ve bu hizayı bozuyordu: joystick "sağ"
-   *  komutu karakteri ekranda yukarı-sola götürüyordu (bildirilen kusur). */
+   *  komutu karakteri ekranda yukarı-sola götürüyordu (bildirilen kusur).
+   *
+   *  P2.19 — ÜÇÜNCÜ ŞAHIS MODUNDA BU DÖNÜŞÜM ZORUNLU. Kamera karakterin
+   *  arkasında döndüğü için ekran ekseni sürekli değişir; joystick "ileri"
+   *  komutu kameranın baktığı yöne gitmelidir. Dönüşüm zaten kameranın
+   *  GÜNCEL yaw'ını okuduğu için ek bir dallanma gerekmez. */
   private cameraRelative(mv: MoveVector): MoveVector {
     if (!this.three3dActive || mv.magnitude <= 0) return mv;
     const w = screenToWorldMove(mv.x, mv.y, this.three!.tuning);
@@ -613,6 +625,13 @@ export class WorldPrototypeScene implements Scene {
     if (this.skillOpen) { this.handleSkills(p); return; }
     if (this.forgeOpen) { this.handleForge(p); return; }
     if (this.sellOpen) { this.handleSell(p); return; }
+    /* P2.19 — kamera modu düğmesi. Her dokunuşta sıradaki moda geçer. */
+    if (this.hit(p, { id: 'cam_mode', ...HUD_CAMERA_BTN, label: '' })) {
+      this.camMode = nextMode(this.camMode);
+      this.host.audio.play('ui');
+      this.say(`Kamera: ${CAMERA_MODE_LABEL[this.camMode]}`);
+      return;
+    }
     for (const n of this.navButtons()) {
       if (!this.hit(p, n)) continue;
       this.host.audio.play('ui');
@@ -1214,10 +1233,17 @@ export class WorldPrototypeScene implements Scene {
        Bu çağrı gameplay durumuna hiçbir şey yazmaz; renderer kapalıysa
        (headless/2D) hiç çalışmaz ve sonuçlar değişmez (§26). */
     if (this.three3dActive) {
-      /* P2.9 — ZOOM: çarpan her karede TABAN ayara uygulanır (`CAMERA_V1`),
-         bir önceki değere DEĞİL — yoksa zoom sürüklenir. Zoom yalnız
-         kamerayı değiştirir; menzil/aggro/hitbox world biriminde kalır. */
-      Object.assign(this.three!.tuning, applyZoom(CAMERA_V1, this.zoom));
+      /* P2.9/P2.19 — ZOOM ve MOD: çarpan her karede MODUN TABAN ayarına
+         uygulanır, bir önceki değere DEĞİL — yoksa zoom sürüklenir.
+         Yaw ayrıca yumuşatılır: üçüncü şahısta kamera karakterin arkasında
+         durur ve dönüş anında değil, yaklaşarak gerçekleşir. */
+      const base = baseTuning(this.camMode);
+      this.camYaw = approachYaw(
+        this.camYaw, modeYaw(this.camMode, this.S.world.facingAngle), dt,
+      );
+      Object.assign(this.three!.tuning, base, applyZoom(base, this.zoom), {
+        yawDeg: this.camMode === 'third' ? this.camYaw : base.yawDeg,
+      });
       this.three!.update(buildWorldFrame(this.S), dt);
       this.three!.render();
     }
@@ -1636,6 +1662,13 @@ export class WorldPrototypeScene implements Scene {
       { w: HUD_GENIE.w, h: HUD_GENIE.h, alpha: tel.enabled ? A : A * 0.55 });
     g.image(HUD_SETTINGS.key, HUD_SETTINGS.x, HUD_SETTINGS.y,
       { w: HUD_SETTINGS.w, h: HUD_SETTINGS.h, alpha: A });
+
+    /* ---- kamera modu ---- */
+    g.image(HUD_CAMERA_BTN.key, HUD_CAMERA_BTN.x, HUD_CAMERA_BTN.y,
+      { w: HUD_CAMERA_BTN.w, h: HUD_CAMERA_BTN.h, alpha: A });
+    g.text(this.camMode === 'third' ? '3Ş' : 'KB',
+      HUD_CAMERA_BTN.x + HUD_CAMERA_BTN.w / 2, HUD_CAMERA_BTN.y + HUD_CAMERA_BTN.h * 0.34,
+      { align: 'center', size: 11, bold: true, color: '#e8d9a0' });
     /* Varlıkta "GENİE AÇIK" yazısı BOYALIDIR. Kapalı durumu üstüne yazı
        basarak DEĞİL, gri perde + sönük ışıkla gösterilir. */
     if (!tel.enabled) {
@@ -1728,6 +1761,13 @@ export class WorldPrototypeScene implements Scene {
     }
 
     /* ---- alt menü ---- */
+    /* P2.19 — kamera modu düğmesi. Her dokunuşta sıradaki moda geçer. */
+    if (this.hit(p, { id: 'cam_mode', ...HUD_CAMERA_BTN, label: '' })) {
+      this.camMode = nextMode(this.camMode);
+      this.host.audio.play('ui');
+      this.say(`Kamera: ${CAMERA_MODE_LABEL[this.camMode]}`);
+      return;
+    }
     for (const n of this.navButtons()) {
       g.image(n.label, n.x, n.y, { w: n.w, h: n.h, alpha: A });
     }

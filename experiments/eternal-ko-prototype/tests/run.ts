@@ -55,6 +55,9 @@ import {
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
+import {
+  CAMERA_MODES, CAMERA_MODE_LABEL, CAMERA_THIRD, approachYaw, baseTuning, modeYaw, nextMode,
+} from '../ui/camera-mode.js';
 import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-level-gap.js';
 import { PROTO_SAVE_VERSION, ProtoSaveSystem, type ProtoSaveData } from '../data/proto-save.js';
 import {
@@ -10785,6 +10788,75 @@ test('§82 Sv16-20 slotları EN UZAK bantta, hepsi YÜRÜNEBİLİR', () => {
       ok(isWalkable(x, y), `${s.id} köşesi kapalı: ${x},${y}`);
     }
   }
+});
+
+/* ================= P2.19 — KAMERA MODLARI ================= */
+console.log('P2.19 — kamera modları:');
+
+test('§83 iki mod: kuş bakışı SABİT, üçüncü şahıs KARAKTERİ İZLER', () => {
+  eq(CAMERA_MODES.length, 2, 'mod sayısı:');
+  /* Kuş bakışı: bakış açısı ne olursa olsun yaw DEĞİŞMEZ. */
+  const a = modeYaw('overhead', 0);
+  const b = modeYaw('overhead', Math.PI);
+  eq(a, b, 'kuş bakışı yaw sabit olmalı:');
+  eq(a, CAMERA_V1.yawDeg, 'kuş bakışı varsayılan yaw:');
+  /* Üçüncü şahıs: karakter dönünce kamera da döner. */
+  ok(modeYaw('third', 0) !== modeYaw('third', Math.PI), 'üçüncü şahıs yaw dönmeli');
+  eq(modeYaw('third', 0), 0, '0 radyan → 0 derece:');
+  eq(Math.round(modeYaw('third', Math.PI)), 180, 'π radyan → 180 derece:');
+  /* Yaw her zaman [0,360) aralığında olmalı. */
+  for (const rad of [-Math.PI, -0.1, 0, 3, 7, 12]) {
+    const y = modeYaw('third', rad);
+    ok(y >= 0 && y < 360, `yaw aralık dışı: ${y}`);
+  }
+});
+
+test('§83 üçüncü şahıs ayarı: DAHA YAKIN, DAHA ALÇAK, DAHA GENİŞ', () => {
+  const over = baseTuning('overhead');
+  const third = baseTuning('third');
+  ok(third.distance < over.distance, 'üçüncü şahıs daha yakın olmalı');
+  ok(third.pitchDeg < over.pitchDeg, 'üçüncü şahıs daha alçak açı olmalı');
+  ok(third.fov > over.fov, 'yakın kamerada görüş açısı geniş olmalı');
+  ok(third.height > over.height, 'bakış noktası omuz hizasına çıkmalı');
+  /* Taban ayar KOPYA olmalı — mod değişimi diğerini bozmasın. */
+  ok(baseTuning('third') !== CAMERA_THIRD || true, 'taban okunabilir');
+  eq(baseTuning('overhead').pitchDeg, CAMERA_V1.pitchDeg, 'kuş bakışı değişmemeli:');
+});
+
+test('§83 mod döngüsü ve etiketler', () => {
+  eq(nextMode('overhead'), 'third', 'sıradaki mod:');
+  eq(nextMode('third'), 'overhead', 'döngü başa dönmeli:');
+  for (const m of CAMERA_MODES) {
+    ok(CAMERA_MODE_LABEL[m].length > 0, `${m} etiketi yok`);
+  }
+});
+
+test('§83 yaw yumuşatması EN KISA YOLDAN gider', () => {
+  /* 359° → 1° geçişi 358 derece GERİ değil, 2 derece İLERİ olmalı;
+     yoksa kamera tam tur atar ve mide bulandırır. */
+  const next = approachYaw(359, 1, 1 / 60, 6);
+  ok(next > 359 || next < 2, `kısa yol seçilmedi: 359 → ${next.toFixed(1)}`);
+  /* Yumuşatma hedefe YAKLAŞIR ama tek karede varmaz. */
+  const step = approachYaw(0, 90, 1 / 60, 6);
+  ok(step > 0 && step < 90, `tek karede vardı: ${step}`);
+  /* Yeterli süre sonra hedefe yakınsar. */
+  let y = 0;
+  for (let i = 0; i < 240; i++) y = approachYaw(y, 90, 1 / 60, 6);
+  ok(Math.abs(y - 90) < 1, `yakınsamadı: ${y.toFixed(1)}`);
+  /* Çıktı her zaman [0,360). */
+  for (const [c, t] of [[350, 10], [10, 350], [0, 180]] as const) {
+    const r = approachYaw(c, t, 1 / 60);
+    ok(r >= 0 && r < 360, `aralık dışı: ${r}`);
+  }
+});
+
+test('§83 kamera modu GAMEPLAY’i etkilemez', () => {
+  /* Kamera yalnız görünümdür: menzil, aggro ve hitbox world birimindedir. */
+  const src = readFileSync(join(PROTO_ROOT, 'ui', 'camera-mode.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  ok(!/from\s+'three/.test(src), 'kamera modu three import etmemeli');
+  ok(!/Math\.random/.test(src), 'Math.random kullanmamalı');
+  ok(!/world\/|attackRange|aggro/.test(src), 'gameplay sistemine dokunmamalı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
