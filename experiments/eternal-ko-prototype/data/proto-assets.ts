@@ -13,7 +13,18 @@
  *  bazında kesildi, ekran ölçeğinin ~2 katına indirildi ve WebP q90 olarak
  *  `public/assets/ui/` altına yazıldı (~490 KB toplam). Yerleşim
  *  `ui/hud-layout.ts` içindedir; burası yalnız anahtar → dosya eşlemesidir. */
+/** P2.11 — zemin dokusu. Kaynak: Poly Haven "rocky_terrain_02" 4K diffuse.
+ *  Tileable olduğu ölçülerek doğrulandı (kenar farkı 6,0/6,9 ≈ iç doku
+ *  farkı 5,8 → döşendiğinde dikiş görünmez). 512×512 WebP, 35 KB. */
+export const GROUND_TEXTURE_KEY = 'ground_texture';
+
 export const UI_ASSETS: Record<string, string> = {
+  /* P2.11 — zemin dokusu. Kaynak: Poly Haven "rocky_terrain_02" 4K diffuse.
+     Tileable olduğu ÖLÇÜLEREK doğrulandı: sol-sağ kenar farkı 6,0 ve
+     üst-alt 6,9; dokunun kendi iç komşu-sütun farkı 5,8. Kenarlar iç
+     dokudan ayırt edilemiyor → döşendiğinde dikiş görünmez.
+     512×512 WebP, 35 KB (kaynak 4K JPG 11 MB idi). */
+  ground_texture: 'assets/nature/ground.webp',
   ui_player_card: 'assets/ui/ui_player_card.webp',
   ui_target_card: 'assets/ui/ui_target_card.webp',
   ui_genie_toggle: 'assets/ui/ui_genie_toggle.webp',
@@ -107,6 +118,27 @@ export const PROTO_MODELS: Record<string, string> = {
      3bb19b3ad5e4689bd7996cfbe1bbba3978832683836139ac44ca276e8c9700db.
      Statik mesh: skin/iskelet/animasyon YOK. */
   arrow_glb: 'assets/models/arrow_mobile_v1.glb',
+
+  /* ═══════════ P2.11 — DOĞA VARLIKLARI ═══════════
+     Kaynak: Stylized Nature MegaKit (68 model). Yalnız 7 aile alındı;
+     her aileden TEK model, varyantlar elenmedi — sahnede aynı model
+     tekrar tekrar örneklenir (68 dosya yerine 7 dosya, 8,8 MB yerine
+     661 KB).
+
+     OPTİMİZASYON: kaynak dokular 1024×1024 PNG'ydi (68 dosyada 77,7 MB).
+     128×128 JPEG q78'e indirildi. Geometriye DOKUNULMADI — üçgen sayısı,
+     kemik ve materyal yapısı kaynaktaki gibi.
+
+     Twisted Tree (9 600 üçgen) ALINMADI: tek başına diğer üç ağacın
+     toplamı kadar. Yol taşları ve mantarlar Moradon'a uymadığı için
+     kapsam dışı. */
+  nature_agac: 'assets/nature/agac.glb',
+  nature_cam: 'assets/nature/cam.glb',
+  nature_olu_agac: 'assets/nature/olu_agac.glb',
+  nature_cali: 'assets/nature/cali.glb',
+  nature_ot: 'assets/nature/ot.glb',
+  nature_cicek: 'assets/nature/cicek.glb',
+  nature_kaya: 'assets/nature/kaya.glb',
 };
 
 /** Önizleme paketi varsa gömülü data URI, yoksa dosya yolu. */

@@ -26,12 +26,16 @@
 import {
   AmbientLight, BoxGeometry, CapsuleGeometry, Color, ConeGeometry, CylinderGeometry,
   DirectionalLight, DoubleSide, GridHelper, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial,
-  Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Raycaster,
+  InstancedMesh, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster,
+  RepeatWrapping, Texture,
   Matrix4, RingGeometry, Scene, SphereGeometry, Vector2, Vector3, Vector4, WebGLRenderer,
   type BufferGeometry, type Camera, type Material,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { facingToYaw } from './coords.js';
+import {
+  FOLIAGE_BASE_SCALE, type FoliageItem,
+} from '../data/moradon-foliage.js';
 import type { GameplayPoint } from './coords.js';
 import {
   CAMERA_V1, cameraLookAt, cameraPosition, orthoBounds, smoothTowards,
@@ -255,7 +259,11 @@ export class ThreeWorldRenderer {
     const groundGeo = this.keepGeo(
       TERRAIN_MESH_ACTIVE ? buildTerrainGeometry() : new PlaneGeometry(8000, 8000),
     );
+    /* P2.11 — zemin dokusu. Doku YOKSA eski düz renk devrede kalır:
+       varlık yüklenemezse oyun yine çalışır. `repeat` arazi boyutundan
+       türer, elle sayı yazılmaz. */
     const groundMat = this.keepMat(new MeshLambertMaterial({ color: 0x38472b }));
+    this.groundMat = groundMat;
     this.ground = new Mesh(groundGeo, groundMat);
     /* Arazi geometrisi ZATEN dünya düzlemindedir (X/Z); düz plane XY'de üretilir
        ve yatırılması gerekir. */
@@ -468,6 +476,86 @@ export class ThreeWorldRenderer {
   }
 
   get usingArrowGlb(): boolean { return this.arrowOwned !== null; }
+
+  /* ═══════════════ P2.11 — BİTKİ ÖRTÜSÜ ═══════════════
+     Konumlar `data/moradon-foliage.ts` (saf, tohumlu) katmanından gelir.
+     Burada YALNIZ çizim var: model yüklenir, InstancedMesh'e dizilir.
+
+     NEDEN InstancedMesh: 860 nesne var ama 7 farklı model. Her nesne için
+     ayrı Mesh yaratmak 860 draw call demek — mobil bunu kaldırmaz.
+     Instancing ile tür başına TEK draw call (7 toplam).
+
+     GAMEPLAY ETKİSİ YOK: bitkiler collision'a girmez, WorldFrame'e
+     yazılmaz, hiçbir gameplay sistemi bunları görmez. */
+  private foliage = new Map<string, InstancedMesh>();
+  private foliageOwned: BufferGeometry[] = [];
+
+  /** Bir bitki türünün modelini yükler ve örneklerini yerleştirir. */
+  attachFoliage(kind: string, glb: LoadedGlb, items: FoliageItem[]): boolean {
+    if (items.length === 0) return false;
+    /* Modelin bütün mesh'lerini tek geometriye topla — kaynak modeller
+       çok parçalı olabiliyor (gövde + yaprak ayrı materyal). İlk mesh'i
+       alıyoruz; çok materyalli modellerde ikincil parçalar düşer, bu
+       bilinçli bir sadeleştirmedir. */
+    let src: Mesh | null = null;
+    glb.scene.traverse((o) => {
+      const m = o as Mesh & { isMesh?: boolean };
+      if (m.isMesh === true && src === null) src = o as Mesh;
+    });
+    if (src === null) return false;
+    const mesh = src as Mesh;
+    this.detachFoliage(kind);
+
+    const geo = mesh.geometry.clone();
+    this.foliageOwned.push(geo);
+    const inst = new InstancedMesh(geo, mesh.material, items.length);
+    inst.frustumCulled = true;
+    const m4 = new Matrix4();
+    const q = new Quaternion();
+    const pos = new Vector3();
+    const scl = new Vector3();
+    items.forEach((it, i) => {
+      const base = FOLIAGE_BASE_SCALE[it.kind] * it.scale;
+      pos.set(it.x, groundElevationAt(it.x, it.y), it.y);
+      q.setFromAxisAngle(new Vector3(0, 1, 0), it.rotation);
+      scl.set(base, base, base);
+      m4.compose(pos, q, scl);
+      inst.setMatrixAt(i, m4);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    this.scene.add(inst);
+    this.foliage.set(kind, inst);
+    return true;
+  }
+
+  detachFoliage(kind: string): void {
+    const inst = this.foliage.get(kind);
+    if (!inst) return;
+    this.scene.remove(inst);
+    inst.dispose();
+    this.foliage.delete(kind);
+  }
+
+  /** Yüklenmiş bitki türü sayısı (telemetri). */
+  get foliageKinds(): number { return this.foliage.size; }
+
+  /** P2.11 — zemin dokusunu uygular. Doku tileable olduğu için `repeat`
+   *  ile döşenir; tek karo 320 dünya birimi (≈ oyuncunun iki adımı).
+   *  Renk çarpanı beyaza çekilir, yoksa doku yeşil filtreden geçer. */
+  private groundMat: MeshLambertMaterial | null = null;
+
+  applyGroundTexture(image: TexImageSource, worldSize = 2560, tile = 320): boolean {
+    if (!this.groundMat) return false;
+    const tex = new Texture(image as unknown as HTMLImageElement);
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = RepeatWrapping;
+    tex.repeat.set(worldSize / tile, worldSize / tile);
+    tex.needsUpdate = true;
+    this.groundMat.map = tex;
+    this.groundMat.color.set(0x9aa88a);   // dokuyu hafif yeşile boya
+    this.groundMat.needsUpdate = true;
+    return true;
+  }
   get arrowGlbAvailable(): boolean { return this.arrowGlb !== null; }
 
   /** DEV — gerçek ok modeli ↔ primitive silüet. */

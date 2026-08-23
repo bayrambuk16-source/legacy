@@ -103,6 +103,48 @@ async function attachThree(): Promise<void> {
       console.warn('[P2.4] Ok GLB yüklenemedi, primitive silüet:',
         err instanceof Error ? err.message : err);
     }
+    /* ══ P2.11 — ZEMİN DOKUSU ══
+       Görsel ön-yükleyici bu anahtarı zaten indirdi; burada yalnız
+       materyale bağlanır. Doku yoksa düz renk devrede kalır. */
+    try {
+      const { GROUND_TEXTURE_KEY } = await import('./data/proto-assets.js');
+      const img = game.assets.images.get(GROUND_TEXTURE_KEY);
+      if (img) renderer.applyGroundTexture(img);
+    } catch (err) {
+      console.warn('[P2.11] Zemin dokusu uygulanamadı:',
+        err instanceof Error ? err.message : err);
+    }
+
+    /* ══ P2.11 — BİTKİ ÖRTÜSÜ ══
+       Bağımsız `try`: bitkiler yüklenemezse harita çıplak kalır ama oyun
+       çalışmaya devam eder. Bitkiler DEKORDUR, gameplay'e girmezler. */
+    try {
+      const [{ loadGlb }, { modelSrc }, foliage] = await Promise.all([
+        import('./render3d/GlbLoader.js'),
+        import('./data/proto-assets.js'),
+        import('./data/moradon-foliage.js'),
+      ]);
+      const items = foliage.buildFoliage();
+      const byKind = new Map<string, typeof items>();
+      for (const it of items) {
+        const list = byKind.get(it.kind) ?? [];
+        list.push(it);
+        byKind.set(it.kind, list);
+      }
+      /* Türler SIRAYLA yüklenir: hepsini paralel çekmek mobilde ağ ve
+         bellek tepesi yaratıyor. Biri düşerse diğerleri devam eder. */
+      for (const [kind, list] of byKind) {
+        try {
+          const url = modelSrc(foliage.FOLIAGE_MODEL_KEY[kind as foliage.FoliageKind]);
+          if (url) renderer.attachFoliage(kind, await loadGlb(url), list);
+        } catch (e) {
+          console.warn(`[P2.11] ${kind} yüklenemedi:`, e instanceof Error ? e.message : e);
+        }
+      }
+    } catch (err) {
+      console.warn('[P2.11] Bitki örtüsü kurulamadı, harita çıplak:',
+        err instanceof Error ? err.message : err);
+    }
   } catch (err) {
     console.warn('[P2.0] Three katmanı kurulamadı, 2D devam ediyor:',
       err instanceof Error ? err.message : err);

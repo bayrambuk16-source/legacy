@@ -51,6 +51,10 @@ import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
 import { ARCHER_SOURCE_ITEMS, archerSourceItem } from '../data/archer-source-items.js';
 import { ALLOC_BOX, ALLOC_ROWS, allocButtons, parseAllocId } from '../ui/character-panel.js';
 import {
+  FOLIAGE_BASE_SCALE, FOLIAGE_MODEL_KEY, FOLIAGE_SEED, SPAWN_CLEAR, SLOT_MARGIN,
+  buildFoliage, type FoliageKind,
+} from '../data/moradon-foliage.js';
+import {
   FORGE_EFFECTIVE_MAX, canAttempt, forgePreview, goldCost, scrollCost, successChance,
 } from '../data/forge-model.js';
 import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
@@ -69,7 +73,7 @@ import {
   KEEP_RADIUS, MORADON_PLAY_SPAWN, MORADON_POPULATION, MORADON_RESPAWN_SEC, SLOT_RECT,
 } from '../data/moradon-farm-slots.js';
 import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
-import { UI_ASSETS } from '../data/proto-assets.js';
+import { GROUND_TEXTURE_KEY, PROTO_MODELS, UI_ASSETS } from '../data/proto-assets.js';
 /* MORADON_WORLD_SPAWN ve SPAWN_POINT dosyanın ilerisinde ZATEN import edilir
    (P2.4A bloğu / world-map). Burada yalnız P2.4C'ye özgü adlar alınır. */
 import {
@@ -9601,8 +9605,15 @@ test('§56 her HUD görseli MANİFESTTE kayıtlı', () => {
   for (const key of hudSpriteKeys()) {
     ok(UI_ASSETS[key] !== undefined, `manifestte yok: ${key}`);
   }
-  /* Manifest yolları `assets/ui/` altında olmalı — legacy havuzuyla karışmasın. */
+  /* Manifest yolları `assets/ui/` altında olmalı — legacy havuzuyla
+     karışmasın. TEK İSTİSNA: zemin dokusu doğa varlıklarıyla birlikte
+     `assets/nature/` altında durur (HUD parçası değildir, aynı kaynak
+     paketten gelir). */
   for (const [k, path] of Object.entries(UI_ASSETS)) {
+    if (k === GROUND_TEXTURE_KEY) {
+      ok(path.startsWith('assets/nature/'), `${k} yanlış klasörde: ${path}`);
+      continue;
+    }
     ok(path.startsWith('assets/ui/'), `${k} yanlış klasörde: ${path}`);
   }
 });
@@ -10202,6 +10213,85 @@ test('§73 EĞRİ: Sv20 dağıtılmış karakter Sv15 mobu MAKUL sürede indirir
   const hits = Math.ceil(boss.hp / Math.max(1, avg));
   ok(hits <= 12, `Sv20'de reis ${hits} vuruş sürüyor (AP ${ap}, hasar ~${avg})`);
   ok(S.player.maxHp > 200, `Sv20 canı düşük: ${S.player.maxHp}`);
+});
+
+/* ================= P2.11 — BİTKİ ÖRTÜSÜ ================= */
+console.log('P2.11 — Moradon bitki örtüsü:');
+
+test('§74 yerleşim DETERMİNİSTİK — aynı tohum aynı harita', () => {
+  const a = buildFoliage(FOLIAGE_SEED);
+  const b = buildFoliage(FOLIAGE_SEED);
+  eq(a.length, b.length, 'nesne sayısı:');
+  for (let i = 0; i < a.length; i++) {
+    eq(a[i]!.x, b[i]!.x, `nesne ${i} X:`);
+    eq(a[i]!.y, b[i]!.y, `nesne ${i} Y:`);
+  }
+  /* FARKLI tohum FARKLI harita üretmeli — yoksa tohum işe yaramıyordur. */
+  const c = buildFoliage(FOLIAGE_SEED + 1);
+  ok(JSON.stringify(a) !== JSON.stringify(c), 'farklı tohum aynı sonucu verdi');
+  /* Math.random KULLANILMAMALI. */
+  const src = readFileSync(join(PROTO_ROOT, 'data', 'moradon-foliage.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  ok(!/Math\.random/.test(src), 'bitki katmanı Math.random kullanmamalı');
+  ok(!/from\s+'three/.test(src), 'bitki katmanı three import etmemeli');
+});
+
+test('§74 bitkiler YÜRÜNEBİLİR alanda, doğuş meydanı BOŞ', () => {
+  const items = buildFoliage();
+  ok(items.length > 700, `nesne sayısı düşük: ${items.length}`);
+  for (const it of items) {
+    ok(isWalkable(it.x, it.y), `${it.kind} kapalı hücrede: ${it.x},${it.y}`);
+    const d = Math.hypot(it.x - MORADON_PLAY_SPAWN.x, it.y - MORADON_PLAY_SPAWN.y);
+    ok(d >= SPAWN_CLEAR, `${it.kind} doğuş meydanında (${Math.round(d)} < ${SPAWN_CLEAR})`);
+  }
+});
+
+test('§74 BÜYÜK bitkiler mob slotlarının içine girmez', () => {
+  /* Savaş sırasında ağaç görüşü kapatmasın. Ot/çiçek/çalı girebilir. */
+  const large = new Set<FoliageKind>(['agac', 'cam', 'olu_agac', 'kaya']);
+  for (const it of buildFoliage()) {
+    if (!large.has(it.kind)) continue;
+    for (const s of FARM_AREA_SLOTS) {
+      const inX = Math.abs(it.x - s.homeX) <= SLOT_RECT / 2 + SLOT_MARGIN;
+      const inY = Math.abs(it.y - s.homeY) <= SLOT_RECT / 2 + SLOT_MARGIN;
+      ok(!(inX && inY), `${it.kind} ${s.id} slotunun içinde`);
+    }
+  }
+});
+
+test('§74 nesneler birbirine YAPIŞMAZ', () => {
+  const items = buildFoliage();
+  /* En küçük tür aralığı 38; hiçbir çift bunun yarısından yakın olmamalı. */
+  let worst = Infinity;
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const d = Math.hypot(items[i]!.x - items[j]!.x, items[i]!.y - items[j]!.y);
+      if (d < worst) worst = d;
+    }
+  }
+  ok(worst >= 29, `en yakın çift ${worst.toFixed(1)} birim — yapışık`);
+});
+
+test('§74 her tür MODEL ANAHTARI ve ÖLÇEK taşır', () => {
+  const kinds = new Set(buildFoliage().map((i) => i.kind));
+  for (const k of kinds) {
+    ok(FOLIAGE_MODEL_KEY[k] !== undefined, `${k} model anahtarı yok`);
+    ok(PROTO_MODELS[FOLIAGE_MODEL_KEY[k]] !== undefined, `${k} manifestte yok`);
+    ok(FOLIAGE_BASE_SCALE[k] > 0, `${k} taban ölçeği geçersiz`);
+  }
+  eq(kinds.size, 7, 'tür sayısı:');
+});
+
+test('§74 bitkiler GAMEPLAY’e GİRMEZ', () => {
+  /* Dekor: collision yok, WorldFrame'de yok, hiçbir sistem görmüyor. */
+  const S = new PrototypeState(2700);
+  const before = S.mobs.mobs.length;
+  const frame = buildWorldFrame(S);
+  eq(frame.mobs.length, before, 'çerçeve mob sayısı:');
+  ok(!('foliage' in frame), 'WorldFrame bitki taşımamalı');
+  /* Bitkinin durduğu noktada yürüyüş SERBEST olmalı. */
+  const it = buildFoliage()[0]!;
+  ok(isWalkable(it.x, it.y), 'bitki noktası yürünebilir kalmalı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
