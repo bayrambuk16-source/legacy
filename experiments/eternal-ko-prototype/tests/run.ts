@@ -67,7 +67,8 @@ import {
   GOBLIN_MAX_LEVEL, KECOON_ATTRIBUTION, KECOON_CLIPS, KECOON_CLIP_MAP,
   kecoonAttackClipFor, kecoonScaleFor, usesGoblinModel,
 } from '../data/kecoon-model.js';
-import { clipMapFor } from '../render3d/MutantAnimator.js';
+import { clipFactOf, clipMapFor } from '../render3d/MutantAnimator.js';
+import type { MobPhase } from '../world/MobAi.js';
 import {
   CAMERA_DIAGONAL_REACH, MAX_MOB_VISUALS, MOB_DRAW_DISTANCE,
 } from '../data/mob-draw-distance.js';
@@ -11904,6 +11905,72 @@ test('§99.1 KESİM SİLMEZ, GİZLER — sınırda kur/yık olmaz', () => {
   /* Klon TEMBEL olmalı: `fillMobVisual` gizleme kontrolünden sonra. */
   const fillAt = loop.indexOf('this.fillMobVisual');
   ok(fillAt > shownAt, 'klon açılışta kuruluyor — 184 klon birden donma yapar');
+});
+
+/* ================= P2.29.3 — GOBLIN ANİMATÖR ÇÖKMESİ ================= */
+console.log('P2.29.3 — goblin animatörü canlı sürülüyor:');
+
+test('§100 GOBLIN animatörü BÜTÜN fazlarda çökmüyor', () => {
+  /* OYUN DONMASININ ASIL SEBEBİ: klip ADLARI modele göre seçiliyordu
+     ama klip SÜRESİ hep mutant tablosundan aranıyordu; `02_WALK`
+     orada yok ve fonksiyon HATA FIRLATIYOR.
+
+     Önceki testler klip haritasını ve manifestleri AYRI AYRI
+     doğruluyordu; çapraz arama ancak canlı bir goblin yürüyünce
+     tetikleniyordu. Bu test animatörü GERÇEKTEN sürer. */
+  const goblinClips = ['01_IDLE', '02_WALK', '03_ATTACK_SLAM', '04_LEAP_ATTACK', '05_DEATH'];
+  const a = new MutantAnimator();
+  a.useClipMap(goblinClips);
+
+  const phases: MobPhase[] = ['IDLE', 'PATROL', 'AGGRO', 'CHASE', 'ATTACK', 'RETURN', 'DEAD'];
+  for (const phase of phases) {
+    for (const moving of [false, true]) {
+      for (const speed of [0, 0.3, 2.5]) {
+        /* Fırlatma OLMAMALI — döngü ortasında hata oyunu dondurur. */
+        const d = a.update(1 / 60, {
+          phase, moving, speed, dead: phase === 'DEAD',
+          attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
+        } as never);
+        ok(d !== undefined && typeof d.clip === 'string',
+          `${phase}/${moving}/${speed} karar üretmedi`);
+        /* Seçilen klip GOBLİN kümesinde olmalı — mutant klibi seçilirse
+           model o klibi bilmediği için sessizce hiçbir şey oynatmaz. */
+        ok(goblinClips.includes(d.clip), `${phase}: goblin dışı klip ${d.clip}`);
+      }
+    }
+  }
+});
+
+test('§100 AGGRO fazı goblin\'de ATLANIR — kükreme klibi yok', () => {
+  /* `map.roar === null` idi ve `mutantClip(null)` hata fırlatıyordu.
+     Doğrusu: klip yoksa faz atlanır, uydurma klip oynatılmaz. */
+  const a = new MutantAnimator();
+  a.useClipMap(['01_IDLE', '02_WALK', '05_DEATH']);
+  const d = a.update(1 / 60, {
+    phase: 'AGGRO', moving: false, speed: 0, dead: false,
+    attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
+  } as never);
+  ok(d.clip !== '07_ROAR', 'goblin kükreme klibi oynatmamalı');
+  /* Mutantta ise kükreme ÇALIŞMAYA devam etmeli. */
+  const b = new MutantAnimator();
+  b.useClipMap(['01_IDLE', '02_IDLE_BREATHE', '03_WALK', '04_RUN', '07_ROAR', '08_DEATH']);
+  const e = b.update(1 / 60, {
+    phase: 'AGGRO', moving: false, speed: 0, dead: false,
+    attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
+  } as never);
+  eq(e.clip, '07_ROAR', 'mutant kükremesi:');
+});
+
+test('§100 klip arama HER İKİ tabloya bakar', () => {
+  /* Mutant klibi. */
+  ok(clipFactOf('03_WALK') !== undefined, 'mutant klibi bulunamadı');
+  /* Goblin klibi — eskiden burada HATA fırlıyordu. */
+  const g = clipFactOf('02_WALK');
+  ok(g !== undefined, 'goblin klibi bulunamadı');
+  ok(g!.durationSec > 0, 'goblin klip süresi yok');
+  /* Bilinmeyen ad HATA FIRLATMAZ, `undefined` döner. */
+  eq(clipFactOf('YOK_BOYLE_KLIP'), undefined, 'bilinmeyen klip:');
+  eq(clipFactOf(null), undefined, 'null klip:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

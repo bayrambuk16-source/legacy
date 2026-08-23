@@ -26,9 +26,10 @@
  *  hit/damage reaction animasyonu yok" diyor. Bu katman da UYDURMAZ: hasar
  *  tepkisi state'i BAĞLANMAZ. */
 import {
-  MUTANT_CLIPS, MUTANT_DEATH_VISUAL_Y_OFFSET_METERS, mutantClip,
+  MUTANT_CLIPS, MUTANT_DEATH_VISUAL_Y_OFFSET_METERS,
   type MutantClipFact, type MutantClipName,
 } from '../data/mutant-model.js';
+import { KECOON_CLIPS } from '../data/kecoon-model.js';
 import type { MobPhase } from '../world/MobAi.js';
 
 /* ───────────────────────────── ayarlar (GÖRSEL) ───────────────────────────── */
@@ -139,6 +140,38 @@ const RUN_PHASES: readonly MobPhase[] = ['CHASE'];
 
 type OneShot = { clip: MutantClipName; remaining: number; cutOnMove: boolean };
 
+/** ═══ P2.29.3 — MODEL-BAĞIMSIZ KLİP ARAMA ═══
+ *
+ *  OYUN DONMASININ ASIL SEBEBİ BUYDU.
+ *
+ *  P2.28'de ikinci model (goblin) geldi ve klip ADLARI doğru seçildi
+ *  (`clipMapFor`), ama klibin SÜRESİ/HIZI hâlâ `mutantClip()` ile
+ *  aranıyordu. Mutant tablosunda `02_WALK` yok; fonksiyon eksik klipte
+ *  bilerek HATA FIRLATIYOR. Hata oyun döngüsünün ortasında patlayınca
+ *  kare kırılıyor ve oyun donuyordu.
+ *
+ *  Belirti "bir adım atınca donuyor" idi: başlangıç bölgesindeki moblar
+ *  goblin; oyuncu adım atınca en yakın goblin AGGRO'ya geçiyor ya da
+ *  yürümeye başlıyor, ilk klip aramasında patlıyordu.
+ *
+ *  TESTLERİN YAKALAYAMAMA SEBEBİ: klip haritası ve manifestler AYRI
+ *  AYRI doğrulanıyordu; çapraz arama (goblin adı → mutant tablosu)
+ *  ancak canlı bir goblin yürüyünce tetikleniyor. Artık §100 bunu
+ *  animatörü gerçekten sürerek sınıyor.
+ *
+ *  Arama sırası: önce mutant tablosu, sonra goblin. Hiçbirinde yoksa
+ *  `undefined` — çağıran güvenli varsayılana düşer, HATA FIRLATMAZ. */
+export function clipFactOf(name: string | null): {
+  name: string; durationSec: number; sourceSpeedMetersPerSec: number;
+} | undefined {
+  if (name === null) return undefined;
+  const m = MUTANT_CLIPS.find((c) => c.name === name);
+  if (m) return m;
+  const k = KECOON_CLIPS.find((c) => c.name === name);
+  if (k) return k;
+  return undefined;
+}
+
 export class MutantAnimator {
   /** P2.28 — MODELE GÖRE klip tablosu. Varsayılan mutanttır; goblin
    *  rig'i için `useClipMap()` ile değiştirilir. `MobRig` model
@@ -211,13 +244,18 @@ export class MutantAnimator {
 
     /* ── 3. AGGRO KÜKREMESİ (yükselen kenar) ── */
     if (phase === 'AGGRO' && prevPhase !== 'AGGRO' && this.oneShot === null) {
-      const roar = mutantClip((this.map.roar as MutantClipName));
-      this.oneShot = {
-        clip: roar.name, remaining: roar.durationSec,
-        cutOnMove: MUTANT_ANIM_TUNING.roarCutOnMove,
-      };
-      restart = true;
-      this.note(roar.name);
+      /* Goblin'de kükreme klibi YOK (`map.roar === null`). Eskiden bu
+         `mutantClip(null)` çağrısına dönüşüp hata fırlatıyordu.
+         Klip yoksa faz ATLANIR — uydurma klip oynatılmaz. */
+      const roar = clipFactOf(this.map.roar);
+      if (roar) {
+        this.oneShot = {
+          clip: roar.name as MutantClipName, remaining: roar.durationSec,
+          cutOnMove: MUTANT_ANIM_TUNING.roarCutOnMove,
+        };
+        restart = true;
+        this.note(roar.name as MutantClipName);
+      }
     }
 
     /* ── 4. devam eden tek-atışlık klip ── */
@@ -236,9 +274,14 @@ export class MutantAnimator {
     /* ── 5. lokomosyon: AİLE FAZDAN, HIZ ORANI ÖLÇÜMDEN ── */
     if (moving && (WALK_PHASES.includes(phase) || RUN_PHASES.includes(phase))) {
       this.idleElapsed = 0;
-      const name = RUN_PHASES.includes(phase) ? (this.map.run as MutantClipName) : (this.map.walk as MutantClipName);
-      const clip = mutantClip(name);
-      const scale = clampScale(speed / Math.max(0.01, clip.sourceSpeedMetersPerSec));
+      const name = RUN_PHASES.includes(phase)
+        ? (this.map.run as MutantClipName) : (this.map.walk as MutantClipName);
+      /* Klip bilgisi HER İKİ tablodan aranır. Bulunamazsa hız oranı 1
+         kalır: animasyon oynar, yalnız ayak kayması ölçülemez. */
+      const clip = clipFactOf(name);
+      const scale = clip
+        ? clampScale(speed / Math.max(0.01, clip.sourceSpeedMetersPerSec))
+        : 1;
       if (this.current !== name) this.note(name);
       this.current = name;
       return this.decide(name, true, false, scale, false);
