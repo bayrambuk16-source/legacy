@@ -62,6 +62,9 @@ export interface MobView {
 export const DEFAULT_MOB_VIEW: Omit<MobView, 'uid' | 'generation' | 'worldX' | 'worldY'> = {
   aiType: 'NORMAL', hpRatio: 1, dead: false,
   phase: 'IDLE', attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
+  /* P2.28 — varsayılan GOBLIN bandında: test/telemetri kuklaları
+     zayıf mob gibi davransın, ölçek ve klip seçimi tutarlı kalsın. */
+  level: 1,
   corpseFaded: false,
 };
 

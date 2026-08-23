@@ -394,20 +394,20 @@ export class ThreeWorldRenderer {
   /** P2.28 — goblin fabrikası. Mutantınkiyle AYNI sınıf: `MobRig`
    *  klip adlarını tablodan okur, model farkı rig'e sızmaz. */
   private kecoonFactory: MutantRigFactory | null = null;
-  private kecoonGlb: LoadedGlb | null = null;
 
   attachKecoon(glb: LoadedGlb): MutantRigFactory {
     this.detachKecoon();
-    this.kecoonGlb = glb;
     this.kecoonFactory = new MutantRigFactory(glb);
     this.rebuildMobVisuals();
     return this.kecoonFactory;
   }
 
+  /** Goblin modelini kaldırır; moblar mutant modeline düşer.
+   *  Mutanttaki gibi bir AÇ/KAPA yolu YOK — goblin bir DEV
+   *  seçeneği değil, üretim varlığıdır. */
   detachKecoon(): void {
     this.kecoonFactory?.dispose();
     this.kecoonFactory = null;
-    this.kecoonGlb = null;
     this.rebuildMobVisuals();
   }
 
