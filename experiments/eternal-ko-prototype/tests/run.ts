@@ -11922,13 +11922,17 @@ test('§100 GOBLIN animatörü BÜTÜN fazlarda çökmüyor', () => {
   const a = new MutantAnimator();
   a.useClipMap(goblinClips);
 
-  const phases: MobPhase[] = ['IDLE', 'PATROL', 'AGGRO', 'CHASE', 'ATTACK', 'RETURN', 'DEAD'];
+  /* GERÇEK faz listesi (`MobAi.MobPhase`) — uydurma faz adı yazmak
+     testi tip düzeyinde kırar ve gerçek kapsamı daraltır. */
+  const phases: MobPhase[] = [
+    'IDLE', 'ROAM', 'AGGRO', 'CHASE', 'ATTACK', 'RETURN', 'DYING', 'DEAD', 'RESPAWN',
+  ];
   for (const phase of phases) {
     for (const moving of [false, true]) {
       for (const speed of [0, 0.3, 2.5]) {
         /* Fırlatma OLMAMALI — döngü ortasında hata oyunu dondurur. */
         const d = a.update(1 / 60, {
-          phase, moving, speed, dead: phase === 'DEAD',
+          phase, moving, speed, dead: phase === 'DEAD' || phase === 'DYING',
           attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
         } as never);
         ok(d !== undefined && typeof d.clip === 'string',
