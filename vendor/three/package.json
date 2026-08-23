@@ -1,0 +1,20 @@
+{
+  "name": "three",
+  "version": "0.169.0",
+  "description": "YEREL VENDOR KOPYASI — npm'den KURULMAZ. Bkz. VENDOR.json",
+  "type": "module",
+  "main": "./build/three.cjs",
+  "module": "./build/three.module.js",
+  "types": "./three.d.ts",
+  "exports": {
+    ".": {
+      "types": "./three.d.ts",
+      "import": "./build/three.module.js",
+      "require": "./build/three.cjs"
+    },
+    "./addons/*": "./examples/jsm/*",
+    "./examples/jsm/*": "./examples/jsm/*"
+  },
+  "license": "MIT",
+  "private": true
+}

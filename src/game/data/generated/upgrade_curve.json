@@ -1,0 +1,105 @@
+{
+  "note": "Kaynak referans eğrileri (BUS / TRINA_BUS). MVP profili UpgradeSystem config: kaynak eğri + yumuşatma.",
+  "source": [
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 1,
+      "probability_percent": 100
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 2,
+      "probability_percent": 100
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 3,
+      "probability_percent": 100
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 4,
+      "probability_percent": 70
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 5,
+      "probability_percent": 50
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 6,
+      "probability_percent": 30
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 7,
+      "probability_percent": 9
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 8,
+      "probability_percent": 5
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 9,
+      "probability_percent": 0
+    },
+    {
+      "mode": "BUS_ONLY",
+      "display_level": 10,
+      "probability_percent": 0
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 1,
+      "probability_percent": 100
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 2,
+      "probability_percent": 100
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 3,
+      "probability_percent": 100
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 4,
+      "probability_percent": 80
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 5,
+      "probability_percent": 60
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 6,
+      "probability_percent": 33
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 7,
+      "probability_percent": 13
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 8,
+      "probability_percent": 8
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 9,
+      "probability_percent": 1
+    },
+    {
+      "mode": "TRINA_BUS",
+      "display_level": 10,
+      "probability_percent": 0
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobile-rpg.local/schema/archer_animation.schema.json",
+  "title": "Archer Animation Atlas Metadata",
+  "description": "ARCHER ANIMATION ASSET SPEC V1 metadata sozlesmesi. Runtime bu dosyadan okur; kare sayisi, fps, loop ve yon satirlari KODA GOMULMEZ.",
+  "type": "object",
+  "required": ["frameWidth", "frameHeight", "footAnchor", "directionRows", "animations"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Teslim surumu (ornek: 'v1.0'). Izlenebilirlik icin onerilir."
+    },
+    "producedAt": {
+      "type": "string",
+      "description": "Teslim tarihi (ISO-8601). Izlenebilirlik icin onerilir."
+    },
+    "sourceFormat": {
+      "type": "string",
+      "enum": ["png", "webp"],
+      "description": "Dogrulamanin kosturuldugu kaynak format. Spec S12: dogrulama PNG uzerinde yapilir."
+    },
+    "frameWidth": { "type": "integer", "minimum": 1, "description": "Tek karenin genisligi (px). V1 = 300." },
+    "frameHeight": { "type": "integer", "minimum": 1, "description": "Tek karenin yuksekligi (px). V1 = 300." },
+    "footAnchor": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "description": "Karakterin zemine degdigi nokta, kare koordinatinda. V1 = (150, 264) -> originX 0.5 / originY 0.88.",
+      "properties": {
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 }
+      }
+    },
+    "directionRows": {
+      "type": "object",
+      "description": "Yon -> atlas SATIR indeksi. Sira butun atlaslarda AYNIDIR ve tahmin edilmez.",
+      "required": ["BACK", "BACK_RIGHT", "RIGHT", "FRONT_RIGHT", "FRONT", "FRONT_LEFT", "LEFT", "BACK_LEFT"],
+      "additionalProperties": false,
+      "properties": {
+        "BACK": { "$ref": "#/$defs/rowIndex" },
+        "BACK_RIGHT": { "$ref": "#/$defs/rowIndex" },
+        "RIGHT": { "$ref": "#/$defs/rowIndex" },
+        "FRONT_RIGHT": { "$ref": "#/$defs/rowIndex" },
+        "FRONT": { "$ref": "#/$defs/rowIndex" },
+        "FRONT_LEFT": { "$ref": "#/$defs/rowIndex" },
+        "LEFT": { "$ref": "#/$defs/rowIndex" },
+        "BACK_LEFT": { "$ref": "#/$defs/rowIndex" }
+      }
+    },
+    "animations": {
+      "type": "object",
+      "required": ["walk", "attack", "skill", "idle", "dead"],
+      "additionalProperties": false,
+      "properties": {
+        "walk": {
+          "allOf": [{ "$ref": "#/$defs/animation" }],
+          "properties": {
+            "contactFrames": {
+              "description": "OPSIYONEL (spec S9.1). Ayagin yere bastigi kare indeksleri; toz/golge nabzi icin. Verilmezse runtime bu efektleri URETMEZ, tahmin etmez.",
+              "oneOf": [
+                { "type": "null" },
+                { "type": "array", "items": { "type": "integer", "minimum": 0 }, "uniqueItems": true }
+              ]
+            }
+          }
+        },
+        "attack": { "$ref": "#/$defs/releasableAnimation" },
+        "skill": { "$ref": "#/$defs/releasableAnimation" },
+        "idle": { "$ref": "#/$defs/animation" },
+        "dead": { "$ref": "#/$defs/animation" }
+      }
+    }
+  },
+  "$defs": {
+    "rowIndex": { "type": "integer", "minimum": 0, "maximum": 7 },
+    "animation": {
+      "type": "object",
+      "required": ["frames", "loop"],
+      "properties": {
+        "frames": { "type": "integer", "minimum": 1, "description": "Yon BASINA kare sayisi = atlas sutun sayisi." },
+        "fps": { "type": "number", "exclusiveMinimum": 0, "description": "Tek kareli animasyonlarda anlamsizdir, verilmeyebilir." },
+        "loop": { "type": "boolean" },
+        "pivotOverrides": {
+          "description": "OPSIYONEL (spec S9.1). Kare bazli anchor duzeltmesi; anahtar = kare indeksi.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+          }
+        }
+      }
+    },
+    "releasableAnimation": {
+      "type": "object",
+      "required": ["frames", "fps", "loop", "releaseFrame"],
+      "properties": {
+        "frames": { "type": "integer", "minimum": 1 },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "loop": { "type": "boolean" },
+        "releaseFrame": {
+          "description": "Projectile'in ciktigi kare. null ise runtime TIMING TAHMIN ETMEZ; final art ile doldurulur.",
+          "oneOf": [
+            { "type": "null" },
+            { "type": "integer", "minimum": 0 }
+          ]
+        },
+        "pivotOverrides": { "type": "object" }
+      }
+    }
+  }
+}

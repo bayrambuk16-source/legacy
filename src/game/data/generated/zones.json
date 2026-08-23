@@ -1,0 +1,439 @@
+[
+  {
+    "id": "zone_hub",
+    "sourceRef": 21,
+    "sourceName": "Moradon",
+    "displayName": "Avcı Kampı",
+    "sceneKey": "hub",
+    "role": "hub",
+    "spawns": [],
+    "startPosition": {
+      "x": 306,
+      "z": 352
+    }
+  },
+  {
+    "id": "zone_combat_a",
+    "sourceRef": 21,
+    "sourceName": "Moradon",
+    "displayName": "Kuzey Ormanı",
+    "sceneKey": "combat",
+    "role": "combat",
+    "spawns": [
+      {
+        "monsterSourceRef": 150,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 126,
+          "top": 332,
+          "right": 141,
+          "bottom": 307
+        }
+      },
+      {
+        "monsterSourceRef": 150,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 141,
+          "top": 278,
+          "right": 162,
+          "bottom": 256
+        }
+      },
+      {
+        "monsterSourceRef": 150,
+        "count": 20,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 281,
+          "top": 142,
+          "right": 395,
+          "bottom": 66
+        }
+      },
+      {
+        "monsterSourceRef": 150,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 363,
+          "top": 155,
+          "right": 387,
+          "bottom": 132
+        }
+      },
+      {
+        "monsterSourceRef": 750,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 221,
+          "top": 318,
+          "right": 236,
+          "bottom": 302
+        }
+      },
+      {
+        "monsterSourceRef": 750,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 265,
+          "top": 279,
+          "right": 286,
+          "bottom": 257
+        }
+      },
+      {
+        "monsterSourceRef": 752,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 179,
+          "top": 329,
+          "right": 224,
+          "bottom": 279
+        }
+      },
+      {
+        "monsterSourceRef": 752,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 254,
+          "top": 267,
+          "right": 303,
+          "bottom": 229
+        }
+      },
+      {
+        "monsterSourceRef": 754,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 302,
+          "top": 232,
+          "right": 374,
+          "bottom": 205
+        }
+      },
+      {
+        "monsterSourceRef": 754,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 381,
+          "top": 225,
+          "right": 394,
+          "bottom": 209
+        }
+      },
+      {
+        "monsterSourceRef": 754,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 427,
+          "top": 215,
+          "right": 483,
+          "bottom": 187
+        }
+      },
+      {
+        "monsterSourceRef": 850,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 162,
+          "top": 348,
+          "right": 173,
+          "bottom": 328
+        }
+      },
+      {
+        "monsterSourceRef": 850,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 193,
+          "top": 326,
+          "right": 238,
+          "bottom": 298
+        }
+      },
+      {
+        "monsterSourceRef": 850,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 299,
+          "top": 260,
+          "right": 320,
+          "bottom": 245
+        }
+      },
+      {
+        "monsterSourceRef": 851,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 145,
+          "top": 291,
+          "right": 185,
+          "bottom": 247
+        }
+      },
+      {
+        "monsterSourceRef": 851,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 361,
+          "top": 228,
+          "right": 385,
+          "bottom": 193
+        }
+      },
+      {
+        "monsterSourceRef": 851,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 416,
+          "top": 202,
+          "right": 447,
+          "bottom": 184
+        }
+      },
+      {
+        "monsterSourceRef": 852,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 213,
+          "top": 268,
+          "right": 241,
+          "bottom": 226
+        }
+      },
+      {
+        "monsterSourceRef": 852,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 293,
+          "top": 211,
+          "right": 348,
+          "bottom": 184
+        }
+      },
+      {
+        "monsterSourceRef": 852,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 413,
+          "top": 175,
+          "right": 483,
+          "bottom": 147
+        }
+      }
+    ],
+    "startPosition": {
+      "x": 306,
+      "z": 352
+    }
+  },
+  {
+    "id": "zone_combat_b",
+    "sourceRef": 21,
+    "sourceName": "Moradon",
+    "displayName": "Gölgeli Vadi",
+    "sceneKey": "combat",
+    "role": "combat",
+    "spawns": [
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 56,
+          "top": 194,
+          "right": 72,
+          "bottom": 159
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 56,
+          "top": 359,
+          "right": 70,
+          "bottom": 334
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 64,
+          "top": 271,
+          "right": 77,
+          "bottom": 246
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 161,
+          "top": 194,
+          "right": 208,
+          "bottom": 142
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 167,
+          "top": 264,
+          "right": 197,
+          "bottom": 232
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 188,
+          "top": 414,
+          "right": 205,
+          "bottom": 395
+        }
+      },
+      {
+        "monsterSourceRef": 250,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 352,
+          "top": 150,
+          "right": 391,
+          "bottom": 115
+        }
+      },
+      {
+        "monsterSourceRef": 252,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 63,
+          "top": 324,
+          "right": 98,
+          "bottom": 276
+        }
+      },
+      {
+        "monsterSourceRef": 252,
+        "count": 5,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 148,
+          "top": 497,
+          "right": 174,
+          "bottom": 456
+        }
+      },
+      {
+        "monsterSourceRef": 255,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 146,
+          "top": 208,
+          "right": 181,
+          "bottom": 189
+        }
+      },
+      {
+        "monsterSourceRef": 255,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 231,
+          "top": 184,
+          "right": 252,
+          "bottom": 158
+        }
+      },
+      {
+        "monsterSourceRef": 255,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 329,
+          "top": 168,
+          "right": 357,
+          "bottom": 140
+        }
+      },
+      {
+        "monsterSourceRef": 255,
+        "count": 5,
+        "regTimeSourceRaw": 30,
+        "rect": {
+          "left": 401,
+          "top": 161,
+          "right": 432,
+          "bottom": 140
+        }
+      },
+      {
+        "monsterSourceRef": 755,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 190,
+          "top": 273,
+          "right": 252,
+          "bottom": 237
+        }
+      },
+      {
+        "monsterSourceRef": 755,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 357,
+          "top": 227,
+          "right": 409,
+          "bottom": 168
+        }
+      },
+      {
+        "monsterSourceRef": 755,
+        "count": 10,
+        "regTimeSourceRaw": 20,
+        "rect": {
+          "left": 426,
+          "top": 214,
+          "right": 481,
+          "bottom": 185
+        }
+      }
+    ],
+    "startPosition": {
+      "x": 306,
+      "z": 352
+    }
+  }
+]

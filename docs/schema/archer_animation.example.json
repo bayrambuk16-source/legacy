@@ -1,0 +1,45 @@
+{
+  "version": "v1-template",
+  "sourceFormat": "png",
+  "frameWidth": 300,
+  "frameHeight": 300,
+  "footAnchor": { "x": 150, "y": 264 },
+  "directionRows": {
+    "BACK": 0,
+    "BACK_RIGHT": 1,
+    "RIGHT": 2,
+    "FRONT_RIGHT": 3,
+    "FRONT": 4,
+    "FRONT_LEFT": 5,
+    "LEFT": 6,
+    "BACK_LEFT": 7
+  },
+  "animations": {
+    "walk": {
+      "frames": 8,
+      "fps": 10,
+      "loop": true,
+      "contactFrames": null
+    },
+    "attack": {
+      "frames": 6,
+      "fps": 18,
+      "loop": false,
+      "releaseFrame": null
+    },
+    "skill": {
+      "frames": 6,
+      "fps": 16,
+      "loop": false,
+      "releaseFrame": null
+    },
+    "idle": {
+      "frames": 1,
+      "loop": true
+    },
+    "dead": {
+      "frames": 1,
+      "loop": false
+    }
+  }
+}

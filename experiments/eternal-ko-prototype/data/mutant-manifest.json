@@ -1,0 +1,377 @@
+{
+  "asset": "mutant_mobile_v1",
+  "version": 1,
+  "generatedFor": "Project Legacy - Three.js 0.169.0 2.5D mobile renderer",
+  "sourceAsset": "Creature Pack (2) / Mutant.fbx (Mixamo)",
+  "file": "mutant_mobile_v1.glb",
+  "fileBytes": 822716,
+  "units": "meters",
+  "upAxis": "Y",
+  "forwardAxis": "+Z",
+  "characterHeightMeters": 1.861,
+  "runtime": {
+    "threeVersion": "0.169.0",
+    "extensionsUsed": [
+      "EXT_texture_webp"
+    ],
+    "extensionsRequired": [],
+    "decoderDependency": null,
+    "note": "EXT_texture_webp is USED, not REQUIRED - a JPEG fallback image is embedded, so any conformant glTF 2.0 loader opens this file without extension support. No Draco, no Meshopt, no KTX2."
+  },
+  "mesh": {
+    "meshes": 1,
+    "primitives": 1,
+    "drawCalls": 1,
+    "materials": 1,
+    "vertices": 6928,
+    "triangles": 11271,
+    "sourceVertices": 6928,
+    "sourceTriangles": 11271,
+    "decimationApplied": false,
+    "note": "Source was already 11,271 triangles - inside the 6k-15k target band for a normal mob - and is a single mesh with a single material. No decimation, no mesh merging and no silhouette change were needed.",
+    "attributes": [
+      "POSITION(f32)",
+      "NORMAL(f32)",
+      "TEXCOORD_0(u16 normalized)",
+      "JOINTS_0(u8)",
+      "WEIGHTS_0(u8 normalized)"
+    ]
+  },
+  "material": {
+    "name": "mutant_M",
+    "type": "glTF PBR metallic-roughness (MeshStandardMaterial)",
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.9,
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "baseColorTexture": "embedded 512x512 (WebP q86 primary, JPEG q86 fallback)",
+    "maps": {
+      "normal": null,
+      "roughness": null,
+      "metallic": null,
+      "ao": null
+    },
+    "normalMapDecision": "Dropped. Measured A/B: at mid camera distance only 0.86% of rendered pixels differ by more than 20/765; close up 3.5-4.8%. The source diffuse already has muscle shading and AO baked in, so the normal map adds almost nothing at 2.5D distance. Keeping a 256 normal map would cost +57.3 KB (860.7 KB total)."
+  },
+  "texture": {
+    "source": "Mutant_diffuse.png 2048x2048 (7.63 MB) + Mutant_normal.png 2048x2048 (7.52 MB)",
+    "final": "Mutant_diffuse -> 512x512 WebP 77.9 KB (+ JPEG fallback 86.4 KB); normal map not shipped",
+    "colorSpace": "sRGB",
+    "uvRange": "[0.003, 0.997] - single UV set, no atlas packing needed"
+  },
+  "skeleton": {
+    "sourceBoneCount": 37,
+    "skinJointCount": 30,
+    "nodeCount": 32,
+    "root": "Mutant",
+    "hips": "mixamorig:Hips",
+    "rightHand": "mixamorig:RightHand",
+    "leftHand": "mixamorig:LeftHand",
+    "headTop": "mixamorig:HeadTop_End",
+    "attackBoneSwipe": "mixamorig:LeftForeArm",
+    "attackBonePunch": "mixamorig:RightHand",
+    "namingNote": "Original Mixamo names kept verbatim, prefix included. 'Mutant' is a plain identity transform root; 'Mutant_Mesh' holds the skinned mesh; 'mixamorig:Hips' is the skeleton root.",
+    "attachmentNodes": {
+      "mixamorig:LeftHand": "present as a NODE but not a skin joint - it carries zero skin weight in the source (the whole left claw is skinned to LeftForeArm). Kept as a static attachment / debug-reach point.",
+      "mixamorig:HeadTop_End": "static node kept as an over-head anchor (health bar, damage numbers, aggro marker)."
+    },
+    "removedBones": [
+      "mixamorig:RightHandIndex4",
+      "mixamorig:RightHandPinky4",
+      "mixamorig:RightHandThumb4",
+      "mixamorig:LeftToe_End",
+      "mixamorig:RightToe_End"
+    ],
+    "removalProof": "Every removed bone carries exactly zero skin weight AND deviates 0.000 deg / 0.0000 cm from its bind local transform across all 8 selected clips. The reduction is therefore mathematically lossless: measured skinning deviation is 0.0000 cm.",
+    "fingersKept": "All 9 animated right-hand finger bones (Index1-3, Pinky1-3, Thumb1-3) were KEPT. They rotate up to 85 deg across the selected clips and the right fist is the punch striking surface, so merging them was rejected.",
+    "secondaryBones": "The rig has no cloth, armour, belly, spike or appendage bones - it is a plain 37-bone mixamorig humanoid skeleton with a partial right hand.",
+    "joints": [
+      "mixamorig:Hips",
+      "mixamorig:Spine",
+      "mixamorig:Spine1",
+      "mixamorig:Spine2",
+      "mixamorig:Neck",
+      "mixamorig:Head",
+      "mixamorig:LeftShoulder",
+      "mixamorig:LeftArm",
+      "mixamorig:LeftForeArm",
+      "mixamorig:RightShoulder",
+      "mixamorig:RightArm",
+      "mixamorig:RightForeArm",
+      "mixamorig:RightHand",
+      "mixamorig:RightHandIndex1",
+      "mixamorig:RightHandIndex2",
+      "mixamorig:RightHandIndex3",
+      "mixamorig:RightHandPinky1",
+      "mixamorig:RightHandPinky2",
+      "mixamorig:RightHandPinky3",
+      "mixamorig:RightHandThumb1",
+      "mixamorig:RightHandThumb2",
+      "mixamorig:RightHandThumb3",
+      "mixamorig:LeftUpLeg",
+      "mixamorig:LeftLeg",
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:RightUpLeg",
+      "mixamorig:RightLeg",
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase"
+    ]
+  },
+  "animations": [
+    {
+      "name": "01_IDLE",
+      "sourceName": "mutant idle.fbx",
+      "durationSec": 14.2333,
+      "frames": 428,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "loopNote": "loops; measured seam 0.47 cm / 0.94 deg. 14.23 s of non-repeating motion - a single long cycle, no shorter internal loop exists (verified)."
+    },
+    {
+      "name": "02_IDLE_BREATHE",
+      "sourceName": "mutant breathing idle.fbx",
+      "durationSec": 4.0333,
+      "frames": 122,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "loopNote": "loops; measured seam 0.00 cm / 0.00 deg (mathematically exact)."
+    },
+    {
+      "name": "03_WALK",
+      "sourceName": "mutant walking.fbx",
+      "durationSec": 1.4333,
+      "frames": 44,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 1.214,
+      "direction": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 1.21,
+      "footSlidePercentAtSourceSpeed": 0.25,
+      "loopSeamDegrees": 1.135,
+      "loopSeamCm": 1.399
+    },
+    {
+      "name": "04_RUN",
+      "sourceName": "mutant run.fbx",
+      "durationSec": 0.8667,
+      "frames": 27,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 2.205,
+      "direction": [
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 2.231,
+      "footSlidePercentAtSourceSpeed": 1.15,
+      "loopSeamDegrees": 0.697,
+      "loopSeamCm": 0.218
+    },
+    {
+      "name": "05_ATTACK_SWIPE",
+      "sourceName": "mutant swiping.fbx",
+      "durationSec": 2.6667,
+      "frames": 81,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.012,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "timing": {
+        "attackBone": "mixamorig:LeftForeArm",
+        "strikingLimb": "left claw (the whole left forearm+claw is driven by mixamorig:LeftForeArm; mixamorig:LeftHand carries no skin weight in the source)",
+        "windupSec": 0.567,
+        "windupFrame": 17,
+        "swingStartSec": 1.1,
+        "swingStartFrame": 33,
+        "hitTimeSec": 1.3,
+        "hitFrame": 39,
+        "recoverySec": 1.333,
+        "recoveryFrame": 40,
+        "recoveryEndSec": 2.667,
+        "reachAtHitMeters": 1.53,
+        "forwardReachAtHitMeters": 1.496,
+        "peakLimbSpeedMetersPerSec": 37.9,
+        "contactWindowFrames": [
+          37,
+          40
+        ],
+        "note": "Single strike, not a combo. 0.000-0.567 s the creature settles, 0.567-1.100 s the left claw is drawn back to 1.19 m BEHIND the hips, 1.100-1.300 s it whips forward, contact at frame 39. The swing crosses the front in 3 frames, so use the [37,40] window for hit detection rather than a single instant. The right arm counter-rotates during the swing; it never exceeds 6 m/s before frame 37 and does not strike."
+      },
+      "suggestedRole": "heavy / long-range attack: 2.67 s cycle, hit at 49% of the clip, 1.53 m reach"
+    },
+    {
+      "name": "06_ATTACK_PUNCH",
+      "sourceName": "mutant punch.fbx",
+      "durationSec": 1.1,
+      "frames": 34,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "timing": {
+        "attackBone": "mixamorig:RightHand",
+        "strikingLimb": "right fist (mixamorig:RightHand plus its 3 finger chains)",
+        "windupSec": 0.0,
+        "windupFrame": 0,
+        "swingStartSec": 0.2,
+        "swingStartFrame": 6,
+        "hitTimeSec": 0.267,
+        "hitFrame": 8,
+        "recoverySec": 0.333,
+        "recoveryFrame": 10,
+        "recoveryEndSec": 1.1,
+        "reachAtHitMeters": 0.852,
+        "forwardReachAtHitMeters": 0.844,
+        "peakLimbSpeedMetersPerSec": 17.24,
+        "contactWindowFrames": [
+          7,
+          10
+        ],
+        "note": "Straight right punch. Fist pulls back over frames 0-5, extends explosively 6-8, contact at frame 8, retracts from frame 10. Peak hand speed is at frame 9, one frame after maximum extension."
+      },
+      "suggestedRole": "basic / fast attack: 1.10 s cycle, hit at 24% of the clip, 0.85 m reach"
+    },
+    {
+      "name": "07_ROAR",
+      "sourceName": "mutant roaring.fbx",
+      "durationSec": 5.4,
+      "frames": 163,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.002,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "loopNote": "one-shot; source first and last pose differ by 15.1 deg so it must NOT be looped. LoopOnce + clampWhenFinished, or blend back to 01_IDLE.",
+      "peakPoseSec": 1.4,
+      "peakPoseFrame": 42,
+      "usage": "visual / state only - produces no gameplay damage. Peak pose (max arm spread + head raised) at 1.40 s; a 0.0-2.2 s sub-range works as a short aggro intro."
+    },
+    {
+      "name": "08_DEATH",
+      "sourceName": "mutant dying.fbx",
+      "durationSec": 4.6,
+      "frames": 139,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": false,
+      "sourceSpeedMetersPerSec": 0.188,
+      "direction": [
+        -0.0537,
+        0.0,
+        -0.9986
+      ],
+      "loopNote": "one-shot; MUST use LoopOnce + clampWhenFinished so the corpse holds the final pose. First/last pose differ by 91.2 deg.",
+      "groundPenetrationMeters": 0.0705,
+      "finalPose": "lies flat on its back; mesh top 0.434 m above ground",
+      "rootMotionMeters": 0.866,
+      "rootMotionVector": [
+        -0.05,
+        -0.64,
+        -0.87
+      ]
+    }
+  ],
+  "optionalClips": [
+    {
+      "name": "OPTIONAL_FLEX",
+      "sourceName": "mutant flexing muscles.fbx",
+      "durationSec": 4.667,
+      "frames": 141,
+      "loop": true,
+      "loopSeamDegrees": 0.69,
+      "rootMotionMeters": 0.0,
+      "status": "NOT included in V1 runtime GLB",
+      "evaluation": "Reads clearly as a taunt / flex: the creature hunches forward and tenses at ~2.3 s, arm spread swings 0.76-1.03 m. Loops cleanly (0.69 deg seam) and has zero root motion. Good candidate for elite intro / boss idle special / taunt. Costs about 35 KB if added later."
+    }
+  ],
+  "missingClips": [
+    {
+      "name": "HIT_REACT",
+      "status": "MISSING",
+      "note": "There is no hit / damage reaction animation anywhere in Creature Pack (2). All 19 animation files were checked by content, not just by name: 3 idles, walk, run, 5 turns, 4 jump/jump-attack, swipe, punch, roar, dying, flexing muscles. None is a flinch or a stagger. No clip was renamed to fill the gap. Download a real hit reaction from Mixamo before P2.2."
+    }
+  ],
+  "excludedSources": [
+    {
+      "files": [
+        "mutant right turn 90.fbx",
+        "mutant right turn 45.fbx",
+        "mutant right turn 45 (2).fbx",
+        "mutant left turn 45.fbx",
+        "left turn 45.fbx"
+      ],
+      "reason": "turn animations not needed - mob visual root is rotated directly through Three.js"
+    },
+    {
+      "files": [
+        "mutant jumping.fbx",
+        "mutant jumping (2).fbx",
+        "jump attack.fbx",
+        "mutant jump attack.fbx"
+      ],
+      "reason": "no jump, no dodge and no vertical combat locomotion in Project Legacy"
+    },
+    {
+      "files": [
+        "mutant idle (2).fbx"
+      ],
+      "reason": "third idle - runtime is capped at 2. It is the most animated of the three (9.49 deg mean amplitude) but has the worst loop seam by far: 2.09 cm / 6.14 deg vertex pop at the loop point, versus 0.47 cm for the chosen main idle and 0.00 cm for breathing idle. Kept out on measured loop quality, not on style."
+    },
+    {
+      "files": [
+        "mutant flexing muscles.fbx"
+      ],
+      "reason": "marked OPTIONAL per brief - see optionalClips"
+    }
+  ],
+  "validation": {
+    "bindPoseGroundedMeters": -0.0059,
+    "locomotionNetHipsDriftMeters": 0.0,
+    "maxFootSlidePercent": 1.2,
+    "skinningDeviationCm": 0.0,
+    "skinWeightsNormalized": true,
+    "nanTransforms": false,
+    "knownIssues": [
+      "08_DEATH dips 0.0705 m below Y=0 during the fall. This comes from the Mixamo source clip, not from this pipeline. Offset the corpse up by ~7 cm or disable ground collision in the death state.",
+      "08_DEATH keeps its authored 0.87 m backward displacement (rootMotionRemoved=false) - a backward fall is real body motion, not locomotion. Gameplay position stays with MobAi / MobSlotSystem.",
+      "03_WALK has a 1.40 cm loop seam (04_RUN is 0.22 cm). Invisible with a short crossfade, but do not hard-cut walk at the loop point.",
+      "01_IDLE is 14.23 s and costs 107 KB, 13% of the whole file. It is a single non-repeating cycle - there is no shorter clean sub-loop (verified frame by frame). Swap to mutant idle (2) at 5.3 s if you need the space, accepting its 2.09 cm seam."
+    ]
+  }
+}

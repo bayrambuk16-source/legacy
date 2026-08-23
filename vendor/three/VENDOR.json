@@ -1,0 +1,35 @@
+{
+  "name": "three",
+  "version": "0.169.0",
+  "lockedVersion": "0.169.0",
+  "source": "npm pack three@0.169.0 (kullanıcı tarafından sağlanan tarball)",
+  "license": "MIT",
+  "note": "YEREL BAĞIMLILIK. Runtime CDN yok, internet erişimi yok. Sürüm SABİTTİR; güncelleme yalnız yeni bir tarball ile yapılır.",
+  "files": {
+    "build/three.module.js": {
+      "sha256": "0a3368c165eea773490aec7b77c22de70e3eac288503409256fdbf4d12578416",
+      "bytes": 1304820,
+      "role": "ESM çekirdek (tarayıcı bundle)"
+    },
+    "build/three.cjs": {
+      "sha256": "8029cd09ba6d3fc022e1203bbd55629cfe412ad647e5a29ffb2484649a149cf0",
+      "bytes": 1315715,
+      "role": "CommonJS çekirdek (headless/node yolu)"
+    },
+    "examples/jsm/loaders/GLTFLoader.js": {
+      "sha256": "6f1719dcc6a179d30273dfb0de07a8c898a7981f7b08e600b446387f5967371f",
+      "bytes": 110029,
+      "role": "GLB/GLTF yükleyici (P2.1 hazırlığı)"
+    },
+    "examples/jsm/utils/BufferGeometryUtils.js": {
+      "sha256": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+      "bytes": 31768,
+      "role": "GLTFLoader bağımlılığı"
+    },
+    "examples/jsm/utils/SkeletonUtils.js": {
+      "sha256": "ee412be1aa05f3051c2bda8ea89612c1ba70c5c87de62b56040282120d5eb991",
+      "bytes": 8802,
+      "role": "SkinnedMesh klonlama (P2.2 — mob örnekleri)"
+    }
+  }
+}

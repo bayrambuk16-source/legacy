@@ -1,0 +1,96 @@
+{
+  "asset": "arrow_mobile_v1",
+  "version": 1,
+  "generatedFor": "Project Legacy - Three.js 0.169.0 2.5D mobile renderer",
+  "sourceAsset": "Pro Longbow Pack / Erika Archer With Bow Arrow.fbx (Mixamo) - the 82-vertex arrow mesh that was removed from archer_mobile_v1.glb per its brief section 7",
+  "file": "arrow_mobile_v1.glb",
+  "fileBytes": 38804,
+  "type": "static projectile mesh - no skin, no skeleton, no animation",
+  "units": "meters",
+  "upAxis": "Y",
+  "forwardAxis": "+Z",
+  "geometry": {
+    "vertices": 82,
+    "triangles": 80,
+    "meshes": 1,
+    "primitives": 1,
+    "drawCalls": 1,
+    "materials": 1,
+    "attributes": [
+      "POSITION(f32)",
+      "NORMAL(f32)",
+      "TEXCOORD_0(u16 normalized)"
+    ],
+    "indexType": "uint16",
+    "lengthMeters": 0.7504,
+    "maxRadiusMeters": {
+      "head": 0.0109,
+      "fletching": 0.0266,
+      "shaft": 0.0041
+    }
+  },
+  "orientation": {
+    "origin": "the nock plane - the rear face of the arrow sits exactly at z = 0",
+    "forward": "+Z points from the nock to the tip",
+    "tipLocalPosition": [
+      0.0,
+      0.0,
+      0.7504
+    ],
+    "markerNodes": {
+      "arrow_nock": "empty node at (0,0,0)",
+      "arrow_tip": "empty node at (0,0,0.7504)"
+    },
+    "why": "This origin drops straight onto the sockets already shipped in archer_mobile_v1.manifest.json: parent the arrow to the 'nock' socket (mixamorig:RightHand, localPosition 0,0,0) with an identity local transform while 11_DRAW_ARROW / 12_AIM_OVERDRAW play, and it sits on the string pointing down the aim axis with no extra maths."
+  },
+  "material": {
+    "name": "Arrow_MAT",
+    "type": "glTF PBR metallic-roughness (MeshStandardMaterial)",
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.7,
+    "alphaMode": "MASK",
+    "alphaCutoff": 0.5,
+    "doubleSided": true,
+    "baseColorTexture": "embedded 256x256 (WebP+alpha primary, PNG8/128-colour fallback)",
+    "maps": {
+      "normal": null,
+      "roughness": null,
+      "metallic": null,
+      "ao": null
+    },
+    "alphaNote": "Alpha is load-bearing here, unlike the other assets in this set: both the knapped flint head silhouette and the three feather vanes are alpha cut-outs in the source texture (14.3% of texels are fully transparent). Dropping alpha would turn the head and the feathers into rectangular slabs, so alphaMode MASK is required.",
+    "doubleSidedNote": "Also required: the three fletching vanes are flat single-sided quads. At 80 triangles the cost of double-siding the whole primitive is nil, so it stays one material and one draw call.",
+    "normalMapNote": "Arrow_NM.jpg was not shipped. The source mesh carries no tangents, so using it would mean generating and storing a TANGENT attribute (82 x 16 B) plus a second texture - more bytes than the entire model, for a 75 cm object seen in flight or stuck in a target at mob distance."
+  },
+  "texture": {
+    "source": "Arrow_DIFF.png 512x512 RGBA (285 KB inside the source FBX)",
+    "final": "256x256 WebP with alpha 13.8 KB (primary) + 256x256 PNG8/128-colour with alpha 19.3 KB (fallback)",
+    "colorSpace": "sRGB",
+    "fallbackNote": "A plain 256 RGBA PNG fallback would have been 90.9 KB - 83% of the whole file. Palettising it to 128 colours brings it to 19.3 KB with a mean RGB error of 3/255, and the alpha-MASK silhouette at cutoff 0.5 is bit-identical to the WebP on 100.000% of texels (0 flipped texels of 65,536)."
+  },
+  "runtime": {
+    "threeVersion": "0.169.0",
+    "extensionsUsed": [
+      "EXT_texture_webp"
+    ],
+    "extensionsRequired": [],
+    "decoderDependency": null,
+    "note": "EXT_texture_webp is USED, not REQUIRED - the PNG fallback means any conformant glTF 2.0 loader opens the file. No Draco, no Meshopt, no KTX2."
+  },
+  "integration": {
+    "nocked": "arrow.position.set(0,0,0); arrow.quaternion.identity(); nockSocket.add(arrow)  // socket data is in archer_mobile_v1.manifest.json",
+    "inFlight": "arrow.position.copy(nockWorldPos); arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), velocity.clone().normalize())",
+    "stuckInTarget": "place so the tip lands on the impact point and the shaft trails behind: arrow.position.copy(hitPoint).addScaledVector(dir, -0.7504 * buried) where buried ~0.85 leaves about 11 cm of the head inside the target",
+    "collisionNote": "The tip is at local (0,0,0.7504). If your projectile integrates the tip rather than the nock, offset by that vector or read the arrow_tip node."
+  },
+  "validation": {
+    "checks": "27 structural, geometric, orientation and texture checks - all passed",
+    "nockPlaneZ": 0.0,
+    "tipOnAxis": true,
+    "alphaSilhouetteMatchPercent": 100.0,
+    "knownIssues": [
+      "The source mesh is only 80 triangles and the shaft has vertex rings at the two ends only - there are no rings along its length. That is fine for a straight arrow but the shaft cannot bend; do not try to animate a flex on this mesh.",
+      "Three non-manifold edges where the flat fletching vanes meet the shaft. Harmless for rendering; only matters if you feed this mesh to a physics convex-hull or CSG routine."
+    ]
+  }
+}

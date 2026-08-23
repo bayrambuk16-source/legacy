@@ -1,0 +1,461 @@
+{
+  "asset": "archer_mobile_v1",
+  "version": 1,
+  "generatedFor": "Project Legacy - Three.js 0.169.0 2.5D mobile renderer",
+  "sourceAsset": "Pro Longbow Pack / Erika Archer With Bow Arrow.fbx (Mixamo)",
+  "file": "archer_mobile_v1.glb",
+  "fileBytes": 929200,
+  "units": "meters",
+  "upAxis": "Y",
+  "forwardAxis": "+Z",
+  "characterHeightMeters": 1.801,
+  "runtime": {
+    "threeVersion": "0.169.0",
+    "extensionsUsed": [
+      "EXT_texture_webp"
+    ],
+    "extensionsRequired": [],
+    "decoderDependency": null,
+    "note": "EXT_texture_webp is USED, not REQUIRED - a JPEG fallback image is embedded, so any conformant glTF 2.0 loader works without extension support."
+  },
+  "mesh": {
+    "meshes": 1,
+    "primitives": 1,
+    "drawCalls": 1,
+    "materials": 1,
+    "vertices": 12240,
+    "triangles": 20820,
+    "attributes": [
+      "POSITION(f32)",
+      "NORMAL(f32)",
+      "TEXCOORD_0(u16 normalized)",
+      "JOINTS_0(u8)",
+      "WEIGHTS_0(u8 normalized)"
+    ]
+  },
+  "material": {
+    "name": "Archer_Atlas",
+    "type": "glTF PBR metallic-roughness (MeshStandardMaterial)",
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.85,
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "baseColorTexture": "embedded 512x512 atlas (WebP primary, JPEG fallback)",
+    "maps": {
+      "normal": null,
+      "roughness": null,
+      "metallic": null,
+      "ao": null
+    }
+  },
+  "textureAtlas": {
+    "size": [
+      512,
+      512
+    ],
+    "format": "WebP q88 (+JPEG q88 fallback)",
+    "colorSpace": "sRGB",
+    "regions": {
+      "skin_and_face": "x 4..252, y 4..252",
+      "clothes": "x 260..508, y 4..252",
+      "bow": "x 4..252, y 260..508"
+    },
+    "gutterPixels": 4,
+    "note": "Body region is shared by the head/skin mesh and the eye mesh (EyeSpec_MAT1 has no diffuse of its own; its UVs land on the body atlas, verified to contain both irises)."
+  },
+  "skeleton": {
+    "boneCount": 23,
+    "sourceBoneCount": 70,
+    "root": "Archer",
+    "hips": "mixamorig:Hips",
+    "rightHand": "mixamorig:RightHand",
+    "leftHand": "mixamorig:LeftHand",
+    "bowBone": "mixamorig:Left_arch1",
+    "namingNote": "Original Mixamo names kept verbatim, prefix included. Node 'Archer' is a plain transform root (identity); 'Archer_Mesh' holds the skinned mesh; 'mixamorig:Hips' is the skeleton root.",
+    "bones": [
+      "mixamorig:Hips",
+      "mixamorig:Spine",
+      "mixamorig:Spine1",
+      "mixamorig:Spine2",
+      "mixamorig:Neck",
+      "mixamorig:Head",
+      "mixamorig:LeftShoulder",
+      "mixamorig:LeftArm",
+      "mixamorig:LeftForeArm",
+      "mixamorig:LeftHand",
+      "mixamorig:Left_arch1",
+      "mixamorig:RightShoulder",
+      "mixamorig:RightArm",
+      "mixamorig:RightForeArm",
+      "mixamorig:RightHand",
+      "mixamorig:LeftUpLeg",
+      "mixamorig:LeftLeg",
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:RightUpLeg",
+      "mixamorig:RightLeg",
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase"
+    ],
+    "removed": {
+      "fingers": 40,
+      "eyes": 2,
+      "endEffectors": 3,
+      "bowTip": 1,
+      "howWeightsWereHandled": "Finger weights were merged onto mixamorig:LeftHand / mixamorig:RightHand. Before merging, the finger geometry was re-baked into the bind pose using the grip pose from 'standing aim overdraw' frame 0, so the hands stay curled around the bow and the string instead of snapping back to a flat T-pose. Eye and bow-tip bones are constant relative to their parent in all 17 clips, so merging those is mathematically lossless (measured deviation: bow 0.0001 cm, eyes 0.116 cm)."
+    }
+  },
+  "sockets": {
+    "bow": {
+      "bone": "mixamorig:Left_arch1",
+      "localPosition": [
+        0,
+        0,
+        0
+      ],
+      "localRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "note": "bow mesh is already skinned to this bone; nothing to attach"
+    },
+    "arrowSpawn": {
+      "bone": "mixamorig:Left_arch1",
+      "localPosition": [
+        -0.0577,
+        0.0039,
+        0.016
+      ],
+      "localRotation": [
+        -0.3881,
+        -0.4648,
+        0.4681,
+        0.6436
+      ],
+      "note": "6 cm in front of the bow grip, -Z of the socket points back at the nock; spawn the projectile here"
+    },
+    "nock": {
+      "bone": "mixamorig:RightHand",
+      "localPosition": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "localRotation": [
+        -0.5017,
+        -0.4013,
+        -0.4475,
+        0.6221
+      ],
+      "note": "string hand; parent the held arrow here while DRAW/OVERDRAW plays"
+    }
+  },
+  "animations": [
+    {
+      "name": "01_IDLE",
+      "sourceName": "standing idle 01",
+      "durationSec": 5.1,
+      "frames": 154,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "02_IDLE_LOOK",
+      "sourceName": "standing idle 02 looking",
+      "durationSec": 3.2,
+      "frames": 97,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "03_RUN_FORWARD",
+      "sourceName": "standing run forward",
+      "durationSec": 0.8667,
+      "frames": 27,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 3.632,
+      "direction": [
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 3.645,
+      "footSlidePercentAtSourceSpeed": 0.36
+    },
+    {
+      "name": "04_RUN_BACK",
+      "sourceName": "standing run back",
+      "durationSec": 0.6667,
+      "frames": 21,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 2.897,
+      "direction": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 2.871,
+      "footSlidePercentAtSourceSpeed": 0.9
+    },
+    {
+      "name": "05_RUN_LEFT",
+      "sourceName": "standing run left",
+      "durationSec": 0.6667,
+      "frames": 21,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 3.218,
+      "direction": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "plantedFootSpeedMetersPerSec": 3.172,
+      "footSlidePercentAtSourceSpeed": 1.43
+    },
+    {
+      "name": "06_RUN_RIGHT",
+      "sourceName": "standing run right",
+      "durationSec": 0.7667,
+      "frames": 24,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 3.244,
+      "direction": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "plantedFootSpeedMetersPerSec": 3.231,
+      "footSlidePercentAtSourceSpeed": 0.4
+    },
+    {
+      "name": "07_AIM_WALK_FORWARD",
+      "sourceName": "standing aim walk forward",
+      "durationSec": 1.2,
+      "frames": 37,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 1.156,
+      "direction": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 1.154,
+      "footSlidePercentAtSourceSpeed": 0.17
+    },
+    {
+      "name": "08_AIM_WALK_BACK",
+      "sourceName": "standing aim walk back",
+      "durationSec": 1.4667,
+      "frames": 45,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.946,
+      "direction": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "plantedFootSpeedMetersPerSec": 0.946,
+      "footSlidePercentAtSourceSpeed": 0.0
+    },
+    {
+      "name": "09_AIM_WALK_LEFT",
+      "sourceName": "standing aim walk left",
+      "durationSec": 1.2,
+      "frames": 37,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 1.491,
+      "direction": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "plantedFootSpeedMetersPerSec": 1.492,
+      "footSlidePercentAtSourceSpeed": 0.07
+    },
+    {
+      "name": "10_AIM_WALK_RIGHT",
+      "sourceName": "standing aim walk right",
+      "durationSec": 1.3,
+      "frames": 40,
+      "sampleRateFps": 30,
+      "loop": true,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 1.474,
+      "direction": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "plantedFootSpeedMetersPerSec": 1.475,
+      "footSlidePercentAtSourceSpeed": 0.07
+    },
+    {
+      "name": "11_DRAW_ARROW",
+      "sourceName": "standing draw arrow",
+      "durationSec": 1.0333,
+      "frames": 32,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.032,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "timing": {
+        "nockTimeSec": 0.567,
+        "fullDrawTimeSec": 1.033,
+        "note": "0.00-0.40 reach to quiver, 0.567 arrow meets the string (nock), 1.033 hand reaches the anchor. Chain straight into 12_AIM_OVERDRAW: the last frame here and the first frame there have an identical 0.761 m draw length."
+      }
+    },
+    {
+      "name": "12_AIM_OVERDRAW",
+      "sourceName": "standing aim overdraw",
+      "durationSec": 3.7667,
+      "frames": 114,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.009,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "timing": {
+        "holdStartSec": 0.0,
+        "drawLengthStartMeters": 0.761,
+        "drawLengthEndMeters": 0.909,
+        "ninetyPercentOverdrawSec": 3.03,
+        "note": "NOT a draw animation - the bow is already fully drawn at frame 0. It is a hold/charge loop: the string hand keeps creeping back. Use elapsed time in this clip as charge power. Source reaches 90% overdraw at 3.03 s; play at 1.5-2.0x if you want max charge in ~1.5-2.0 s."
+      },
+      "loopNote": "one-shot, but CLAMP and hold the last frame while the player keeps the fire button down (LoopOnce + clampWhenFinished in three.js)"
+    },
+    {
+      "name": "13_AIM_RECOIL",
+      "sourceName": "standing aim recoil",
+      "durationSec": 0.7,
+      "frames": 22,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.048,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "timing": {
+        "releaseTimeSec": 0.183,
+        "releaseFrame": 6,
+        "peakHandSpeedSec": 0.167,
+        "recoilEndSec": 0.7,
+        "note": "Measured: draw length holds ~0.90 m through frame 5, then jumps 0.899 -> 1.125 m between frame 5 and 6 while hand speed spikes 0.56 -> 6.96 m/s. That snap is the string release. Frames 6-21 are follow-through."
+      }
+    },
+    {
+      "name": "14_HIT_REACT",
+      "sourceName": "standing react small from front",
+      "durationSec": 1.2667,
+      "frames": 39,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "15_DEATH",
+      "sourceName": "standing death backward 01",
+      "durationSec": 3.1,
+      "frames": 94,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": false,
+      "sourceSpeedMetersPerSec": 0.364,
+      "direction": [
+        0.1891,
+        0.0,
+        -0.9819
+      ],
+      "loopNote": "one-shot, MUST clamp on the last frame (LoopOnce + clampWhenFinished); never loop"
+    },
+    {
+      "name": "16_EQUIP_BOW",
+      "sourceName": "standing equip bow",
+      "durationSec": 0.9,
+      "frames": 28,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.005,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "17_DISARM_BOW",
+      "sourceName": "standing disarm bow",
+      "durationSec": 1.1,
+      "frames": 34,
+      "sampleRateFps": 30,
+      "loop": false,
+      "rootMotionRemoved": true,
+      "sourceSpeedMetersPerSec": 0.0,
+      "direction": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "validation": {
+    "bindPoseGroundedMeters": -0.0062,
+    "locomotionNetHipsDriftMeters": 0.0,
+    "maxFootSlidePercent": 1.4,
+    "skinWeightsNormalized": true,
+    "nanTransforms": false,
+    "knownIssues": [
+      "15_DEATH dips 0.118 m below Y=0 at the end of the fall. This is inherent to the Mixamo source clip (source measures 0.155 m); the bone reduction actually reduced it. Offset the character up, or disable ground collision during the death state.",
+      "15_DEATH keeps its authored 1.13 m backward displacement (rootMotionRemoved=false) because a backward fall is real body motion, not locomotion. Set rootMotionRemoved handling accordingly if WorldMovementSystem should own it.",
+      "Finger animation is baked, not driven. Clips where the source opens the hand (13_AIM_RECOIL follow-through, 17_DISARM_BOW) keep the gripped hand shape. Worst-case vertex deviation 13 cm at a fingertip; mesh-wide mean is 0.076 cm."
+    ]
+  }
+}

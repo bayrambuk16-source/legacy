@@ -1,0 +1,41 @@
+{
+  "_note": "Prototip typecheck kapisi. tests/ Node API kullandigi icin types:['node'] (npm install ile gelen @types/node). experiments/ silinirse bu dosya da silinir; ana kapilar (app/tools) etkilenmez. P2.0: three@0.169.0 YEREL vendor dizininden gelir (vendor/three); npm bagimliligi ve CDN YOKTUR.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "paths": {
+      "three": [
+        "./vendor/three/build/three.module.js"
+      ],
+      "three/addons/*": [
+        "./vendor/three/examples/jsm/*"
+      ]
+    }
+  },
+  "include": [
+    "experiments/**/*.ts",
+    "experiments/**/*.json",
+    "src/**/*.ts",
+    "src/**/*.json",
+    "vendor/three/three.d.ts"
+  ]
+}

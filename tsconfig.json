@@ -1,0 +1,16 @@
+{
+  "_note": "Editör için birleşik görünüm. Gerçek kalite kapıları: tsconfig.app.json (production src/, Node type'sız) + tsconfig.tools.json (tools/tests, vendored @types/node ile). npm run typecheck ikisini de çalıştırır.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "strict": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.json"]
+}
