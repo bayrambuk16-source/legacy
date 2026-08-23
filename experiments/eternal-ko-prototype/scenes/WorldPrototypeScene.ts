@@ -32,6 +32,7 @@ import {
   skillPoolRects, statRows,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
+import { MORADON_PLAY_SPAWN } from '../data/moradon-farm-slots.js';
 import {
   PENDING_BOX, PENDING_PAGE_SIZE, SELL_PANEL, TOGGLE_LABELS,
   bulkButtons, classButtons, deathOkButton, keepMaxButtons, pendingRows, sellHitTest,
@@ -2267,8 +2268,9 @@ export class WorldPrototypeScene implements Scene {
        tek görselden gelir; kod yalnız METİN ve ITEM ikonu çizer.
        Görsel yüklenmediyse eski çizim devrede kalır (aşağıdaki
        `panelShell` yolu). */
-    const art = this.host.assets.images.get('ui_inv_panel');
-    if (art) {
+    /* `AssetStore` arayüzü `images` haritasını AÇMAZ; varlık kontrolü
+       `has()` iledir. Görsel yüklenmediyse eski çizim devrede kalır. */
+    if (this.host.assets.has('ui_inv_panel')) {
       g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
       g.image('ui_inv_panel', INV_LAYOUT.panel.x, INV_LAYOUT.panel.y,
         { w: INV_LAYOUT.panel.w, h: INV_LAYOUT.panel.h, alpha: 1 });
@@ -2395,9 +2397,6 @@ export class WorldPrototypeScene implements Scene {
   }
 
   /** Yuva kutusuna sığmayan uzun adları kısaltır (yalnız GÖRSEL). */
-  private shortName(name: string): string {
-    return name.length <= 12 ? name : `${name.slice(0, 11)}…`;
-  }
 
 
   /* ═══════════════ P2.7 — KARAKTER EKRANI ═══════════════

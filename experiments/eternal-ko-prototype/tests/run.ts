@@ -38,7 +38,7 @@ import { MORADON_TERRAIN_SPAN } from '../data/moradon-terrain.js';
 import { buildTerrainGeometry, groundElevationAt } from '../render3d/terrain.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
-  hitTest as invHitTest, invButtons, invCloseButton, targetSlotFor,
+  hitTest as invHitTest, invButtons, invCloseButton, targetSlotFor, type UiRect,
 } from '../ui/inventory-panel.js';
 import {
   HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_TARGET_BTN, UI_MOCK, UI_SCALE,
@@ -11153,13 +11153,15 @@ test('§88 BAŞLANGIÇ BARI puansız açık — Lv1 oyuncu skillsiz kalmaz', () 
 test('§89 OKÇU ZIRHI ARTIK DEX VERİYOR — döngü kapandı', () => {
   /* Kaynakta okçu zırhında stat bonusu YOKTU; zırh toplamak saldırıyı
      hiç artırmıyordu. DEX bonusu Project Legacy tuning'idir. */
+  /* `allDefinitions()` birleşim tipi döner; `dex` yalnız zırh ve takıda
+     var. `category` ile daraltmak tip güvenliğini korur — `as` yok. */
   const armors = allDefinitions().filter((d) => d.category === 'armor');
-  const withDex = armors.filter((d) => (d.stats.dex ?? 0) > 0);
+  const withDex = armors.filter((d) => d.stats.dex > 0);
   ok(withDex.length >= 10, `DEX veren zırh az: ${withDex.length}/${armors.length}`);
   /* Üst kademe alt kademeden DAHA ÇOK DEX vermeli. */
-  const low = allDefinitions().find((d) => d.definitionRef === 241001000)!;
-  const mid = allDefinitions().find((d) => d.definitionRef === 242001000)!;
-  ok((mid.stats.dex ?? 0) > (low.stats.dex ?? 0), 'üst kademe daha çok DEX vermeli');
+  const low = armors.find((d) => d.definitionRef === 241001000)!;
+  const mid = armors.find((d) => d.definitionRef === 242001000)!;
+  ok(mid.stats.dex > low.stats.dex, 'üst kademe daha çok DEX vermeli');
 
   /* CANLI: zırh kuşanınca saldırı GERÇEKTEN artmalı.
      ÖNEMLİ: KO formülünde DEX katkısı SİLAH HASARIYLA ÇARPILIR
@@ -11206,7 +11208,7 @@ test('§90 ÖLÜM SONRASI doğuş noktasına ışınlanılır', () => {
   eq(Math.round(S.player.hp), Math.round(S.player.maxHp), 'can dolmalı:');
   eq(Math.round(S.player.mp), Math.round(S.player.maxMp), 'mana dolmalı:');
   /* Genie durmalı: ölüm noktasındaki farm merkezine yürümeye çalışmasın. */
-  ok(!S.genie.running, 'Genie durdurulmalı');
+  ok(!S.genie.enabled, 'Genie durdurulmalı');
   eq(S.targets.selectedUid, null, 'hedef temizlenmeli:');
   /* Hareket kalıntısı kalmamalı. */
   eq(S.world.moving, false, 'hareket durmalı:');
