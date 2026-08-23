@@ -11,6 +11,12 @@
  *  ortalandı. Sabit ızgarayla kesilseydi hücre genişlikleri eşit
  *  olmadığı için (159-189 px) bazı ikonlar kırpılırdı.
  *
+ *  ══════════════ KLASÖR: `assets/ui/items/` ══════════════
+ *  Üst düzey `assets/items/` yerine UI klasörünün ALTINDA duruyorlar.
+ *  Sebep: yayın hattı `assets/ui` klasörünü kopyalıyor; yeni bir üst
+ *  düzey klasör açmak dosyaların dağıtıma girmemesine yol açtı ve
+ *  ikonlar oyunda görünmedi (yedek daireler çizildi).
+ *
  *  ══════════════ EKSİK İKON HATA DEĞİL ══════════════
  *  Tabloda olmayan referans için sunu katmanı SLOT ikonuna düşer.
  *  Katalog büyüdükçe ikonlar sonradan eklenir. */
@@ -61,45 +67,45 @@ export const ITEM_ICONS: Readonly<Record<number, string>> = {
 /** Manifest yolları — `PROTO_ASSETS` bunları yükler. */
 export const ITEM_ICON_PATHS: Readonly<Record<string, string>> = {
 
-  item_kul_agaci_yay: 'assets/items/kul_agaci_yay.webp',
-  item_mese_yay: 'assets/items/mese_yay.webp',
-  item_kisa_avci_yayi: 'assets/items/kisa_avci_yayi.webp',
-  item_avci_yayi: 'assets/items/avci_yayi.webp',
-  item_celik_tendon: 'assets/items/celik_tendon.webp',
-  item_yirtici_yay: 'assets/items/yirtici_yay.webp',
-  item_akrep_disi: 'assets/items/akrep_disi.webp',
-  item_karanlik_yemin: 'assets/items/karanlik_yemin.webp',
-  item_avci_basligi: 'assets/items/avci_basligi.webp',
-  item_deri_baslik: 'assets/items/deri_baslik.webp',
-  item_zirhli_migfer: 'assets/items/zirhli_migfer.webp',
-  item_sertlestirilmis_baslik: 'assets/items/sertlestirilmis_baslik.webp',
-  item_golge_basligi: 'assets/items/golge_basligi.webp',
-  item_avci_gomlegi: 'assets/items/avci_gomlegi.webp',
-  item_deri_gogusluk: 'assets/items/deri_gogusluk.webp',
-  item_sertlestirilmis_gogusluk: 'assets/items/sertlestirilmis_gogusluk.webp',
-  item_zirhli_gogusluk: 'assets/items/zirhli_gogusluk.webp',
-  item_avci_dizligi: 'assets/items/avci_dizligi.webp',
-  item_deri_pantolon: 'assets/items/deri_pantolon.webp',
-  item_zirhli_dizlik: 'assets/items/zirhli_dizlik.webp',
-  item_iz_surucu_pantolon: 'assets/items/iz_surucu_pantolon.webp',
-  item_avci_eldiveni: 'assets/items/avci_eldiveni.webp',
-  item_deri_eldiven: 'assets/items/deri_eldiven.webp',
-  item_zirhli_eldiven: 'assets/items/zirhli_eldiven.webp',
-  item_iz_surucu_eldiven: 'assets/items/iz_surucu_eldiven.webp',
-  item_avci_cizmesi: 'assets/items/avci_cizmesi.webp',
-  item_deri_cizme: 'assets/items/deri_cizme.webp',
-  item_zirhli_cizme: 'assets/items/zirhli_cizme.webp',
-  item_golge_cizmesi: 'assets/items/golge_cizmesi.webp',
-  item_tunc_kupe: 'assets/items/tunc_kupe.webp',
-  item_sahin_kupesi: 'assets/items/sahin_kupesi.webp',
-  item_kekuri_yuzugu: 'assets/items/kekuri_yuzugu.webp',
-  item_zumrut_yuzuk: 'assets/items/zumrut_yuzuk.webp',
-  item_kizil_ejder: 'assets/items/kizil_ejder.webp',
-  item_yasam_kusagi: 'assets/items/yasam_kusagi.webp',
-  item_parsomen: 'assets/items/parsomen.webp',
-  item_yasam_tasi: 'assets/items/yasam_tasi.webp',
-  item_yasam_suyu: 'assets/items/yasam_suyu.webp',
-  item_ruh_iksiri: 'assets/items/ruh_iksiri.webp',
+  item_kul_agaci_yay: 'assets/ui/items/kul_agaci_yay.webp',
+  item_mese_yay: 'assets/ui/items/mese_yay.webp',
+  item_kisa_avci_yayi: 'assets/ui/items/kisa_avci_yayi.webp',
+  item_avci_yayi: 'assets/ui/items/avci_yayi.webp',
+  item_celik_tendon: 'assets/ui/items/celik_tendon.webp',
+  item_yirtici_yay: 'assets/ui/items/yirtici_yay.webp',
+  item_akrep_disi: 'assets/ui/items/akrep_disi.webp',
+  item_karanlik_yemin: 'assets/ui/items/karanlik_yemin.webp',
+  item_avci_basligi: 'assets/ui/items/avci_basligi.webp',
+  item_deri_baslik: 'assets/ui/items/deri_baslik.webp',
+  item_zirhli_migfer: 'assets/ui/items/zirhli_migfer.webp',
+  item_sertlestirilmis_baslik: 'assets/ui/items/sertlestirilmis_baslik.webp',
+  item_golge_basligi: 'assets/ui/items/golge_basligi.webp',
+  item_avci_gomlegi: 'assets/ui/items/avci_gomlegi.webp',
+  item_deri_gogusluk: 'assets/ui/items/deri_gogusluk.webp',
+  item_sertlestirilmis_gogusluk: 'assets/ui/items/sertlestirilmis_gogusluk.webp',
+  item_zirhli_gogusluk: 'assets/ui/items/zirhli_gogusluk.webp',
+  item_avci_dizligi: 'assets/ui/items/avci_dizligi.webp',
+  item_deri_pantolon: 'assets/ui/items/deri_pantolon.webp',
+  item_zirhli_dizlik: 'assets/ui/items/zirhli_dizlik.webp',
+  item_iz_surucu_pantolon: 'assets/ui/items/iz_surucu_pantolon.webp',
+  item_avci_eldiveni: 'assets/ui/items/avci_eldiveni.webp',
+  item_deri_eldiven: 'assets/ui/items/deri_eldiven.webp',
+  item_zirhli_eldiven: 'assets/ui/items/zirhli_eldiven.webp',
+  item_iz_surucu_eldiven: 'assets/ui/items/iz_surucu_eldiven.webp',
+  item_avci_cizmesi: 'assets/ui/items/avci_cizmesi.webp',
+  item_deri_cizme: 'assets/ui/items/deri_cizme.webp',
+  item_zirhli_cizme: 'assets/ui/items/zirhli_cizme.webp',
+  item_golge_cizmesi: 'assets/ui/items/golge_cizmesi.webp',
+  item_tunc_kupe: 'assets/ui/items/tunc_kupe.webp',
+  item_sahin_kupesi: 'assets/ui/items/sahin_kupesi.webp',
+  item_kekuri_yuzugu: 'assets/ui/items/kekuri_yuzugu.webp',
+  item_zumrut_yuzuk: 'assets/ui/items/zumrut_yuzuk.webp',
+  item_kizil_ejder: 'assets/ui/items/kizil_ejder.webp',
+  item_yasam_kusagi: 'assets/ui/items/yasam_kusagi.webp',
+  item_parsomen: 'assets/ui/items/parsomen.webp',
+  item_yasam_tasi: 'assets/ui/items/yasam_tasi.webp',
+  item_yasam_suyu: 'assets/ui/items/yasam_suyu.webp',
+  item_ruh_iksiri: 'assets/ui/items/ruh_iksiri.webp',
 };
 
 /** Bir eşyanın ikon anahtarı. Yoksa `null` — çağıran slot ikonuna düşer. */

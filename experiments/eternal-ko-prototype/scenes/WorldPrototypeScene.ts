@@ -2282,14 +2282,19 @@ export class WorldPrototypeScene implements Scene {
       g.rect(L.panel.x, L.panel.y, L.panel.w, L.panel.h, '#100d08', 0.97);
       g.rect(L.panel.x, L.panel.y, L.panel.w, 3, '#e08a3c');
     }
-    g.text('ÇANTA & EKİPMAN', L.panel.x + 16, L.panel.y + 18,
-      { size: 15, bold: true, color: '#e8d9a0' });
+    /* Başlık maketin ORTA şeridinde (x ~130-500, y ~28-70 sahne).
+       Eskiden sol üst köşeye yazılıyordu ve çerçevenin dışına taşıyordu. */
+    g.text('ÇANTA & EKİPMAN', L.panel.w / 2, 38,
+      { align: 'center', size: 15, bold: true, color: '#e8d9a0' });
     const cap = `${this.S.inventory.usedSlots}/${this.S.inventory.capacity}`;
-    g.text(cap, L.panel.x + L.panel.w - 74, L.panel.y + 20, { align: 'right', size: 12, color: '#8d8272' });
+    g.text(cap, L.panel.w / 2, 58, { align: 'center', size: 11, color: '#8d8272' });
     const close = invCloseButton();
     /* Kapatma düğmesinin zemini de görselde var — yalnız yoksa çizilir. */
-    if (!art) g.rect(close.x, close.y, close.w, close.h, '#241c14');
-    g.text(close.label, close.x + close.w / 2, close.y + 9, { align: 'center', size: 15, color: '#cfc7b6' });
+    if (!art) {
+      g.rect(close.x, close.y, close.w, close.h, '#241c14');
+      g.text(close.label, close.x + close.w / 2, close.y + 9,
+        { align: 'center', size: 15, color: '#cfc7b6' });
+    }
 
     /* ---- ekipman ızgarası ---- */
     const views = this.S.stats.slots();
@@ -2305,8 +2310,8 @@ export class WorldPrototypeScene implements Scene {
       /* P2.24 — etiket yuvanın ÜSTÜNDEKİ şeritte (maketin ayırdığı yer),
          ikon yuvanın ortasında. Eskiden ikisi de kutunun içindeydi ve
          item adı ikonla çakışıyordu. */
-      g.text(r.label, r.x + 4, r.y - INV_LAYOUT.equipLabelH + 4,
-        { size: 9, color: '#6f655a' });
+      g.text(r.label, r.x + r.w / 2, r.y - INV_LAYOUT.equipLabelH + 5,
+        { align: 'center', size: 9, color: '#8d8272' });
       if (v.definition) {
         this.drawItemIcon(g, v.definition.definitionRef, r.x + r.w / 2, r.y + r.h / 2,
           r.w - 12, ITEM_CLASS_COLOR[v.definition.itemClass]);
@@ -2346,7 +2351,8 @@ export class WorldPrototypeScene implements Scene {
     if (!art) g.rect(d.x, d.y, d.w, d.h, '#0b0908', 0.95);
     const picked = this.selectedItem();
     if (picked === null) {
-      g.text('Bir eşya seç', d.x + 12, d.y + 16, { size: 13, color: '#8d8272' });
+      g.text('Bir eşya seç', d.x + d.w / 2, d.y + 20,
+        { align: 'center', size: 13, color: '#6f655a' });
     } else if (picked.def === null) {
       /* P2.20 — EKİPMAN OLMAYAN EŞYA. Eskiden "katalogda yok" deniyordu
          ve bozukmuş gibi görünüyordu; parşömen/iksir/ganimet tasarım

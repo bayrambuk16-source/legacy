@@ -9669,7 +9669,9 @@ test('§56 her HUD görseli MANİFESTTE kayıtlı', () => {
     /* P2.24 — item ikonları `assets/items/` altında durur. HUD parçası
        değiller; ayrı klasör kalabalığı önlüyor (39 dosya). */
     if (k.startsWith('item_')) {
-      ok(path.startsWith('assets/items/'), `${k} yanlış klasörde: ${path}`);
+      /* P2.24.3 — `assets/ui/` ALTINDA: yeni bir üst düzey klasör
+         yayın hattına girmiyordu ve ikonlar oyunda görünmüyordu. */
+      ok(path.startsWith('assets/ui/items/'), `${k} yanlış klasörde: ${path}`);
       continue;
     }
     ok(path.startsWith('assets/ui/'), `${k} yanlış klasörde: ${path}`);
@@ -11264,10 +11266,14 @@ test('§91 hücreler ADIM aralıklı — maketle hizalı kalır', () => {
      kullanmalı, yoksa alt satırlarda kayma birikir. */
   const cells = bagCellRects();
   const b = INV_LAYOUT.bag;
-  eq(cells[1]!.x - cells[0]!.x, b.pitch, 'yatay adım:');
-  eq(cells[b.cols]!.y - cells[0]!.y, b.pitch, 'dikey adım:');
+  /* Adım kesirli (49.4) — kayan nokta karşılaştırmasında tolerans şart. */
+  const near = (a: number, b2: number, n: string): void => {
+    ok(Math.abs(a - b2) < 0.01, `${n}: ${a} ≠ ${b2}`);
+  };
+  near(cells[1]!.x - cells[0]!.x, b.pitch, 'yatay adım');
+  near(cells[b.cols]!.y - cells[0]!.y, b.pitch, 'dikey adım');
   /* Son satır ilk satırla AYNI hizada başlamalı (birikimli kayma yok). */
-  eq(cells[(b.rows - 1) * b.cols]!.x, cells[0]!.x, 'son satır hizası:');
+  near(cells[(b.rows - 1) * b.cols]!.x, cells[0]!.x, 'son satır hizası');
 });
 
 test('§91 dokunma çözümlemesi her hücreyi bulur', () => {

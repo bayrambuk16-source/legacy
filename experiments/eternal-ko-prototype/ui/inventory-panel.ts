@@ -44,13 +44,25 @@ import {
 export const INV_LAYOUT = {
   panel: { x: 0, y: 0, w: 620, h: 1100 },
   /** Ekipman ızgarası — 2 sütun × 6 satır, maketin sol bloğu. */
-  equip: { x: 40, y: 96, cell: 80, gap: 18, cols: 2, pitchX: 104, pitchY: 126 },
-  /** Yuva etiketi şeridi — yuvanın ÜSTÜNDE, maketten ölçüldü. */
+  /** Ekipman ızgarası. SATIR KONUMLARI TEK TEK ÖLÇÜLDÜ, formülle
+   *  türetilmedi: maketin ilk dört satırı 126 px adımlı ve 89 px
+   *  yüksekliğinde, son iki satırı ise 124 px adımlı ve 71 px
+   *  yüksekliğinde. Tek adım varsaymak alt iki satırı kaydırıyordu. */
+  equip: {
+    x: 40, cols: 2, pitchX: 94,
+    /** [yuvanın üst kenarı, yüksekliği] — sahne pikselinde. */
+    rows: [
+      [127, 89], [253, 89], [379, 89], [505, 88], [629, 73], [739, 69],
+    ] as ReadonlyArray<readonly [number, number]>,
+    /** Yuva genişliği — sütun ölçümünden (40-121 ve 134-218). */
+    cell: 81,
+  },
+  /** Yuva etiketi şeridi — yuvanın ÜSTÜNDE, 20 px yüksekliğinde. */
   equipLabelH: 20,
   /** Çanta ızgarası — 7 sütun × 11 satır. */
-  bag: { x: 244, y: 105, cell: 45, gap: 5, cols: 7, rows: 14, pitch: 50 },
-  /** Alt detay/karşılaştırma bloğu. */
-  detail: { x: 26, y: 819, w: 567, h: 165 },
+  bag: { x: 242, y: 105, cell: 44, gap: 5, cols: 7, rows: 14, pitch: 49.4 },
+  /** Alt detay/karşılaştırma bloğu — maketin büyük boş alanı. */
+  detail: { x: 30, y: 828, w: 560, h: 161 },
 } as const;
 
 export interface UiRect { x: number; y: number; w: number; h: number }
@@ -61,12 +73,11 @@ export function equipSlotRects(): Array<UiRect & { slotId: string; label: string
   return EQUIP_SLOTS.map((s, i) => ({
     slotId: s.id,
     label: s.label,
-    /* Adım maketten ölçüldü; `cell + gap` yerine ADIM kullanılır çünkü
-       maketin yuvaları arasında etiket şeridi de var. */
+    /* Satır tablosundan okunur; maketin satırları EŞİT ARALIKLI DEĞİL. */
     x: e.x + (i % e.cols) * e.pitchX,
-    y: e.y + Math.floor(i / e.cols) * e.pitchY,
+    y: e.rows[Math.floor(i / e.cols)]![0],
     w: e.cell,
-    h: e.cell,
+    h: e.rows[Math.floor(i / e.cols)]![1],
   }));
 }
 
@@ -86,20 +97,22 @@ export function bagCellRects(): UiRect[] {
 }
 
 /** Panelin düğmeleri. `id` Scene'in dispatch anahtarıdır. */
+/** Üç işlem düğmesi. KONUMLAR MAKETTEN ÖLÇÜLDÜ: görselin renkli düğme
+ *  zeminleri x 45/226/414'te ve ~160 px genişliğinde. Formülle türetirsem
+ *  metin zeminin dışına düşer. */
 export function invButtons(): Array<UiRect & { id: string; label: string }> {
-  const d = INV_LAYOUT.detail;
-  const w = 168, h = 46, gap = 12;
-  const y = d.y + d.h - h - 14;
+  const y = 1012, h = 43;
   return [
-    { id: 'inv_equip', label: 'KUŞAN', x: d.x + 10, y, w, h },
-    { id: 'inv_unequip', label: 'ÇIKAR', x: d.x + 10 + (w + gap), y, w, h },
-    { id: 'inv_drop', label: 'AT', x: d.x + 10 + 2 * (w + gap), y, w, h },
+    { id: 'inv_equip', label: 'KUŞAN', x: 45, y, w: 159, h },
+    { id: 'inv_unequip', label: 'ÇIKAR', x: 226, y, w: 167, h },
+    { id: 'inv_drop', label: 'AT', x: 414, y, w: 158, h },
   ];
 }
 
+/** Kapatma düğmesi. KONUM MAKETTEN: görselin kırmızı X kutusu
+ *  sahne pikselinde x 528-570, y 25-67. */
 export function invCloseButton(): UiRect & { id: string; label: string } {
-  const p = INV_LAYOUT.panel;
-  return { id: 'inv_close', label: '✕', x: p.x + p.w - 52, y: p.y + 12, w: 40, h: 36 };
+  return { id: 'inv_close', label: '✕', x: 528, y: 25, w: 44, h: 44 };
 }
 
 /* ───────────────────────── seçim modeli ───────────────────────── */
