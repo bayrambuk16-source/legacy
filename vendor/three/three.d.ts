@@ -122,6 +122,8 @@ declare module 'three' {
     constructor(array: ArrayLike<number>, itemSize: number, normalized?: boolean);
     array: ArrayLike<number>;
     itemSize: number;
+    /** Öğe sayısı (array.length / itemSize) — P2.19.1 UV testi kullanır. */
+    count: number;
     needsUpdate: boolean;
   }
   export class BufferGeometry {
@@ -134,6 +136,8 @@ declare module 'three' {
     translate(x: number, y: number, z: number): this;
     /* P2.4C — elle geometri kurma yüzeyi. */
     setAttribute(name: string, attribute: BufferAttribute): this;
+    /* P2.19.1 — arazi UV doğrulaması (test) bu okumayı kullanıyor. */
+    getAttribute(name: string): BufferAttribute | undefined;
     setIndex(index: BufferAttribute | null): this;
     computeVertexNormals(): void;
     computeBoundingSphere(): void;

@@ -1772,13 +1772,6 @@ export class WorldPrototypeScene implements Scene {
     }
 
     /* ---- alt menü ---- */
-    /* P2.19 — kamera modu düğmesi. Her dokunuşta sıradaki moda geçer. */
-    if (this.hit(p, { id: 'cam_mode', ...HUD_CAMERA_BTN, label: '' })) {
-      this.camMode = nextMode(this.camMode);
-      this.host.audio.play('ui');
-      this.say(`Kamera: ${CAMERA_MODE_LABEL[this.camMode]}`);
-      return;
-    }
     for (const n of this.navButtons()) {
       g.image(n.label, n.x, n.y, { w: n.w, h: n.h, alpha: A });
     }
