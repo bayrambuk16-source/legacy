@@ -49,6 +49,10 @@ import {
 import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import { NON_GEAR_COLOR, nonGearInfo } from '../ui/non-gear-info.js';
 import { itemIconKey } from '../data/item-icons.js';
+import {
+  GATE_ALPHA, GATE_COLOR, gateBadge, skillGate, skillIconKey, skillInitial,
+  type SkillGateState,
+} from '../data/skill-visuals.js';
 import { ArcherProgression } from '../../../src/game/systems/combat/ArcherProgression.js';
 import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
@@ -1247,6 +1251,9 @@ export class WorldPrototypeScene implements Scene {
       else this.S.anim.releaseCombatFacing();
     }
     this.S.player.update(dt);
+    /* P2.32 — iksir bekleme sayaçları. Panel açıkken de akar: bekleme
+       oyuncunun ilgisine değil GEÇEN SÜREYE bağlıdır. */
+    this.S.potions.update(dt);
     this.S.updateInfiniteMp();      // TEST: sonsuz MP (varsayılan kapalı)
     this.S.combat.update(dt);
     /* Ölüyken devam eden cast/ok zinciri KESİLİR — havadaki oklar da
@@ -1837,16 +1844,43 @@ export class WorldPrototypeScene implements Scene {
     const busy = this.S.adapter.actionBusy;
     const skillBoxes = hudSkillBoxes();
     this.actionButtons().forEach((b, i) => {
-      const art = skillBoxes[i];
       const s = slots[i];
       const def = s?.def;
       const hasRealCd = (def?.cooldownSec ?? 0) > 0;
       const cdRatio = hasRealCd ? (s?.cooldownRatio ?? 0) : 0;
-      const locked = s ? s.blocked !== null && s.blocked !== 'noTarget' : true;
-      if (art) {
-        g.image(art.key, b.x, b.y, { w: b.w, h: b.h, alpha: locked ? A * 0.45 : A });
+      /* ═══ P2.31 — İKON SKİLLE, KİLİT DURUMU ÜÇ DEĞERLİ ═══
+         Eskiden ikon YUVA KONUMUNA bağlıydı ve kilit yalnız "engelli mi"
+         diye bakıyordu; Sv70 skilli ile mana yetersizliği aynı
+         görünüyordu. Artık kalıcı kilit (seviye/puan) geçici engelden
+         (mana/cooldown) belirgin biçimde AYRI çizilir. */
+      const gate: SkillGateState = def
+        ? skillGate({
+          requiredLevel: def.requiredLevel,
+          playerLevel: this.S.player.level,
+          unlocked: this.S.stats.progression.isUnlocked(def.sourceRef),
+          blocked: s?.blocked ?? null,
+        })
+        : 'ready';
+      const alpha = A * (def ? GATE_ALPHA[gate] : 0.3);
+      const iconKey = def ? skillIconKey(def.sourceRef) : null;
+      if (iconKey !== null && this.host.assets.has(iconKey)) {
+        g.image(iconKey, b.x, b.y, { w: b.w, h: b.h, alpha });
       } else {
-        g.rect(b.x, b.y, b.w, b.h, '#221c14', 0.9);
+        /* İkon YOK — sahte eşleme yapmak yerine yer tutucu. Hangi
+           skillin görselinin eksik olduğu GÖRÜNÜR kalır. */
+        g.rect(b.x, b.y, b.w, b.h, '#221c14', alpha);
+        g.rect(b.x, b.y, b.w, 2, GATE_COLOR[gate], alpha);
+        if (def) {
+          g.text(skillInitial(def.displayName), b.x + b.w / 2, b.y + b.h / 2 - 12,
+            { align: 'center', size: 20, bold: true, color: GATE_COLOR[gate], alpha });
+        }
+      }
+      /* Kalıcı kilit rozeti — Sv1 oyuncu neyi kullanamadığını görsün. */
+      const badge = def ? gateBadge(gate, def.requiredLevel) : null;
+      if (badge !== null) {
+        g.rect(b.x, b.y + b.h - 16, b.w, 16, '#0b0908', 0.85);
+        g.text(badge, b.x + b.w / 2, b.y + b.h - 14,
+          { align: 'center', size: 10, bold: true, color: GATE_COLOR[gate] });
       }
       if (cdRatio > 0) {
         g.rect(b.x, b.y + b.h * (1 - cdRatio), b.w, b.h * cdRatio, '#0b0908', 0.66);
@@ -2701,9 +2735,17 @@ export class WorldPrototypeScene implements Scene {
       const ref = shown[i]!;
       const def = SkillRegistry.get(ref);
       if (!def) return;
-      const levelLocked = def.requiredLevel > this.S.player.level;
-      const unlocked = this.S.stats.progression.isUnlocked(ref);
-      const locked = levelLocked || !unlocked;
+      /* P2.31 — kapı durumu TEK KAYNAKTAN (`skillGate`). Eskiden HUD
+         ve yetenek ekranı kilidi ayrı ayrı hesaplıyordu. */
+      const gate = skillGate({
+        requiredLevel: def.requiredLevel,
+        playerLevel: this.S.player.level,
+        unlocked: this.S.stats.progression.isUnlocked(ref),
+        blocked: null,
+      });
+      const levelLocked = gate === 'levelLocked';
+      const unlocked = gate !== 'unpurchased';
+      const locked = gate !== 'ready';
       const inBar = equipped.has(ref);
       /* Hücre zemini GÖRSELDEN; kod yalnız durum vurgusu ve metin.
          Metin ikon karesinin SAĞINDAN başlar — maketin sol tarafında

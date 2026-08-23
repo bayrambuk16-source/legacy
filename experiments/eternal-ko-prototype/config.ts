@@ -110,7 +110,13 @@ export const PROTO: ProtoConstants = {
      dengesini taşıdığı için çarpan 1'e çekildi — Sv1 solucan (7 can) iki
      atışta ölür, kaynak temposu budur. Mob HASARI çarpanına DOKUNULMADI. */
   monsterHpMultiplier: 1,
-  monsterDamageMultiplier: 8,
+  /* P2.32 — MOB HASARI YARIYA. Oyun testi bulgusu: "moblar çok fazla
+     vuruyor". Çarpan 8'den 4'e indi (kullanıcı kararı).
+
+     Kaynak mob hasarı DEĞİŞMEDİ — bu bir denge çarpanıdır. P2.5A'da
+     mob CANI 8'den 1'e çekilmişti ama HASAR çarpanına dokunulmamıştı;
+     yani mob ölmesi kolaylaşırken vuruşu aynı sert kalmıştı. */
+  monsterDamageMultiplier: 4,
   /* P2.14 — EXP ÇARPANI (kullanıcı kararı, kaynaktan gelmez).
      Ölçüm: kaynak eğrisiyle Lv1→20 yalnız 106 kill ≈ 19 dakika sürüyordu.
      KO'nun Lv1-20 bandı zaten hızlıdır (asıl duvar Lv20+), ama Moradon

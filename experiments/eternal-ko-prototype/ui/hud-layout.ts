@@ -92,6 +92,14 @@ export const HUD_TARGET = {
  *  ekranın ortasında, düğmeler onun üstüne geliyordu). Çember %22 küçültüldü
  *  ve sağ-alta, alt menünün hemen üstüne çekildi. Dokunma hedefi hâlâ
  *  rahat: en küçük yuva sahnede ~76 px. */
+/* P2.31 — SPOT ARTIK GÖRSEL TAŞIMAZ, yalnız KONUM.
+   Eskiden her konumun sabit bir ikon anahtarı vardı; birinci yuvada
+   hangi skill olursa olsun `ui_skill_standart` çiziliyordu. Oyuncu
+   barı yeniden düzenleyince ikon yerinde kalıyor, skill değişiyordu
+   ("görünen ikon başka, çalışan skill başka" bulgusu).
+
+   İkon artık SKILL REFERANSINDAN gelir: `data/skill-visuals.ts`.
+   `key` alanı yalnız varlık ön-yüklemesi için korunur. */
 const SKILL_SPOTS: ReadonlyArray<{ cx: number; cy: number; w: number; key: string }> = [
   { cx: 762, cy: 1272, w: 132, key: 'ui_skill_standart' },
   { cx: 700, cy: 1080, w: 116, key: 'ui_skill_yesil' },

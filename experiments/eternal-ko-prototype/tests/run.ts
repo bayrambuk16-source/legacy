@@ -62,7 +62,15 @@ import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
 import { NON_GEAR_COLOR, nonGearInfo, nonGearRole } from '../ui/non-gear-info.js';
 import { QUESTS, promotionQuests, questById } from '../data/quests.js';
 import { DEATH_EXP_PENALTY } from '../state.js';
+import { POTION_COOLDOWN_SEC } from '../world/PotionSystem.js';
 import { LEVELING } from '../../../src/game/config.js';
+import {
+  EQUIP_DROP_CHANCE, itemTierLevel, pickFromPool, poolFor, slotCoverage,
+} from '../data/moradon-loot-pool.js';
+import {
+  GATE_ALPHA, SKILL_ICONS, gateBadge, skillGate, skillIconKey, skillInitial,
+  skillsWithoutIcon,
+} from '../data/skill-visuals.js';
 import {
   GOBLIN_MAX_LEVEL, KECOON_ATTRIBUTION, KECOON_CLIPS, KECOON_CLIP_MAP,
   kecoonAttackClipFor, kecoonScaleFor, usesGoblinModel,
@@ -309,6 +317,14 @@ function fireAndResolve(S: PrototypeState, ref: number, target: WorldMob | null,
  *  başlıyor (`PROTO.startLevel`), bu yüzden test dünyası seviyeyi de AÇIKÇA
  *  kurar — tıpkı dünyayı açıkça kurduğu gibi. */
 const TEST_LEVEL = 70;
+
+/** P2.32 — iksire 1,5 sn bekleme geldi. Ardışık kullanım sınayan
+ *  testler bekleme SÜRESİNİ İLERLETİR; amaçları tempo değil, miktar/
+ *  adet doğruluğu. */
+function usePotion(S: PrototypeState, ref: number): ReturnType<PrototypeState['potions']['use']> {
+  S.potions.update(POTION_COOLDOWN_SEC + 0.1);
+  return S.potions.use(ref);
+}
 
 function protoState(seed?: number, slots?: readonly MobSpawnSlot[]): PrototypeState {
   /* Dünya ile slot tablosu BİRLİKTE gider: test dünyasının doğuş noktası
@@ -4132,19 +4148,44 @@ test('profildeki itemRef\'ler generated items.json ile eşleşiyor', () => {
   }
 });
 
-test('POTION RECAST SEMANTIC UNRESOLVED — cooldown UYDURULMADI', () => {
-  for (const p of KO_POTIONS) {
-    eq(p.sourceRecastTimeRaw, 1, `#${p.itemRef} ham recast:`);
-    eq(p.sourceCastTimeRaw, 5, `#${p.itemRef} ham cast:`);
-  }
-  /* Sistemde iksir cooldown alanı YOK: art arda iki kullanım engellenmemeli. */
-  const S = protoState(504);
+test('P2.32 — iksir BEKLEMESİ var (kullanıcı kararı, kaynaktan değil)', () => {
+  /* Eskiden cooldown YOKTU: kaynak `recast_time` biriminin
+     doğrulanamaması gerekçesiyle uydurma sayı konmamıştı. Oyun
+     testinde bu kusur olarak bildirildi — iksir sınırsız hızda
+     içiliyordu. Süre bir TUNING'dir, kaynağın yerine geçmez. */
+  const S = protoState(4000);
+  S.giveTestPotions();
   S.player.hp = 1;
-  const a = S.potions.use(389011000);
-  const b = S.potions.use(389011000);
-  ok(a.ok, 'ilk kullanım');
-  ok(b.ok, 'ikinci kullanım ANINDA mümkün olmalı (uydurma cooldown yok)');
+  const first = S.potions.use(389011000);
+  ok(first.ok, 'ilk kullanım başarılı olmalı');
+  S.player.hp = 1;
+  const second = S.potions.use(389011000);
+  ok(!second.ok && second.fail === 'cooldown', 'ikinci kullanım beklemeli');
+  /* Bekleme dolunca yeniden kullanılabilir. */
+  S.potions.update(POTION_COOLDOWN_SEC + 0.01);
+  ok(S.potions.use(389011000).ok, 'bekleme sonrası kullanılabilmeli');
 });
+
+test('P2.32 — can ve mana beklemesi AYRI', () => {
+  /* Tek sayaç olsaydı can içmek manayı kilitlerdi; savaşta ölümcül. */
+  const S = protoState(4001);
+  S.giveTestPotions();
+  S.player.hp = 1; S.player.mp = 1;
+  ok(S.potions.use(389011000).ok, 'can iksiri');
+  ok(S.potions.use(389016000).ok, 'mana iksiri can beklemesinden etkilenmemeli');
+  ok(S.potions.cooldownLeft('hp') > 0, 'can beklemesi başlamalı');
+  ok(S.potions.cooldownLeft('mp') > 0, 'mana beklemesi başlamalı');
+});
+
+test('P2.32 — REDDEDİLEN kullanım bekleme BAŞLATMAZ', () => {
+  const S = protoState(4002);
+  S.giveTestPotions();
+  S.player.hp = S.player.maxHp;          // dolu → 'full'
+  const r = S.potions.use(389011000);
+  ok(!r.ok, 'dolu canda kullanım reddedilmeli');
+  eq(S.potions.cooldownLeft('hp'), 0, 'reddedilen deneme cezalandırılmamalı:');
+});
+
 
 console.log('\n[P1.4.1] SABİT miktarlı restore:');
 
@@ -4155,7 +4196,7 @@ test('MP +480 / +960 / +1920 SABİT restore (yüzde DEĞİL)', () => {
 
   /* Tavana SIĞAN kademe: miktar birebir uygulanır. */
   S.player.mp = 0;
-  const r120 = S.potions.use(389016000);            // +120
+  const r120 = usePotion(S, 389016000);            // +120
   eq(r120.before, 0, '+120 önce:');
   eq(r120.after, 120, '+120 sonra (tam miktar):');
   eq(r120.actual, 120, '+120 gerçek:');
@@ -4164,7 +4205,7 @@ test('MP +480 / +960 / +1920 SABİT restore (yüzde DEĞİL)', () => {
   /* Kural her kademede aynı: after = min(max, before + amount) */
   for (const [ref, amount] of [[389018000, 480], [389019000, 960], [389020000, 1920]] as const) {
     S.player.mp = 100;
-    const r = S.potions.use(ref);
+    const r = usePotion(S, ref);
     ok(r.ok, `#${ref} kullanım`);
     eq(r.restoreAmount, amount, `#${ref} SABİT miktar:`);
     eq(r.after, Math.min(maxMp, 100 + amount), `#${ref} after = min(max, before+amount):`);
@@ -4184,13 +4225,13 @@ test('P2.5A — KO MP formülü iksir ölçeğine YAKLAŞTI (eski bulgu kapandı
   S.giveTestPotions();
   S.player.mp = 0;
   /* 480'lik kademe artık TAM kazanılır, ziyan YOK. */
-  const mid = S.potions.use(389016000);
+  const mid = usePotion(S, 389016000);
   if (mid.ok) {
     eq(mid.wasted, 0, 'orta kademe ziyanı:');
   }
   /* En büyük kademe (1920) hâlâ tavanı aşar → ziyan raporlanır. */
   S.player.mp = 0;
-  const big = S.potions.use(389020000);
+  const big = usePotion(S, 389020000);
   eq(big.after, maxMp, 'tavana çıkar:');
   eq(big.wasted, 1920 - maxMp, 'ziyan raporlanır:');
 });
@@ -4201,7 +4242,7 @@ test('HP de sabit: 90 / 180 / 360 / 720', () => {
   S.giveTestPotions();
   for (const [ref, amount] of [[389011000, 90], [389012000, 180], [389013000, 360], [389014000, 720]] as const) {
     S.player.hp = 1;
-    const r = S.potions.use(ref);
+    const r = usePotion(S, ref);
     ok(r.ok, `#${ref} kullanım`);
     eq(r.restoreAmount, amount, `#${ref} sabit miktar:`);
     eq(r.after, Math.min(S.stats.finalStats().maxHp, 1 + amount), `#${ref} sonuç:`);
@@ -4212,9 +4253,9 @@ test('yüzde YOK: aynı iksir farklı maxMP\'de AYNI miktarı verir', () => {
   const S = protoState(507);
   S.giveTestPotions();
   S.player.mp = 0;
-  const a = S.potions.use(389018000);          // +480
+  const a = usePotion(S, 389018000);          // +480
   S.player.mp = 0;
-  const b = S.potions.use(389018000);
+  const b = usePotion(S, 389018000);
   eq(a.actual, b.actual, 'iki kullanım aynı olmalı:');
   eq(a.restoreAmount, 480, 'sabit:');
 });
@@ -4226,14 +4267,14 @@ test('adet düşer: 2 → 1 → 0 → outOfStock', () => {
   S.inventory.add(389018000, { quantity: 2 });
   eq(S.potions.stock(389018000), 2, 'başlangıç:');
   S.player.mp = 0;
-  ok(S.potions.use(389018000).ok, '1. kullanım');
+  ok(usePotion(S, 389018000).ok, '1. kullanım');
   eq(S.potions.stock(389018000), 1, 'kalan:');
   S.player.mp = 0;
-  const second = S.potions.use(389018000);
+  const second = usePotion(S, 389018000);
   ok(second.ok, '2. kullanım');
   eq(second.remaining, 0, 'kalan:');
   S.player.mp = 0;
-  const third = S.potions.use(389018000);
+  const third = usePotion(S, 389018000);
   eq(third.ok, false, '3. kullanım reddedilmeli:');
   eq(third.fail, 'outOfStock', 'sebep:');
 });
@@ -5753,7 +5794,7 @@ test('KİLİTLİ + kullanılabilir AYNI iksirden iki yığın: atomik TEK adet d
 
   eq(S.potions.stock(ref), preexisting + 8, 'toplam stok BÜTÜN yığınları saymalı:');
   S.player.mp = 0;
-  const res = S.potions.use(ref);
+  const res = usePotion(S, ref);
   ok(res.ok, `kullanım başarılı olmalı: ${res.fail ?? ''}`);
   eq(S.potions.stock(ref), preexisting + 7, 'TAM 1 adet düşmeli:');
   eq(S.inventory.count(ref), preexisting + 7, 'envanter sayımı:');
@@ -5764,10 +5805,10 @@ test('KİLİTLİ + kullanılabilir AYNI iksirden iki yığın: atomik TEK adet d
   eq(Math.round(S.player.mp), res.after, 'MP uygulanmış olmalı:');
 
   /* Kullanılabilir yığını bitir → yalnız kilitli kalır → `locked` reddi */
-  for (let i = 0; i < 2; i++) { S.player.mp = 0; ok(S.potions.use(ref).ok, `kullanım ${i}`); }
+  for (let i = 0; i < 2; i++) { S.player.mp = 0; ok(usePotion(S, ref).ok, `kullanım ${i}`); }
   eq(S.potions.stock(ref), preexisting + 5, 'yalnız kilitli yığınlar kalmalı:');
   S.player.mp = 0;
-  const blocked = S.potions.use(ref);
+  const blocked = usePotion(S, ref);
   eq(blocked.ok, false, 'kilitli yığın kullanılamaz:');
   eq(blocked.fail, 'locked', 'gerekçe:');
   eq(S.potions.stock(ref), preexisting + 5, 'başarısız kullanımda adet DEĞİŞMEZ:');
@@ -6290,7 +6331,11 @@ test('§39 farm ORTASINDA çanta dolarsa: loot yere düşer, farm sürer, item k
     if (!S.inventory.add(PLAYER.starterWeaponRef).ok) break;
   }
   S.genie.start(S.world);
-  farmLoop(S, 40);
+  /* P2.30 — ekipman düşme şansı %14'e ayarlandı (eskiden kaynak
+     tablolarındaki yüksek grup şansı geliyordu). Kırk saniyelik farm
+     çantayı doldurmaya yetmiyor; senaryo çanta DOLANA kadar sürer.
+     Testin amacı "dolu çantada item kaybolmuyor mu" — süre değil. */
+  for (let i = 0; i < 12 && S.drops.totals.blockedFull === 0; i++) farmLoop(S, 40);
   ok(S.drops.totals.kills > 0, 'farm devam etmeli');
   eq(S.inventory.usedSlots, S.inventory.capacity, 'çanta dolmuş olmalı:');
   ok(S.drops.totals.blockedFull > 0, 'dolu yüzünden yere düşen olmalı');
@@ -11975,6 +12020,217 @@ test('§100 klip arama HER İKİ tabloya bakar', () => {
   /* Bilinmeyen ad HATA FIRLATMAZ, `undefined` döner. */
   eq(clipFactOf('YOK_BOYLE_KLIP'), undefined, 'bilinmeyen klip:');
   eq(clipFactOf(null), undefined, 'null klip:');
+});
+
+/* ================= P2.30 — GANİMET HAVUZU KATALOGDAN ================= */
+console.log('P2.30 — Moradon ganimet havuzu:');
+
+test('§101 HER YUVA en az bir eşyayla temsil ediliyor', () => {
+  /* Oyun testi bulgusu: bir saat oynayıp bot, eldiven ve HİÇBİR takı
+     düşmedi. Kaynak tablolar kataloğun yarısını kapsamıyordu. */
+  const cov = slotCoverage();
+  for (const slot of ['weapon', 'helmet', 'chest', 'pants', 'gloves', 'boots',
+    'earring', 'ring', 'necklace', 'belt']) {
+    ok((cov[slot]?.length ?? 0) > 0, `${slot} yuvası havuzda yok`);
+  }
+});
+
+test('§101 HAVUZ SEVİYEYLE BÜYÜR ve yuva kaybetmez', () => {
+  /* İlk denemede alt sınır vardı ve ÖLÇÜMDE ÇÖKTÜ: Sv30 havuzunda
+     yalnız yay kalıyordu. Alt sınır kaldırıldı, çeşitlilik ağırlıkla
+     sağlanıyor. */
+  let prevSlots = 0;
+  for (const lv of [1, 5, 10, 15, 20, 25, 30]) {
+    const pool = poolFor(lv);
+    ok(pool.length > 0, `Sv${lv} havuzu boş`);
+    const slots = new Set(pool.map((d) => d.equipSlot)).size;
+    ok(slots >= prevSlots, `Sv${lv}'de yuva sayısı düştü: ${prevSlots} → ${slots}`);
+    prevSlots = slots;
+  }
+  /* En üst seviyede KATALOGUN TAMAMI havuzda olmalı. */
+  eq(poolFor(30).length, allDefinitions().length, 'Sv30 havuzu:');
+  /* Sv1 mob üst kademe eşya DÜŞÜREMEZ. */
+  const weak = poolFor(1);
+  for (const d of weak) ok(itemTierLevel(d) <= 1, `Sv1 havuzunda üst kademe: ${d.displayName}`);
+});
+
+test('§101 SEÇİM TOHUMLU ve ağırlık YAKIN KADEMEYİ tercih eder', () => {
+  const pool = poolFor(30);
+  /* Aynı zar → aynı eşya. */
+  eq(pickFromPool(pool, 30, 0.42)?.definitionRef,
+    pickFromPool(pool, 30, 0.42)?.definitionRef, 'deterministik:');
+  /* Boş havuz `null` döner, patlamaz. */
+  eq(pickFromPool([], 30, 0.5), null, 'boş havuz:');
+  /* Zar sınırları güvenli. */
+  for (const roll of [0, 0.9999, 1, -1, 2]) {
+    ok(pickFromPool(pool, 30, roll) !== null, `zar ${roll} sonuç vermedi`);
+  }
+  /* Güçlü mob, kendi kademesine yakın eşyayı DAHA SIK seçmeli. */
+  let near = 0, far = 0;
+  for (let i = 0; i < 2000; i++) {
+    const d = pickFromPool(pool, 30, i / 2000)!;
+    if (itemTierLevel(d) >= 20) near += 1;
+    if (itemTierLevel(d) <= 5) far += 1;
+  }
+  ok(near > 0, 'üst kademe hiç seçilmiyor');
+  ok(far > 0, 'alt kademe hiç seçilmiyor — çeşitlilik yok');
+});
+
+test('§101 CANLI: bir saatlik oturumda HİÇBİR yuva boş kalmaz', () => {
+  /* Asıl kabul kriteri. Ölçüm: saatte ~550 kill. */
+  const S = new PrototypeState(3800);
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  const seen = new Map<string, number>();
+  for (let i = 0; i < 550; i++) {
+    const m = S.mobs.mobs[i % S.mobs.mobs.length]!;
+    /* `MobAiState` değerleri KÜÇÜK HARF ve 'alive' YOK — mob canlıysa
+       'idle'dır. `reapDead()` yalnız `state === 'dying'` ve
+       `ai !== 'dead'` olanları toplar. */
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+    for (const { drop } of S.reapDead()) {
+      for (const r of drop.records) {
+        if (r.kind !== 'item') continue;
+        const d = definitionOf(r.itemRef);
+        if (d) seen.set(d.equipSlot, (seen.get(d.equipSlot) ?? 0) + 1);
+      }
+    }
+    m.ai = 'idle'; m.hp = m.maxHp; m.state = 'walk';
+  }
+  const missing: string[] = [];
+  for (const slot of ['weapon', 'helmet', 'chest', 'pants', 'gloves', 'boots',
+    'earring', 'ring', 'necklace', 'belt']) {
+    if (!seen.has(slot)) missing.push(slot);
+  }
+  eq(missing.length, 0, `bir saatte hiç düşmeyen yuva: ${missing.join(', ')}`);
+});
+
+test('§101 KAYNAK ZİNCİRİ korunuyor — denetlenebilirlik', () => {
+  /* Havuz kataloğa geçti ama ham kaynak SİLİNMEDİ. */
+  for (const ref of [750, 252, 115]) {
+    const p = dropProfile(ref);
+    if (!p) continue;
+    ok(p.sourceChain.includes('monster_drops'), `${ref} kaynak zinciri kayıp`);
+    ok(p.source.slots.length > 0, `${ref} kaynak slotları silinmiş`);
+  }
+  ok(EQUIP_DROP_CHANCE > 0 && EQUIP_DROP_CHANCE < 0.5, 'düşme şansı makul değil:');
+});
+
+/* ================= P2.31 — SKILL İKONU VE KİLİT ================= */
+console.log('P2.31 — skill ikonu skille bağlı, kilit üç değerli:');
+
+test('§102 İKON SKİLLE bağlı, YUVA KONUMUNA değil', () => {
+  /* Oyun testi bulgusu: "görünen ikon başka, çalışan skill başka".
+     `SKILL_SPOTS` her konuma sabit ikon veriyordu. */
+  const layout = readFileSync(join(PROTO_ROOT, 'ui', 'hud-layout.ts'), 'utf8');
+  ok(/SPOT ARTIK GÖRSEL TAŞIMAZ/.test(layout), 'konum-ikon bağı notu yok');
+  const scene = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  /* HUD artık `art.key` DEĞİL, `skillIconKey(def.sourceRef)` kullanmalı. */
+  ok(/skillIconKey\(def\.sourceRef\)/.test(scene), 'HUD ikonu skillden almıyor');
+  ok(!/g\.image\(art\.key/.test(scene), 'HUD hâlâ konum ikonunu çiziyor');
+
+  /* Eşleme geçerli olmalı: her anahtar manifestte, her ref katalogda. */
+  for (const [refStr, key] of Object.entries(SKILL_ICONS)) {
+    ok(PROTO_ASSETS[key] !== undefined, `ikon manifestte yok: ${key}`);
+    ok(ARCHER_SKILL_ORDER.includes(Number(refStr)), `bilinmeyen skill: ${refStr}`);
+  }
+  /* İkon ANAHTARLARI benzersiz — iki skill aynı ikonu kullanmamalı. */
+  const keys = Object.values(SKILL_ICONS);
+  eq(new Set(keys).size, keys.length, 'aynı ikon iki skillde:');
+});
+
+test('§102 EKSİK ikonlar GİZLENMİYOR — yer tutucu var', () => {
+  /* Beş ikon, on beş skill. Sahte eşleme yapmak yerine `null` döner. */
+  const missing = skillsWithoutIcon(ARCHER_SKILL_ORDER);
+  ok(missing.length > 0, 'senaryo geçersiz — tüm skillerin ikonu var');
+  for (const ref of missing) eq(skillIconKey(ref), null, `${ref} sahte ikon:`);
+  /* Yer tutucu harfi Türkçe büyük harf kuralına uymalı. */
+  eq(skillInitial('İzci Oku'), 'İ', 'Türkçe büyük harf:');
+  eq(skillInitial('kara takip'), 'K', 'baş harf:');
+  eq(skillInitial('   '), '?', 'boş ad:');
+});
+
+test('§103 KİLİT ÜÇ DEĞERLİ: kalıcı ile geçici AYRI', () => {
+  /* Oyun testi bulgusu: Sv1'de hangi skilli kullanabildiğin belli
+     değildi — Sv70 kilidi ile mana yetersizliği aynı görünüyordu. */
+  eq(skillGate({ requiredLevel: 1, playerLevel: 1, unlocked: true, blocked: null }),
+    'ready', 'kullanılabilir:');
+  eq(skillGate({ requiredLevel: 70, playerLevel: 1, unlocked: true, blocked: null }),
+    'levelLocked', 'seviye kilidi:');
+  eq(skillGate({ requiredLevel: 1, playerLevel: 5, unlocked: false, blocked: null }),
+    'unpurchased', 'puanla açılmamış:');
+  eq(skillGate({ requiredLevel: 1, playerLevel: 5, unlocked: true, blocked: 'mana' }),
+    'busy', 'geçici engel:');
+
+  /* SIRA ÖNEMLİ: kalıcı engel geçicinin ÖNÜNDE bildirilir. Sv70 skilli
+     "mana yetmiyor" gibi görünmemeli. */
+  eq(skillGate({ requiredLevel: 70, playerLevel: 1, unlocked: false, blocked: 'mana' }),
+    'levelLocked', 'kalıcı engel önce:');
+
+  /* 'noTarget' engel SAYILMAZ — hedef yokken skill kilitli görünmemeli. */
+  eq(skillGate({ requiredLevel: 1, playerLevel: 5, unlocked: true, blocked: 'noTarget' }),
+    'ready', 'hedefsizlik kilit değil:');
+});
+
+test('§103 KALICI kilit GEÇİCİDEN daha soluk çizilir', () => {
+  /* Görsel hiyerarşi: kullanılabilir en parlak, seviye kilidi en soluk. */
+  ok(GATE_ALPHA.ready > GATE_ALPHA.busy, 'hazır > meşgul');
+  ok(GATE_ALPHA.busy > GATE_ALPHA.unpurchased, 'meşgul > açılmamış');
+  ok(GATE_ALPHA.unpurchased > GATE_ALPHA.levelLocked, 'açılmamış > seviye kilidi');
+  /* Rozet yalnız KALICI kilitte görünür. */
+  eq(gateBadge('levelLocked', 25), 'Sv25', 'seviye rozeti:');
+  eq(gateBadge('unpurchased', 5), 'AÇ', 'açma rozeti:');
+  eq(gateBadge('busy', 5), null, 'geçici engelde rozet yok:');
+  eq(gateBadge('ready', 5), null, 'hazırken rozet yok:');
+});
+
+test('§103 CANLI: Sv1 oyuncuda kullanılabilir skill AYIRT EDİLEBİLİR', () => {
+  const S = new PrototypeState(3900);
+  eq(S.player.level, 1, 'başlangıç seviyesi:');
+  const states = ARCHER_SKILL_ORDER.map((ref) => {
+    const def = SkillRegistry.get(ref)!;
+    return skillGate({
+      requiredLevel: def.requiredLevel,
+      playerLevel: S.player.level,
+      unlocked: S.stats.progression.isUnlocked(ref),
+      blocked: null,
+    });
+  });
+  /* En az bir skill kullanılabilir olmalı — yoksa Sv1 oyuncu hiçbir
+     şey yapamaz. */
+  ok(states.includes('ready'), 'Sv1\'de kullanılabilir skill yok');
+  /* Çoğu KALICI kilitli olmalı — hepsi hazır görünürse ayrım kaybolur. */
+  const locked = states.filter((x) => x === 'levelLocked').length;
+  ok(locked >= ARCHER_SKILL_ORDER.length / 2, `Sv1'de yalnız ${locked} skill kilitli`);
+});
+
+test('§104 MOB HASARI YARIYA indi — kaynak değeri DEĞİŞMEDİ', () => {
+  /* Oyun testi bulgusu: "moblar çok fazla vuruyor". P2.5A'da mob CANI
+     8'den 1'e çekilmişti ama HASAR çarpanına dokunulmamıştı. */
+  eq(PROTO.monsterDamageMultiplier, 4, 'hasar çarpanı:');
+  /* Kaynak mob hasarı ETKİLENMEMELİ — çarpan bir denge katmanıdır. */
+  const worm = Content.monster(750)!;
+  eq(worm.attack, 4, 'kaynak solucan hasarı:');
+  /* CANLI: aynı mob artık daha az vurmalı. */
+  const S = protoState(4003);
+  const before = S.player.hp;
+  const dmg = S.combat.damageRoll(worm.attack * PROTO.monsterDamageMultiplier, 0, 1);
+  const old = S.combat.damageRoll(worm.attack * 8, 0, 1);
+  ok(dmg < old, `yeni hasar düşük olmalı: ${dmg} vs ${old}`);
+  ok(before > 0, 'oyuncu canlı olmalı');
+});
+
+test('§104 iksir beklemesi PANEL AÇIKKEN de akar', () => {
+  /* Bekleme oyuncunun ilgisine değil GEÇEN SÜREYE bağlıdır. */
+  const S = protoState(4004);
+  S.giveTestPotions();
+  S.player.hp = 1;
+  ok(S.potions.use(389011000).ok, 'ilk kullanım');
+  const start = S.potions.cooldownLeft('hp');
+  ok(start > 0, 'bekleme başlamalı');
+  for (let i = 0; i < 30; i++) S.potions.update(1 / 60);
+  ok(S.potions.cooldownLeft('hp') < start, 'bekleme azalmalı');
+  eq(POTION_COOLDOWN_SEC, 1.5, 'bekleme süresi (kullanıcı kararı):');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

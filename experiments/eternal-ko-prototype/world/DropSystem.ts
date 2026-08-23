@@ -26,7 +26,7 @@ import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
 import type { Rng } from '../../../src/engine/rng.js';
 import { SCROLL_ITEM_REF } from './ForgeSystem.js';
-import { isEquipmentItem } from '../data/item-catalog.js';
+import { EQUIP_DROP_CHANCE, pickFromPool, poolFor } from '../data/moradon-loot-pool.js';
 import {
   DROP_TUNING_V1, dropProfile, effectiveCoin,
   type DropTuning, type MonsterDropProfile,
@@ -155,14 +155,25 @@ export class DropSystem {
       autoLoot,
     };
 
-    /* ── 2) ITEM'LER — her drop AYRI kayıt / AYRI teslimat (§17) ──
-       P2.14 — OKÇU SÜZGECİ BURADA DA UYGULANIR. Grup üyeleri
-       `drop-profile.ts` içinde süzülüyordu ama DOĞRUDAN droplar (kind
-       'direct') o yoldan geçmiyor ve savaşçı silahı düşürebiliyordu.
-       Süzgeç tek yerde tanımlı (`isEquipmentItem`), burada uygulanır. */
-    for (const d of rolled.drops) {
-      if (!isEquipmentItem(d.itemRef)) continue;
-      ev.records.push(this.deliverItem(mob, d.itemRef, 1, d.from, autoLoot, owner));
+    /* ── 2) EKİPMAN — P2.30'DAN İTİBAREN KATALOGDAN TÜRER ──
+       Kaynak ganimet tabloları kataloğumuzun ancak yarısını kapsıyordu:
+       takıların HİÇBİRİ, A1'de eklenen Avcı/Zırhlı Avcı setlerinin de
+       hiçbiri hiçbir mobun tablosunda yoktu. Bir saat oynayıp bot,
+       eldiven ve takı düşmemesinin sebebi buydu.
+
+       Artık havuz MOBUN SEVİYE BANDINDAKİ katalog eşyalarından
+       türetilir (`moradon-loot-pool.ts`). Kaynak tablolar SİLİNMEDİ —
+       `ev.sourceChain` ve `source.slots` denetlenebilir kalır; yalnız
+       oyuncuya ULAŞAN havuz değişti. */
+    const eliteX = mob.monster.tier === 'elite' ? 2 : 1;
+    if (this.deps.rng() < EQUIP_DROP_CHANCE * eliteX) {
+      const pool = poolFor(mob.monster.level);
+      const pick = pickFromPool(pool, mob.monster.level, this.deps.rng());
+      if (pick) {
+        ev.records.push(
+          this.deliverItem(mob, pick.definitionRef, 1, 'group', autoLoot, owner),
+        );
+      }
     }
 
     /* ── 2b) YÜKSELTME PARŞÖMENİ (P2.8) ──

@@ -15,15 +15,31 @@
  *    4) delta uygula
  *  Başarısız kullanımda HP/MP ve adet DEĞİŞMEZ.
  *
- *  COOLDOWN YOK: kaynak `recast_time = 1` / `cast_time = 5` alanlarının birimi
- *  DOĞRULANMADI (POTION RECAST SEMANTIC UNRESOLVED) → uydurma cooldown eklenmedi.
- *  Kullanım temposunu yalnız Genie'nin karar tiki belirler. */
+ *  ══════════════ P2.32 — COOLDOWN EKLENDİ ══════════════
+ *  Eskiden cooldown YOKTU: kaynak `recast_time` / `cast_time` alanlarının
+ *  birimi doğrulanamadığı için uydurma bir sayı konmamıştı ve tempoyu
+ *  yalnız Genie'nin karar tiki belirliyordu.
+ *
+ *  Oyun testinde bu bir kusur olarak bildirildi: iksir sınırsız hızda
+ *  içilebiliyor, can/mana yönetimi anlamını yitiriyordu.
+ *
+ *  `POTION_COOLDOWN_SEC` bir PROJECT LEGACY TUNING'idir — kaynaktan
+ *  gelmez, kullanıcı kararıdır (en az 1,5 sn). Kaynak belirsizliği
+ *  hâlâ geçerli; bu sayı onun yerine geçmez, oynanış için konur.
+ *
+ *  KAYNAK PAYLAŞIMLI DEĞİL: can ve mana iksirinin cooldown'ı AYRIDIR.
+ *  Tek sayaç olsaydı can içmek manayı kilitlerdi ve savaşta ölümcül
+ *  olurdu. */
 import type { InventoryState } from '../../../src/game/systems/InventoryState.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import type { CharacterStats } from '../../../src/game/systems/CharacterStats.js';
 import { koPotion, type KoPotionProfile, type PotionResource } from '../data/ko-potions.js';
 
-export type PotionFail = 'noProfile' | 'outOfStock' | 'full' | 'locked';
+export type PotionFail = 'noProfile' | 'outOfStock' | 'full' | 'locked' | 'cooldown';
+
+/** İksir bekleme süresi (sn) — PROJECT LEGACY TUNING, kullanıcı kararı.
+ *  Can ve mana için AYRI sayaç. */
+export const POTION_COOLDOWN_SEC = 1.5;
 
 export interface PotionUseResult {
   ok: boolean;
@@ -85,6 +101,19 @@ export class KoPotionSystem {
   }
 
   /** Sabit miktarlı kullanım. */
+  /** Kaynak başına kalan bekleme (sn). Can ve mana AYRI. */
+  private cooldown: Record<PotionResource, number> = { hp: 0, mp: 0 };
+
+  /** Kare tiki — bekleme sayaçlarını düşürür. */
+  update(dt: number): void {
+    for (const k of ['hp', 'mp'] as const) {
+      if (this.cooldown[k] > 0) this.cooldown[k] = Math.max(0, this.cooldown[k] - dt);
+    }
+  }
+
+  /** Bu kaynak için kalan bekleme (sn); 0 = hazır. */
+  cooldownLeft(resource: PotionResource): number { return this.cooldown[resource]; }
+
   use(itemRef: number): PotionUseResult {
     const p = koPotion(itemRef);
     if (!p) {
@@ -93,7 +122,8 @@ export class KoPotionSystem {
         restoreAmount: 0, before: 0, after: 0, actual: 0, wasted: 0, remaining: 0,
       };
     }
-    /* 1) doğrulamalar */
+    /* 1) doğrulamalar — bekleme EN ÖNCE, hiçbir mutasyon olmadan. */
+    if (this.cooldown[p.resource] > 0) return emptyResult(p, 'cooldown', this.stock(itemRef));
     const stock = this.stock(itemRef);
     if (stock <= 0) return emptyResult(p, 'outOfStock', 0);
     const instanceId = this.firstUsable(itemRef);
@@ -113,6 +143,9 @@ export class KoPotionSystem {
 
     /* 4) uygula */
     if (p.resource === 'hp') this.player.hp = after; else this.player.mp = after;
+    /* Bekleme YALNIZ başarılı kullanımda başlar — reddedilen deneme
+       cezalandırılmaz. */
+    this.cooldown[p.resource] = POTION_COOLDOWN_SEC;
 
     return {
       ok: true, itemRef, displayName: p.displayName, resource: p.resource,
