@@ -55,6 +55,7 @@ import {
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-level-gap.js';
+import { PROTO_SAVE_VERSION, ProtoSaveSystem, type ProtoSaveData } from '../data/proto-save.js';
 import {
   HP_POTION_REF, MP_POTION_REF, POTION_DROP_CHANCE, TROPHY_DROP_CHANCE, TROPHY_ITEM_REF,
 } from '../world/DropSystem.js';
@@ -10560,6 +10561,102 @@ test('§79 özel ganimet 5k eder, iksirler kullanılabilir', () => {
   /* Drop şansları makul aralıkta — sıfır ya da bire yapışmasın. */
   ok(TROPHY_DROP_CHANCE > 0 && TROPHY_DROP_CHANCE < 0.1, 'özel ganimet şansı:');
   ok(POTION_DROP_CHANCE > 0 && POTION_DROP_CHANCE < 0.5, 'iksir şansı:');
+});
+
+/* ================= P2.15 — KAYIT ================= */
+console.log('P2.15 — yerel kayıt:');
+
+/** Test için bellek-içi depolama — gerçek localStorage'a dokunulmaz. */
+function memStore(): { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void } {
+  const m = new Map<string, string>();
+  return {
+    getItem: (k) => m.get(k) ?? null,
+    setItem: (k, v) => { m.set(k, v); },
+    removeItem: (k) => { m.delete(k); },
+  };
+}
+
+test('§80 kayıt → yükleme: ilerleme AYNEN geri gelir', () => {
+  const S = new PrototypeState(3000);
+  S.player.level = 14;
+  S.player.coins = 12345;
+  S.stats.progression.spend('dex', 20);
+  S.stats.progression.spend('hp', 9);
+  /* Bir eşya kuşan ve bir yığın ekle. */
+  const bow = allDefinitions().filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
+  const add = S.inventory.add(bow.definitionRef, { upgradeLevel: 3 });
+  if (add.ok) S.equipService.equip(add.instance.instanceId);
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 7 });
+  S.world.worldX = 1234; S.world.worldY = 4321;
+  const snap = S.snapshot();
+
+  /* Yeni bir dünyaya yükle. */
+  const T = new PrototypeState(3001);
+  T.restore(snap);
+  eq(T.player.level, 14, 'seviye:');
+  eq(T.player.coins, 12345, 'altın:');
+  eq(T.stats.progression.spent.dex, 20, 'dağıtılan DEX:');
+  eq(T.stats.progression.spent.hp, 9, 'dağıtılan HP:');
+  eq(T.inventory.count(SCROLL_ITEM_REF), 7, 'parşömen:');
+  eq(Math.round(T.world.worldX), 1234, 'konum X:');
+  const w = T.equipment.equippedInstance('weapon');
+  ok(w !== undefined, 'silah kuşanılı olmalı');
+  eq(w!.upgradeLevel, 3, 'yükseltme seviyesi:');
+  /* Türetilen değerler de tutmalı — stat tavanları seviyeden geliyor. */
+  eq(Math.round(T.stats.finalStats().attack), Math.round(S.stats.finalStats().attack), 'AP:');
+  eq(Math.round(T.player.maxHp), Math.round(S.player.maxHp), 'MaxHP:');
+});
+
+test('§80 BOZUK kayıt oyunu DÜŞÜRMEZ', () => {
+  const sys = new ProtoSaveSystem(memStore());
+  eq(sys.load(), null, 'kayıt yokken:');
+  /* Çöp veri → null döner, hata fırlatmaz. */
+  const raw = memStore();
+  raw.setItem('project-legacy-proto', '{bozuk json');
+  const sys2 = new ProtoSaveSystem(raw);
+  eq(sys2.load(), null, 'bozuk JSON:');
+  /* Yarım kayıt (player yok) → reddedilir. */
+  const raw3 = memStore();
+  raw3.setItem('project-legacy-proto', JSON.stringify({ saveVersion: 1 }));
+  eq(new ProtoSaveSystem(raw3).load(), null, 'yarım kayıt:');
+});
+
+test('§80 bütçeyi AŞAN dağıtım kaydı kırpılır', () => {
+  /* Elle düzenlenmiş kayıt: Lv1'de 200 puan harcanmış gibi. */
+  const S = new PrototypeState(3002);
+  const fake: ProtoSaveData = {
+    ...S.snapshot(),
+    player: { ...S.snapshot().player, level: 1 },
+    allocation: { dex: 150, hp: 150 },
+  };
+  S.restore(fake);
+  const p = S.stats.progression;
+  ok(p.spent.dex + p.spent.hp <= p.statBudget,
+    `bütçe aşıldı: ${p.spent.dex + p.spent.hp} > ${p.statBudget}`);
+});
+
+test('§80 kayıt yazma/okuma döngüsü ve sürüm', () => {
+  const sys = new ProtoSaveSystem(memStore());
+  const S = new PrototypeState(3003);
+  S.player.coins = 999;
+  ok(sys.save(S.snapshot()), 'yazma başarılı olmalı');
+  ok(sys.hasSave, 'kayıt var görünmeli');
+  const back = sys.load();
+  ok(back !== null, 'okuma başarılı olmalı');
+  eq(back!.saveVersion, PROTO_SAVE_VERSION, 'sürüm damgası:');
+  eq(back!.player.coins, 999, 'altın:');
+  sys.wipe();
+  eq(sys.load(), null, 'silme sonrası:');
+});
+
+test('§80 kayıt GAMEPLAY’i etkilemez — anlık görüntü KOPYADIR', () => {
+  const S = new PrototypeState(3004);
+  const snap = S.snapshot();
+  const before = snap.inventory.entries.length;
+  /* Snapshot alındıktan sonra envanter değişirse görüntü DEĞİŞMEMELİ. */
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 3 });
+  eq(snap.inventory.entries.length, before, 'görüntü sonradan değişmemeli:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

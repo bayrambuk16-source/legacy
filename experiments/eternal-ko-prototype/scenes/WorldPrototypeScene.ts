@@ -97,6 +97,9 @@ const HUD_ALPHA = 0.88;
 
 /** Oto giy bildiriminin ekranda kalma süresi (sn). */
 const POWER_TOAST_SEC = 3;
+
+/** Otomatik kayıt aralığı (sn). Seviye atlayınca ayrıca hemen yazılır. */
+const AUTOSAVE_SEC = 20;
 const MAX_SET_SKILLS = GENIE_SET_MAX;
 const LOG_LINES = 5;
 /** DEV panelinde telemetri listesinin ALTINDA başlayan toggle kolonu. */
@@ -169,6 +172,11 @@ export class WorldPrototypeScene implements Scene {
   readonly key = 'world-proto';
   private bag = new DisposerBag();
   private S = new PrototypeState();
+
+  /** P2.15 — kayıt erişimi. `main.ts` sahne başlamadan ÖNCE yükler ve
+   *  sekme kapanırken yazar; durum nesnesi sahnenin içinde olduğu için
+   *  dışarıya bu köprüden verilir. */
+  get state(): PrototypeState { return this.S; }
 
   /* joystick */
   private stick: JoystickInput = { dx: 0, dy: 0, active: false };
@@ -265,6 +273,9 @@ export class WorldPrototypeScene implements Scene {
   private forgeMsg = '';
   /** P2.13 — güç skoru bildirimi: `+20 Up` şeridi. Süre dolunca kaybolur. */
   private powerToast: { name: string; before: number; after: number; t: number } | null = null;
+  /** P2.15 — otomatik kayıt sayacı ve son kaydedilen seviye. */
+  private autosaveTimer = AUTOSAVE_SEC;
+  private lastSavedLevel = 0;
   private genieTab: 'general' | 'sets' | 'bar' = 'general';
   private editingSet: SetId = 0;
   /** Aktif bar sekmesinde düzenlenen slot. */
@@ -348,6 +359,12 @@ export class WorldPrototypeScene implements Scene {
    *  P2.3: combat ölçer paneli kaldırıldı; bu araç DEV paneline taşındı. */
   private infiniteMpBtn(): Btn {
     return { id: 'dev_inf_mp', x: 44, y: DEV_TOGGLE_TOP + 80, w: 300, h: 34, label: 'SONSUZ MP' };
+  }
+
+  /** P2.15 — DEV: kaydı sil ve baştan başla. Oyun testinde temiz bir
+   *  başlangıca dönmek için tek yol; production'da bu düğme yoktur. */
+  private wipeSaveBtn(): Btn {
+    return { id: 'dev_wipe', x: 44, y: DEV_TOGGLE_TOP + 120, w: 300, h: 34, label: 'KAYDI SİL' };
   }
 
   /** Genie kontrol şeridi (üst HUD'ın hemen altı). */
@@ -737,6 +754,11 @@ export class WorldPrototypeScene implements Scene {
     if (this.hit(p, this.infiniteMpBtn())) {
       this.S.infiniteMp = !this.S.infiniteMp;
       this.say(`Sonsuz MP: ${this.S.infiniteMp ? 'AÇIK' : 'KAPALI'}`);
+      return true;
+    }
+    if (this.hit(p, this.wipeSaveBtn())) {
+      this.S.saves.wipe();
+      this.say('Kayıt silindi — sayfayı yenile');
       return true;
     }
     if (this.hit(p, this.lootPanelToggle())) {
@@ -1193,6 +1215,21 @@ export class WorldPrototypeScene implements Scene {
     }, dt);
 
     if (this.noticeTimer > 0) this.noticeTimer -= dt;
+
+    /* P2.15 — OTOMATİK KAYIT.
+       Her karede yazmak localStorage'ı boğar; `AUTOSAVE_SEC` aralıkla
+       yazılır. Ayrıca seviye atlayınca HEMEN yazılır — en çok canı yakan
+       kayıp odur. Kayıt gameplay'i etkilemez; yazma başarısız olsa bile
+       oyun devam eder. */
+    this.autosaveTimer -= dt;
+    if (this.S.player.level !== this.lastSavedLevel) {
+      this.lastSavedLevel = this.S.player.level;
+      this.autosaveTimer = 0;
+    }
+    if (this.autosaveTimer <= 0) {
+      this.autosaveTimer = AUTOSAVE_SEC;
+      this.S.saveNow();
+    }
     /* P2.13 — oto giy olayını yakala ve bildirim şeridini süre ile söndür. */
     const up = this.S.lastUpgrade;
     if (up) {
@@ -1841,6 +1878,12 @@ export class WorldPrototypeScene implements Scene {
     g.text(`${ll.label}: ${this.S.worldLoot.tuning.lootLifetimeSec}s`
       + `  (${LOOT_LIFETIME_OPTIONS.join('/')})`,
       ll.x + ll.w / 2, ll.y + ll.h / 2, { align: 'center', size: 11, color: '#a8c090' });
+    const wb = this.wipeSaveBtn();
+    g.rect(wb.x, wb.y, wb.w, wb.h, '#2a1512', 0.95);
+    g.rect(wb.x, wb.y, wb.w, 2, '#c96a5a');
+    g.text(`${wb.label}${this.S.saves.persistent ? '' : '  (kalıcı depolama YOK)'}`,
+      wb.x + 12, wb.y + wb.h / 2 - 7, { size: 12, bold: true, color: '#e8b8b0' });
+
     const im = this.infiniteMpBtn();
     const imOn = this.S.infiniteMp;
     g.rect(im.x, im.y, im.w, im.h, imOn ? '#1b2634' : '#1c1710');

@@ -29,6 +29,7 @@ import { KoArcherPhysicalStrategy } from '../../src/game/systems/combat/KoArcher
 import { EquipService } from './world/EquipService.js';
 import { ForgeSystem } from './world/ForgeSystem.js';
 import { AutoGearSystem, type EquipUpgradeEvent } from './world/AutoGearSystem.js';
+import { ProtoSaveSystem, type ProtoSaveData } from './data/proto-save.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
 import { PlayerAnimator } from './world/PlayerAnimation.js';
@@ -121,6 +122,8 @@ export class PrototypeState {
   autoGear!: AutoGearSystem;
   /** Son oto giy olayı — HUD bildirimi bunu okur, sonra temizler. */
   lastUpgrade: EquipUpgradeEvent | null = null;
+  /** P2.15 — yerel kayıt. Ana oyunun `SaveSystem`inden AYRI anahtar. */
+  readonly saves = new ProtoSaveSystem();
   /** Oyuncu görsel durum makinesi — saldırı animasyonu YALNIZ buradan tetiklenir. */
   readonly anim = new PlayerAnimator();
 
@@ -274,6 +277,74 @@ export class PrototypeState {
       out.push({ kill, drop });
     }
     return out;
+  }
+
+  /* ═══════════════ P2.15 — KAYIT ═══════════════ */
+
+  /** Kaydedilecek durumun anlık görüntüsü. */
+  snapshot(): ProtoSaveData {
+    const equipment: Record<string, number> = {};
+    for (const { slotId, instance } of this.equipment.allEquipped()) {
+      equipment[slotId] = instance.instanceId;
+    }
+    return {
+      saveVersion: 1,
+      player: {
+        level: this.player.level, exp: this.player.exp,
+        hp: this.player.hp, mp: this.player.mp, coins: this.player.coins,
+      },
+      allocation: this.stats.progression.serialize(),
+      inventory: this.inventory.serialize(),
+      equipment,
+      skills: { loadout: this.combat.skills.loadout.serialize() },
+      autoGear: { ...this.autoGear.settings },
+      world: { x: this.world.worldX, y: this.world.worldY },
+    };
+  }
+
+  /** Kaydı uygular. SIRA ÖNEMLİDİR (bkz. `data/proto-save.ts` başlığı):
+   *  seviye → dağıtım → envanter → ekipman → can/mana.
+   *  Bozuk kayıt oyunu düşürmez; her adım kendi doğrulamasını yapar. */
+  restore(d: ProtoSaveData): void {
+    /* 1) seviye — puan bütçesi ve stat tavanları buna bağlı */
+    this.player.restoreProgression({
+      level: d.player.level, exp: d.player.exp, coins: d.player.coins,
+    });
+    this.player.level = Math.max(1, Math.floor(d.player.level));
+
+    /* 2) dağıtım — bütçe belli olmadan kırpılamaz */
+    this.stats.progression.restore(d.allocation);
+
+    /* 3) envanter */
+    this.inventory.restore(d.inventory.entries ?? [], d.inventory.nextInstanceId ?? 1);
+
+    /* 4) ekipman — envanterdeki instance'lara işaret eder */
+    this.equipment.restore(d.equipment ?? {});
+
+    /* 5) skill barı ve ayarlar */
+    this.combat.skills.loadout.restore(d.skills?.loadout);
+    if (d.autoGear) Object.assign(this.autoGear.settings, d.autoGear);
+
+    /* 6) konum ve vitaller — tavanlar ancak burada kesinleşir */
+    if (d.world) {
+      this.world.worldX = d.world.x;
+      this.world.worldY = d.world.y;
+    }
+    this.player.restoreVitals({
+      hp: Number.isFinite(d.player.hp) ? d.player.hp : Number.POSITIVE_INFINITY,
+      mp: Number.isFinite(d.player.mp) ? d.player.mp : Number.POSITIVE_INFINITY,
+    });
+  }
+
+  /** Kaydeder. Depolama kısıtlıysa `false` döner — oyun devam eder. */
+  saveNow(): boolean { return this.saves.save(this.snapshot()); }
+
+  /** Varsa kaydı yükler. Kayıt yoksa `false`. */
+  loadSaved(): boolean {
+    const d = this.saves.load();
+    if (!d) return false;
+    this.restore(d);
+    return true;
   }
 
   /** P1.6 — COMBAT KARESİ: pipeline'ı ilerletir VE impact yan etkilerini uygular.

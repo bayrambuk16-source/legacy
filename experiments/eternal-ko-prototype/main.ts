@@ -159,6 +159,24 @@ async function attachThree(): Promise<void> {
 const keys = [...Object.keys(ASSET_MANIFEST), ...Object.keys(PROTO_ASSETS)];
 const srcOf = (k: string): string => assetSrc(k) || PROTO_ASSETS[k] || '';
 
+/* P2.15 — VARSA KAYDI YÜKLE.
+   Sahne başlamadan ÖNCE yüklenir: seviye/ekipman ilk kareden itibaren
+   doğru olsun, oyuncu bir an Sv1 görüp sonra sıçramasın.
+   Kayıt yoksa ya da bozuksa sessizce yeni oyun başlar. */
+try {
+  if (scene.state.loadSaved()) console.info('[P2.15] Kayıt yüklendi.');
+} catch (err) {
+  console.warn('[P2.15] Kayıt yüklenemedi, yeni oyun:',
+    err instanceof Error ? err.message : err);
+}
+
+/* Sekme kapanırken son durumu yaz — 20 sn'lik otomatik kayıt aralığında
+   kaybolan ilerleme olmasın. */
+window.addEventListener('pagehide', () => { scene.state.saveNow(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') scene.state.saveNow();
+});
+
 void Promise.all(keys.map((k) => game.assets.loadImage(k, srcOf(k)).catch(() => undefined)))
   .then(() => attachThree())
   .then(() => game.start(scene.key));

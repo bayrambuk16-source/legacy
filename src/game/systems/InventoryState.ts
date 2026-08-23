@@ -208,6 +208,16 @@ export class InventoryState {
 
   clear(): void { this.entries = []; this.nextInstanceId = 1; }
 
+  /** P2.15 — kayıt için anlık görüntü. `restore()` ile simetriktir:
+   *  aynı iki alanı verir, aynı ikisini bekler. Girdiler KOPYALANIR —
+   *  kaydedilen görüntü sonradan oyun içi mutasyonlarla değişmesin. */
+  serialize(): { entries: ItemInstance[]; nextInstanceId: number } {
+    return {
+      entries: this.entries.map((e) => ({ ...e })),
+      nextInstanceId: this.nextInstanceId,
+    };
+  }
+
   /* geriye dönük uyum (Faz 3 testleri) */
   list(): Array<{ item: GameItem | undefined; entry: { itemRef: number; count: number } }> {
     const byRef = new Map<number, number>();
