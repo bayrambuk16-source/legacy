@@ -34,7 +34,6 @@ import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
 } from '../ui/camera-zoom.js';
 import { CAMERA_V1 } from '../render3d/CameraRig.js';
-import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
   hitTest as invHitTest, invButtons, invCloseButton, itemHeadline, targetSlotFor,

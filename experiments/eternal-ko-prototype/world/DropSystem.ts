@@ -176,7 +176,7 @@ export class DropSystem {
   /** Tek bir itemin teslimatı. Envanter reddi item'ı YOK ETMEZ (§8/§16). */
   private deliverItem(
     mob: WorldMob, itemRef: number, quantity: number,
-    from: 'direct' | 'group', autoLoot: boolean, owner: number,
+    from: DropRecord['from'], autoLoot: boolean, owner: number,
   ): DropRecord {
     const itemName = Content.item(itemRef)?.displayName ?? `#${itemRef}`;
     this.totals.items += quantity;

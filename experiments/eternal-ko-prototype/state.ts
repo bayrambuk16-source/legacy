@@ -32,7 +32,6 @@ import { KoPotionSystem } from './world/PotionSystem.js';
 import { PlayerAnimator } from './world/PlayerAnimation.js';
 import { FARM_AREA_SLOTS } from './data/farm-area.js';
 import type { MobSpawnSlot } from './data/mob-slot-schema.js';
-import { RESPAWN_DEFAULT } from './data/mob-ai-profiles.js';
 import { ACTIVE_WORLD, type WorldConfig } from './data/world-map.js';
 import {
   ACTIVE_BAR_SLOTS, DEFAULT_ACTIVE_BAR, DEFAULT_GENIE_SETS, archerBehaviors,

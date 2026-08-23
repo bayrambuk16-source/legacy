@@ -23,7 +23,7 @@
  *  doldurulmadı. Oyun tavanı bu yüzden fiilen +8'dir. Trina benzeri bir
  *  ikinci malzeme geldiğinde `TRINA_BUS` satırları devreye alınabilir. */
 
-import upgradeCurve from '../../../src/game/data/generated/upgrade_curve.json' with { type: 'json' };
+import upgradeCurve from '../../../src/game/data/generated/upgrade_curve.json';
 import { UPGRADE_MODEL } from '../../../src/game/config.js';
 
 /* ───────────────────────── başarı eğrisi ───────────────────────── */
