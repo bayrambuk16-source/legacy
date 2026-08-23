@@ -10119,7 +10119,9 @@ test('§70 katalog OKÇU İLERLEMESİNİ kapsıyor — her yuvada kademe var', (
   }
   ok((bySlot.get('weapon') ?? 0) >= 5, `yay kademesi yetersiz: ${bySlot.get('weapon') ?? 0}`);
   /* Yay hasarları ARTAN bir bant oluşturmalı. */
-  const bows = defs.filter((d) => d.equipSlot === 'weapon')
+  /* `allDefinitions()` birleşim tipi döner; `attack` yalnız silahta var.
+     `category` ile daraltmak tip güvenliğini korur — `as` KULLANILMAZ. */
+  const bows = defs.filter((d) => d.category === 'weapon')
     .map((d) => d.stats.attack).sort((a, b) => a - b);
   ok(bows[bows.length - 1]! >= 26, `en güçlü yay ${bows[bows.length - 1]} — bant dar`);
 });
@@ -10199,7 +10201,7 @@ test('§73 EĞRİ: Sv20 dağıtılmış karakter Sv15 mobu MAKUL sürede indirir
   prog.spend('hp', prog.unspent);
   /* En güçlü yayı kuşan. */
   const best = allDefinitions()
-    .filter((d) => d.equipSlot === 'weapon')
+    .filter((d) => d.category === 'weapon')
     .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
   const add = S.inventory.add(best.definitionRef, { upgradeLevel: 0 });
   if (add.ok) S.equipService.equip(add.instance.instanceId);

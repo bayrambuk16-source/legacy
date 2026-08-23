@@ -34,7 +34,7 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { facingToYaw } from './coords.js';
 import {
-  FOLIAGE_BASE_SCALE, type FoliageItem,
+  FOLIAGE_BASE_SCALE, type FoliageItem, type FoliageKind,
 } from '../data/moradon-foliage.js';
 import type { GameplayPoint } from './coords.js';
 import {
@@ -487,11 +487,11 @@ export class ThreeWorldRenderer {
 
      GAMEPLAY ETKİSİ YOK: bitkiler collision'a girmez, WorldFrame'e
      yazılmaz, hiçbir gameplay sistemi bunları görmez. */
-  private foliage = new Map<string, InstancedMesh>();
+  private foliage = new Map<FoliageKind, InstancedMesh>();
   private foliageOwned: BufferGeometry[] = [];
 
   /** Bir bitki türünün modelini yükler ve örneklerini yerleştirir. */
-  attachFoliage(kind: string, glb: LoadedGlb, items: FoliageItem[]): boolean {
+  attachFoliage(kind: FoliageKind, glb: LoadedGlb, items: FoliageItem[]): boolean {
     if (items.length === 0) return false;
     /* Modelin bütün mesh'lerini tek geometriye topla — kaynak modeller
        çok parçalı olabiliyor (gövde + yaprak ayrı materyal). İlk mesh'i
@@ -528,7 +528,7 @@ export class ThreeWorldRenderer {
     return true;
   }
 
-  detachFoliage(kind: string): void {
+  detachFoliage(kind: FoliageKind): void {
     const inst = this.foliage.get(kind);
     if (!inst) return;
     this.scene.remove(inst);

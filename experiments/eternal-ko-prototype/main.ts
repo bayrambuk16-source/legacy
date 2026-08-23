@@ -12,6 +12,7 @@
 import { CanvasGame } from '../../src/engine/canvas.js';
 import { ASSET_MANIFEST, assetSrc } from '../../src/game/data/assets-manifest.js';
 import { PROTO_ASSETS } from './data/proto-assets.js';
+import type { FoliageKind } from './data/moradon-foliage.js';
 import { WorldPrototypeScene } from './scenes/WorldPrototypeScene.js';
 import { PROTO } from './config.js';
 
@@ -119,13 +120,15 @@ async function attachThree(): Promise<void> {
        Bağımsız `try`: bitkiler yüklenemezse harita çıplak kalır ama oyun
        çalışmaya devam eder. Bitkiler DEKORDUR, gameplay'e girmezler. */
     try {
-      const [{ loadGlb }, { modelSrc }, foliage] = await Promise.all([
+      const [{ loadGlb }, { modelSrc }, { FOLIAGE_MODEL_KEY, buildFoliage }] = await Promise.all([
         import('./render3d/GlbLoader.js'),
         import('./data/proto-assets.js'),
         import('./data/moradon-foliage.js'),
       ]);
-      const items = foliage.buildFoliage();
-      const byKind = new Map<string, typeof items>();
+      const items = buildFoliage();
+      /* Anahtar tipi `FoliageKind` olarak KORUNUR: `string` yaparsak
+         `FOLIAGE_MODEL_KEY[kind]` indekslemesi tip güvenliğini kaybeder. */
+      const byKind = new Map<FoliageKind, typeof items>();
       for (const it of items) {
         const list = byKind.get(it.kind) ?? [];
         list.push(it);
@@ -135,7 +138,7 @@ async function attachThree(): Promise<void> {
          bellek tepesi yaratıyor. Biri düşerse diğerleri devam eder. */
       for (const [kind, list] of byKind) {
         try {
-          const url = modelSrc(foliage.FOLIAGE_MODEL_KEY[kind as foliage.FoliageKind]);
+          const url = modelSrc(FOLIAGE_MODEL_KEY[kind]);
           if (url) renderer.attachFoliage(kind, await loadGlb(url), list);
         } catch (e) {
           console.warn(`[P2.11] ${kind} yüklenemedi:`, e instanceof Error ? e.message : e);

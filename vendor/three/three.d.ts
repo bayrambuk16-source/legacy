@@ -50,6 +50,8 @@ declare module 'three' {
     elements: number[];
     copy(m: Matrix4): this;
     invert(): this;
+    /* P2.11 — bitki örtüsü InstancedMesh matrisleri için. */
+    compose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
   }
   export class Vector4 {
     constructor(x?: number, y?: number, z?: number, w?: number);
@@ -182,8 +184,20 @@ declare module 'three' {
   export class MeshBasicMaterial extends Material {
     constructor(p?: MaterialParams);
   }
+  /** P2.11 — bitki örtüsü. 860 nesne için 860 draw call yerine tür başına
+   *  TEK çağrı; mobil bunu kaldırabilsin diye. */
+  export class InstancedMesh extends Mesh {
+    constructor(geometry: BufferGeometry, material: Material | Material[], count: number);
+    count: number;
+    instanceMatrix: { needsUpdate: boolean };
+    setMatrixAt(index: number, matrix: Matrix4): void;
+    dispose(): void;
+  }
   export class MeshLambertMaterial extends Material {
     constructor(p?: MaterialParams);
+    /* P2.11 — zemin dokusu bu materyale bağlanıyor. */
+    map: Texture | null;
+    needsUpdate: boolean;
   }
   export class MeshStandardMaterial extends Material {
     constructor(p?: MaterialParams);
@@ -327,12 +341,19 @@ declare module 'three' {
   export const LoopPingPong: number;
   export const SRGBColorSpace: string;
   export class Texture {
+    /* P2.11 — zemin dokusu döşeme için görüntüden kurulur. */
+    constructor(image?: TexImageSource);
     colorSpace: string;
     anisotropy: number;
     needsUpdate: boolean;
+    wrapS: number;
+    wrapT: number;
+    repeat: Vector2;
     dispose(): void;
   }
 
+  /* P2.11 — doku döşeme sarma modu. */
+  export const RepeatWrapping: number;
   export const DoubleSide: number;
   export const FrontSide: number;
   export const BackSide: number;
