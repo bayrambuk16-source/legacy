@@ -1,406 +1,406 @@
 {
-  "note": "KO Lv1-80 referans eğrisi. MVP cap 20; mobil pacing için scale profili ProgressionSystem içinde.",
-  "maxLevelMvp": 20,
-  "rows": [
-    {
-      "level": 1,
-      "requiredExp": 50,
-      "cumulativeStart": 0
-    },
-    {
-      "level": 2,
-      "requiredExp": 100,
-      "cumulativeStart": 50
-    },
-    {
-      "level": 3,
-      "requiredExp": 190,
-      "cumulativeStart": 150
-    },
-    {
-      "level": 4,
-      "requiredExp": 342,
-      "cumulativeStart": 340
-    },
-    {
-      "level": 5,
-      "requiredExp": 581,
-      "cumulativeStart": 682
-    },
-    {
-      "level": 6,
-      "requiredExp": 929,
-      "cumulativeStart": 1263
-    },
-    {
-      "level": 7,
-      "requiredExp": 1393,
-      "cumulativeStart": 2192
-    },
-    {
-      "level": 8,
-      "requiredExp": 1950,
-      "cumulativeStart": 3585
-    },
-    {
-      "level": 9,
-      "requiredExp": 2535,
-      "cumulativeStart": 5535
-    },
-    {
-      "level": 10,
-      "requiredExp": 5070,
-      "cumulativeStart": 8070
-    },
-    {
-      "level": 11,
-      "requiredExp": 6084,
-      "cumulativeStart": 13140
-    },
-    {
-      "level": 12,
-      "requiredExp": 7300,
-      "cumulativeStart": 19224
-    },
-    {
-      "level": 13,
-      "requiredExp": 8760,
-      "cumulativeStart": 26524
-    },
-    {
-      "level": 14,
-      "requiredExp": 10512,
-      "cumulativeStart": 35284
-    },
-    {
-      "level": 15,
-      "requiredExp": 12614,
-      "cumulativeStart": 45796
-    },
-    {
-      "level": 16,
-      "requiredExp": 15136,
-      "cumulativeStart": 58410
-    },
-    {
-      "level": 17,
-      "requiredExp": 18163,
-      "cumulativeStart": 73546
-    },
-    {
-      "level": 18,
-      "requiredExp": 21795,
-      "cumulativeStart": 91709
-    },
-    {
-      "level": 19,
-      "requiredExp": 26154,
-      "cumulativeStart": 113504
-    },
-    {
-      "level": 20,
-      "requiredExp": 52308,
-      "cumulativeStart": 139658
-    },
-    {
-      "level": 21,
-      "requiredExp": 60154,
-      "cumulativeStart": 191966
-    },
-    {
-      "level": 22,
-      "requiredExp": 69177,
-      "cumulativeStart": 252120
-    },
-    {
-      "level": 23,
-      "requiredExp": 79553,
-      "cumulativeStart": 321297
-    },
-    {
-      "level": 24,
-      "requiredExp": 91485,
-      "cumulativeStart": 400850
-    },
-    {
-      "level": 25,
-      "requiredExp": 105207,
-      "cumulativeStart": 492335
-    },
-    {
-      "level": 26,
-      "requiredExp": 120988,
-      "cumulativeStart": 597542
-    },
-    {
-      "level": 27,
-      "requiredExp": 139136,
-      "cumulativeStart": 718530
-    },
-    {
-      "level": 28,
-      "requiredExp": 160006,
-      "cumulativeStart": 857666
-    },
-    {
-      "level": 29,
-      "requiredExp": 184006,
-      "cumulativeStart": 1017672
-    },
-    {
-      "level": 30,
-      "requiredExp": 368012,
-      "cumulativeStart": 1201678
-    },
-    {
-      "level": 31,
-      "requiredExp": 404813,
-      "cumulativeStart": 1569690
-    },
-    {
-      "level": 32,
-      "requiredExp": 445294,
-      "cumulativeStart": 1974503
-    },
-    {
-      "level": 33,
-      "requiredExp": 489823,
-      "cumulativeStart": 2419797
-    },
-    {
-      "level": 34,
-      "requiredExp": 538805,
-      "cumulativeStart": 2909620
-    },
-    {
-      "level": 35,
-      "requiredExp": 808207,
-      "cumulativeStart": 3448425
-    },
-    {
-      "level": 36,
-      "requiredExp": 889027,
-      "cumulativeStart": 4256632
-    },
-    {
-      "level": 37,
-      "requiredExp": 977929,
-      "cumulativeStart": 5145659
-    },
-    {
-      "level": 38,
-      "requiredExp": 1075721,
-      "cumulativeStart": 6123588
-    },
-    {
-      "level": 39,
-      "requiredExp": 1183293,
-      "cumulativeStart": 7199309
-    },
-    {
-      "level": 40,
-      "requiredExp": 2366586,
-      "cumulativeStart": 8382602
-    },
-    {
-      "level": 41,
-      "requiredExp": 2603244,
-      "cumulativeStart": 10749188
-    },
-    {
-      "level": 42,
-      "requiredExp": 2863568,
-      "cumulativeStart": 13352432
-    },
-    {
-      "level": 43,
-      "requiredExp": 3149924,
-      "cumulativeStart": 16216000
-    },
-    {
-      "level": 44,
-      "requiredExp": 3464916,
-      "cumulativeStart": 19365924
-    },
-    {
-      "level": 45,
-      "requiredExp": 5197374,
-      "cumulativeStart": 22830840
-    },
-    {
-      "level": 46,
-      "requiredExp": 5717111,
-      "cumulativeStart": 28028214
-    },
-    {
-      "level": 47,
-      "requiredExp": 6288822,
-      "cumulativeStart": 33745325
-    },
-    {
-      "level": 48,
-      "requiredExp": 6917704,
-      "cumulativeStart": 40034147
-    },
-    {
-      "level": 49,
-      "requiredExp": 7609474,
-      "cumulativeStart": 46951851
-    },
-    {
-      "level": 50,
-      "requiredExp": 15218948,
-      "cumulativeStart": 54561325
-    },
-    {
-      "level": 51,
-      "requiredExp": 16740842,
-      "cumulativeStart": 69780273
-    },
-    {
-      "level": 52,
-      "requiredExp": 18414926,
-      "cumulativeStart": 86521115
-    },
-    {
-      "level": 53,
-      "requiredExp": 20256418,
-      "cumulativeStart": 104936041
-    },
-    {
-      "level": 54,
-      "requiredExp": 22282059,
-      "cumulativeStart": 125192459
-    },
-    {
-      "level": 55,
-      "requiredExp": 33423088,
-      "cumulativeStart": 147474518
-    },
-    {
-      "level": 56,
-      "requiredExp": 36765396,
-      "cumulativeStart": 180897606
-    },
-    {
-      "level": 57,
-      "requiredExp": 40441935,
-      "cumulativeStart": 217663002
-    },
-    {
-      "level": 58,
-      "requiredExp": 44486128,
-      "cumulativeStart": 258104937
-    },
-    {
-      "level": 59,
-      "requiredExp": 48934740,
-      "cumulativeStart": 302591065
-    },
-    {
-      "level": 60,
-      "requiredExp": 73402110,
-      "cumulativeStart": 351525805
-    },
-    {
-      "level": 61,
-      "requiredExp": 132123798,
-      "cumulativeStart": 424927915
-    },
-    {
-      "level": 62,
-      "requiredExp": 145336177,
-      "cumulativeStart": 557051713
-    },
-    {
-      "level": 63,
-      "requiredExp": 159869794,
-      "cumulativeStart": 702387890
-    },
-    {
-      "level": 64,
-      "requiredExp": 175856773,
-      "cumulativeStart": 862257684
-    },
-    {
-      "level": 65,
-      "requiredExp": 193442450,
-      "cumulativeStart": 1038114457
-    },
-    {
-      "level": 66,
-      "requiredExp": 212786695,
-      "cumulativeStart": 1231556907
-    },
-    {
-      "level": 67,
-      "requiredExp": 234065364,
-      "cumulativeStart": 1444343602
-    },
-    {
-      "level": 68,
-      "requiredExp": 257471900,
-      "cumulativeStart": 1678408966
-    },
-    {
-      "level": 69,
-      "requiredExp": 283219090,
-      "cumulativeStart": 1935880866
-    },
-    {
-      "level": 70,
-      "requiredExp": 311540999,
-      "cumulativeStart": 2219099956
-    },
-    {
-      "level": 71,
-      "requiredExp": 373849198,
-      "cumulativeStart": 2530640955
-    },
-    {
-      "level": 72,
-      "requiredExp": 453852927,
-      "cumulativeStart": 2904490153
-    },
-    {
-      "level": 73,
-      "requiredExp": 550977453,
-      "cumulativeStart": 3358343080
-    },
-    {
-      "level": 74,
-      "requiredExp": 668886628,
-      "cumulativeStart": 3909320533
-    },
-    {
-      "level": 75,
-      "requiredExp": 812028367,
-      "cumulativeStart": 4578207161
-    },
-    {
-      "level": 76,
-      "requiredExp": 985802438,
-      "cumulativeStart": 5390235528
-    },
-    {
-      "level": 77,
-      "requiredExp": 1196764160,
-      "cumulativeStart": 6376037966
-    },
-    {
-      "level": 78,
-      "requiredExp": 1452871690,
-      "cumulativeStart": 7572802126
-    },
-    {
-      "level": 79,
-      "requiredExp": 1763876232,
-      "cumulativeStart": 9025673816
-    },
-    {
-      "level": 80,
-      "requiredExp": 2141236485,
-      "cumulativeStart": 10789550048
-    }
-  ]
+ "note": "KO Lv1-80 referans eğrisi. MVP cap 30 (P2.27: Moradon Sv30 icerigi); mobil pacing için scale profili ProgressionSystem içinde.",
+ "maxLevelMvp": 30,
+ "rows": [
+  {
+   "level": 1,
+   "requiredExp": 50,
+   "cumulativeStart": 0
+  },
+  {
+   "level": 2,
+   "requiredExp": 100,
+   "cumulativeStart": 50
+  },
+  {
+   "level": 3,
+   "requiredExp": 190,
+   "cumulativeStart": 150
+  },
+  {
+   "level": 4,
+   "requiredExp": 342,
+   "cumulativeStart": 340
+  },
+  {
+   "level": 5,
+   "requiredExp": 581,
+   "cumulativeStart": 682
+  },
+  {
+   "level": 6,
+   "requiredExp": 929,
+   "cumulativeStart": 1263
+  },
+  {
+   "level": 7,
+   "requiredExp": 1393,
+   "cumulativeStart": 2192
+  },
+  {
+   "level": 8,
+   "requiredExp": 1950,
+   "cumulativeStart": 3585
+  },
+  {
+   "level": 9,
+   "requiredExp": 2535,
+   "cumulativeStart": 5535
+  },
+  {
+   "level": 10,
+   "requiredExp": 5070,
+   "cumulativeStart": 8070
+  },
+  {
+   "level": 11,
+   "requiredExp": 6084,
+   "cumulativeStart": 13140
+  },
+  {
+   "level": 12,
+   "requiredExp": 7300,
+   "cumulativeStart": 19224
+  },
+  {
+   "level": 13,
+   "requiredExp": 8760,
+   "cumulativeStart": 26524
+  },
+  {
+   "level": 14,
+   "requiredExp": 10512,
+   "cumulativeStart": 35284
+  },
+  {
+   "level": 15,
+   "requiredExp": 12614,
+   "cumulativeStart": 45796
+  },
+  {
+   "level": 16,
+   "requiredExp": 15136,
+   "cumulativeStart": 58410
+  },
+  {
+   "level": 17,
+   "requiredExp": 18163,
+   "cumulativeStart": 73546
+  },
+  {
+   "level": 18,
+   "requiredExp": 21795,
+   "cumulativeStart": 91709
+  },
+  {
+   "level": 19,
+   "requiredExp": 26154,
+   "cumulativeStart": 113504
+  },
+  {
+   "level": 20,
+   "requiredExp": 52308,
+   "cumulativeStart": 139658
+  },
+  {
+   "level": 21,
+   "requiredExp": 60154,
+   "cumulativeStart": 191966
+  },
+  {
+   "level": 22,
+   "requiredExp": 69177,
+   "cumulativeStart": 252120
+  },
+  {
+   "level": 23,
+   "requiredExp": 79553,
+   "cumulativeStart": 321297
+  },
+  {
+   "level": 24,
+   "requiredExp": 91485,
+   "cumulativeStart": 400850
+  },
+  {
+   "level": 25,
+   "requiredExp": 105207,
+   "cumulativeStart": 492335
+  },
+  {
+   "level": 26,
+   "requiredExp": 120988,
+   "cumulativeStart": 597542
+  },
+  {
+   "level": 27,
+   "requiredExp": 139136,
+   "cumulativeStart": 718530
+  },
+  {
+   "level": 28,
+   "requiredExp": 160006,
+   "cumulativeStart": 857666
+  },
+  {
+   "level": 29,
+   "requiredExp": 184006,
+   "cumulativeStart": 1017672
+  },
+  {
+   "level": 30,
+   "requiredExp": 368012,
+   "cumulativeStart": 1201678
+  },
+  {
+   "level": 31,
+   "requiredExp": 404813,
+   "cumulativeStart": 1569690
+  },
+  {
+   "level": 32,
+   "requiredExp": 445294,
+   "cumulativeStart": 1974503
+  },
+  {
+   "level": 33,
+   "requiredExp": 489823,
+   "cumulativeStart": 2419797
+  },
+  {
+   "level": 34,
+   "requiredExp": 538805,
+   "cumulativeStart": 2909620
+  },
+  {
+   "level": 35,
+   "requiredExp": 808207,
+   "cumulativeStart": 3448425
+  },
+  {
+   "level": 36,
+   "requiredExp": 889027,
+   "cumulativeStart": 4256632
+  },
+  {
+   "level": 37,
+   "requiredExp": 977929,
+   "cumulativeStart": 5145659
+  },
+  {
+   "level": 38,
+   "requiredExp": 1075721,
+   "cumulativeStart": 6123588
+  },
+  {
+   "level": 39,
+   "requiredExp": 1183293,
+   "cumulativeStart": 7199309
+  },
+  {
+   "level": 40,
+   "requiredExp": 2366586,
+   "cumulativeStart": 8382602
+  },
+  {
+   "level": 41,
+   "requiredExp": 2603244,
+   "cumulativeStart": 10749188
+  },
+  {
+   "level": 42,
+   "requiredExp": 2863568,
+   "cumulativeStart": 13352432
+  },
+  {
+   "level": 43,
+   "requiredExp": 3149924,
+   "cumulativeStart": 16216000
+  },
+  {
+   "level": 44,
+   "requiredExp": 3464916,
+   "cumulativeStart": 19365924
+  },
+  {
+   "level": 45,
+   "requiredExp": 5197374,
+   "cumulativeStart": 22830840
+  },
+  {
+   "level": 46,
+   "requiredExp": 5717111,
+   "cumulativeStart": 28028214
+  },
+  {
+   "level": 47,
+   "requiredExp": 6288822,
+   "cumulativeStart": 33745325
+  },
+  {
+   "level": 48,
+   "requiredExp": 6917704,
+   "cumulativeStart": 40034147
+  },
+  {
+   "level": 49,
+   "requiredExp": 7609474,
+   "cumulativeStart": 46951851
+  },
+  {
+   "level": 50,
+   "requiredExp": 15218948,
+   "cumulativeStart": 54561325
+  },
+  {
+   "level": 51,
+   "requiredExp": 16740842,
+   "cumulativeStart": 69780273
+  },
+  {
+   "level": 52,
+   "requiredExp": 18414926,
+   "cumulativeStart": 86521115
+  },
+  {
+   "level": 53,
+   "requiredExp": 20256418,
+   "cumulativeStart": 104936041
+  },
+  {
+   "level": 54,
+   "requiredExp": 22282059,
+   "cumulativeStart": 125192459
+  },
+  {
+   "level": 55,
+   "requiredExp": 33423088,
+   "cumulativeStart": 147474518
+  },
+  {
+   "level": 56,
+   "requiredExp": 36765396,
+   "cumulativeStart": 180897606
+  },
+  {
+   "level": 57,
+   "requiredExp": 40441935,
+   "cumulativeStart": 217663002
+  },
+  {
+   "level": 58,
+   "requiredExp": 44486128,
+   "cumulativeStart": 258104937
+  },
+  {
+   "level": 59,
+   "requiredExp": 48934740,
+   "cumulativeStart": 302591065
+  },
+  {
+   "level": 60,
+   "requiredExp": 73402110,
+   "cumulativeStart": 351525805
+  },
+  {
+   "level": 61,
+   "requiredExp": 132123798,
+   "cumulativeStart": 424927915
+  },
+  {
+   "level": 62,
+   "requiredExp": 145336177,
+   "cumulativeStart": 557051713
+  },
+  {
+   "level": 63,
+   "requiredExp": 159869794,
+   "cumulativeStart": 702387890
+  },
+  {
+   "level": 64,
+   "requiredExp": 175856773,
+   "cumulativeStart": 862257684
+  },
+  {
+   "level": 65,
+   "requiredExp": 193442450,
+   "cumulativeStart": 1038114457
+  },
+  {
+   "level": 66,
+   "requiredExp": 212786695,
+   "cumulativeStart": 1231556907
+  },
+  {
+   "level": 67,
+   "requiredExp": 234065364,
+   "cumulativeStart": 1444343602
+  },
+  {
+   "level": 68,
+   "requiredExp": 257471900,
+   "cumulativeStart": 1678408966
+  },
+  {
+   "level": 69,
+   "requiredExp": 283219090,
+   "cumulativeStart": 1935880866
+  },
+  {
+   "level": 70,
+   "requiredExp": 311540999,
+   "cumulativeStart": 2219099956
+  },
+  {
+   "level": 71,
+   "requiredExp": 373849198,
+   "cumulativeStart": 2530640955
+  },
+  {
+   "level": 72,
+   "requiredExp": 453852927,
+   "cumulativeStart": 2904490153
+  },
+  {
+   "level": 73,
+   "requiredExp": 550977453,
+   "cumulativeStart": 3358343080
+  },
+  {
+   "level": 74,
+   "requiredExp": 668886628,
+   "cumulativeStart": 3909320533
+  },
+  {
+   "level": 75,
+   "requiredExp": 812028367,
+   "cumulativeStart": 4578207161
+  },
+  {
+   "level": 76,
+   "requiredExp": 985802438,
+   "cumulativeStart": 5390235528
+  },
+  {
+   "level": 77,
+   "requiredExp": 1196764160,
+   "cumulativeStart": 6376037966
+  },
+  {
+   "level": 78,
+   "requiredExp": 1452871690,
+   "cumulativeStart": 7572802126
+  },
+  {
+   "level": 79,
+   "requiredExp": 1763876232,
+   "cumulativeStart": 9025673816
+  },
+  {
+   "level": 80,
+   "requiredExp": 2141236485,
+   "cumulativeStart": 10789550048
+  }
+ ]
 }

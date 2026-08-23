@@ -66,6 +66,17 @@ function facts(sourceRef: number): ItemSourceFacts {
   };
 }
 
+/* ═══ P2.27 — MORADON KALİTE TAVANI: YEŞİL ═══
+   Oyun testi bulgusu: başlangıç bölgesinde MOR ve TURUNCU ekipman
+   düşüyordu. Sv5'te 34 hasarlı "Karanlık Yemin" düşünce oyunun geri
+   kalanı anlamsızlaşıyordu.
+
+   Kalite artık "ne kadar güçlü" DEĞİL, "hangi bölgeden" anlamına
+   gelir. Moradon beyaz ve yeşille sınırlı; mavi/mor/turuncu üst
+   haritalara ayrıldı.
+
+   STATLAR DEĞİŞMEDİ — yalnız renk etiketi. Sekiz yayın altısı beyaz,
+   ikisi (en güçlü ikisi) yeşil; kullanıcı kararı. */
 const ARCHER: readonly PlayerClass[] = ['archer'];
 const el = (e: Partial<ElementalDamage>): ElementalDamage => ({ ...ZERO_ELEMENTAL, ...e });
 const res = (r: Partial<Resistances>): Resistances => ({ ...ZERO_RESIST, ...r });
@@ -98,21 +109,21 @@ export const ARCHER_WEAPONS: readonly WeaponDefinition[] = [
     attack: 12, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
   /* YEŞİL — daha yüksek Attack, başka bir şey yok. */
-  weapon(160100004, 'Avcı Yayı', 'MIDDLE', {
+  weapon(160100004, 'Avcı Yayı', 'LOW', {
     attack: 20, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
   /* MAVİ — Attack + temel elemental (TUNING: kaynakta bu ref'te elemental yok). */
-  weapon(160100006, 'Çelik Tendon Yay', 'HIGH', {
+  weapon(160100006, 'Çelik Tendon Yay', 'LOW', {
     attack: 28, elemental: el({ fire: 12 }), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
   /* MOR — Attack + GÜÇLÜ elemental. Poison değeri KAYNAKTAN gelir
      (`poison_damage = 50`) ve BİR DoT DEĞİLDİR (§4). */
-  weapon(160210045, 'Akrep Dişi Yayı', 'RARE', {
+  weapon(160210045, 'Akrep Dişi Yayı', 'MIDDLE', {
     attack: 31, elemental: el({ poison: 50 }), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
   /* TURUNCU — isimli UNIQUE. Kimliğini tanımlayan SABİT kombinasyon;
      bu nitelikler başka hiçbir yaya basılmaz. */
-  weapon(160100005, 'Karanlık Yemin', 'UNIQUE', {
+  weapon(160100005, 'Karanlık Yemin', 'MIDDLE', {
     attack: 34,
     elemental: el({ ice: 18, lightning: 10 }),
     special: spc({ hpDrain: 6, mpDrain: 4 }),
@@ -163,10 +174,10 @@ const A0 = { str: 0, dex: 0, int: 0, sta: 0, maxHp: 0, maxMp: 0 };
    altında kalır. Uydurma seviye şartı yazmak yerine iyi yaylar UZAKTAKİ
    GÜÇLÜ MOBLARDAN düşer (bkz. drop-profile.ts okçu filtresi). */
 export const ARCHER_TIER_BOWS: readonly WeaponDefinition[] = [
-  weapon(160210000, 'Kısa Avcı Yayı', 'MIDDLE', {
+  weapon(160210000, 'Kısa Avcı Yayı', 'LOW', {
     attack: 15, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
-  weapon(160410000, 'Yırtıcı Yay', 'RARE', {
+  weapon(160410000, 'Yırtıcı Yay', 'LOW', {
     attack: 26, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
   }),
 ];
@@ -222,15 +233,15 @@ export const ARCHER_ARMOR: readonly ArmorDefinition[] = [
     { ...A0, defense: 26, sta: 6, resist: res({}) }, 'rogue_hardened'),
 
   /* ---- MAVİ: Defense + sınıfa uygun build statı (DEX) ---- */
-  armor(241002505, 'İz Sürücü Pantolonu', 'HIGH', 'pants',
+  armor(241002505, 'İz Sürücü Pantolonu', 'MIDDLE', 'pants',
     { ...A0, defense: 27, sta: 8, dex: 5, resist: res({}) }, 'tracker'),
-  armor(241004505, 'İz Sürücü Eldiveni', 'HIGH', 'gloves',
+  armor(241004505, 'İz Sürücü Eldiveni', 'MIDDLE', 'gloves',
     { ...A0, defense: 13, sta: 8, dex: 4, resist: res({}) }, 'tracker'),
 
   /* ---- MOR: Defense + build stat + HP + direnç ---- */
-  armor(241003505, 'Gölge Avcısı Başlığı', 'RARE', 'helmet',
+  armor(241003505, 'Gölge Avcısı Başlığı', 'MIDDLE', 'helmet',
     { ...A0, defense: 20, sta: 8, dex: 6, maxHp: 80, resist: res({ poison: 8 }) }, 'shadow'),
-  armor(241005504, 'Gölge Avcısı Çizmesi', 'RARE', 'boots',
+  armor(241005504, 'Gölge Avcısı Çizmesi', 'MIDDLE', 'boots',
     { ...A0, defense: 11, sta: 6, dex: 5, maxHp: 60, resist: res({ ice: 6 }) }, 'shadow'),
 ];
 
@@ -258,15 +269,15 @@ export const ARCHER_ACCESSORIES: readonly AccessoryDefinition[] = [
   /* KÜPE ×2 */
   accessory(310110101, 'Tunç Küpe', 'LOW', 'earring',
     { ...A0, sta: 8, resist: res({}) }),
-  accessory(310110103, 'Şahin Küpesi', 'HIGH', 'earring',
+  accessory(310110103, 'Şahin Küpesi', 'MIDDLE', 'earring',
     { ...A0, dex: 7, maxHp: 40, resist: res({}) }),          // DEX odaklı
   /* YÜZÜK ×2 */
   accessory(330310014, 'Kekuri Yüzüğü', 'MIDDLE', 'ring',
     { ...A0, dex: 8, resist: res({}) }),                     // kaynak dex_bonus = 8
-  accessory(330110262, 'Zümrüt Yüzük', 'RARE', 'ring',
+  accessory(330110262, 'Zümrüt Yüzük', 'MIDDLE', 'ring',
     { ...A0, dex: 4, maxHp: 90, maxMp: 60, resist: res({ fire: 6, ice: 6 }) }),  // dengeli
   /* KOLYE ×1 */
-  accessory(320310129, 'Kızıl Ejder Muskası', 'UNIQUE', 'necklace',
+  accessory(320310129, 'Kızıl Ejder Muskası', 'MIDDLE', 'necklace',
     { ...A0, dex: 10, maxHp: 120, maxMp: 100,
       resist: res({ fire: 12, poison: 8 }) }),               // isimli UNIQUE
   /* KEMER ×1 */

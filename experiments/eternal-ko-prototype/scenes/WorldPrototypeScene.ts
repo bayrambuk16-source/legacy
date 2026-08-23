@@ -12,7 +12,7 @@ import { SkillRegistry } from '../../../src/game/systems/SkillRegistry.js';
 import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import { PLAYER_SPEED_OPTIONS, PROTO, TUNING_DEFAULTS, type TuningValues } from '../config.js';
-import { PrototypeState } from '../state.js';
+import { DEATH_EXP_PENALTY, PrototypeState } from '../state.js';
 import {
   resolveJoystick, type JoystickInput, type MoveVector,
 } from '../world/WorldMovementSystem.js';
@@ -2999,8 +2999,14 @@ export class WorldPrototypeScene implements Scene {
       g.text(`Doğuş noktasına ${d} birim uzakta düştün.`,
         B.x + B.w / 2, B.y + 86, { align: 'center', size: 11, color: '#6f655a' });
     }
+    /* P2.27 — ölüm bedeli ÖNCEDEN gösterilir: oyuncu ne kaybedeceğini
+       onaylamadan önce görsün. */
+    const need = this.S.player.requiredExpForCurrentLevel();
+    const loss = Math.min(Math.floor(need * DEATH_EXP_PENALTY), this.S.player.exp);
+    g.text(`Deneyim kaybı: -${loss}`, B.x + B.w / 2, B.y + 110,
+      { align: 'center', size: 12, bold: true, color: '#c96a5a' });
     g.text('TAMAM dediğinde doğuş noktasına ışınlanırsın.',
-      B.x + B.w / 2, B.y + 112, { align: 'center', size: 11, color: '#8d8272' });
+      B.x + B.w / 2, B.y + 132, { align: 'center', size: 11, color: '#8d8272' });
     const b = deathOkButton();
     g.rect(b.x, b.y, b.w, b.h, '#2c2417');
     g.rect(b.x, b.y, b.w, 3, '#e08a3c');

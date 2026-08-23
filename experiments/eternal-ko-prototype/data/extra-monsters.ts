@@ -1,4 +1,4 @@
-/** SV16-20 MOBLARI — v8 DIŞI EK KAYITLAR (P2.17)
+/** SV16-30 MOBLARI — v8 DIŞI EK KAYITLAR (P2.17 · P2.27)
  *
  *  ══════════════ NEDEN GEREKTİ ══════════════
  *  `generated/monsters.json` MVP kapsamıyla üretildi ve en yüksek mobu
@@ -13,8 +13,10 @@
  *  Ayrıştırıcı bu yüzden güvenilir kabul edildi.
  *
  *  ══════════════ SEÇİM ══════════════
- *  Her seviyeden bir tane (16, 17, 18, 19, 20). Ölçüt: makul HP/AC
- *  (boss/event kayıtları elendi) ve kesintisiz bir zorluk merdiveni.
+ *  P2.17'de Sv16-20, P2.27'de Sv21-30 eklendi. Moradon artık Sv30'a
+ *  kadar içerik taşıyor (kullanıcı kararı: bir üst haritaya önerilen
+ *  geçiş Sv30). Ölçüt: makul HP/AC — boss/event kayıtları elendi —
+ *  ve kesintisiz bir zorluk merdiveni.
  *  Türkçe adlar `content_overrides.json` katmanındadır; kaynak adlar
  *  yalnız denetim içindir.
  *
@@ -78,6 +80,41 @@ export const EXTRA_MONSTERS: readonly ExtraMonsterRow[] = [
     attackRange: 5, searchRange: 3,
     hitRate: 1, evadeRate: 1,
   },
+  {
+    sourceRef: 1000, sourceName: 'Zombie0',
+    level: 21, hp: 454, attack: 39, defense: 181,
+    exp: 3798, attackDelayMs: 2000,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 500, sourceName: 'Werewolf0',
+    level: 23, hp: 625, attack: 35, defense: 132,
+    exp: 4671, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 114, sourceName: 'Kecoon berserker0',
+    level: 25, hp: 745, attack: 43, defense: 144,
+    exp: 6813, attackDelayMs: 1500,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 502, sourceName: 'Loup-garou0',
+    level: 27, hp: 879, attack: 51, defense: 155,
+    exp: 6813, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 115, sourceName: 'Kecoon dragoon0',
+    level: 30, hp: 1108, attack: 83, defense: 204,
+    exp: 10503, attackDelayMs: 1500,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
 ];
 
 /** Ek mobları Content deposuna tanıtır. VAR OLAN kayıt EZİLMEZ.
@@ -92,6 +129,8 @@ export function registerExtraMonsters(): number {
        yoksa kaynak ad kullanılır (placeholder olduğu belli olsun). */
     displayName: OVERRIDES[String(m.sourceRef)]?.displayName ?? m.sourceName,
     visualKey: OVERRIDES[String(m.sourceRef)]?.visualKey ?? 'kurt',
+    /* Sv20'den itibaren elit: iki kat parşömen/ganimet şansı ve
+       ELITE AI profili. Sv30 tepe mobu doğal olarak elit olur. */
     tier: m.level >= 20 ? 'elite' : 'normal',
     level: m.level,
     hp: m.hp,

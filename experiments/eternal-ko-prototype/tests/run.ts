@@ -61,6 +61,8 @@ import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
 import { NON_GEAR_COLOR, nonGearInfo, nonGearRole } from '../ui/non-gear-info.js';
 import { QUESTS, promotionQuests, questById } from '../data/quests.js';
+import { DEATH_EXP_PENALTY } from '../state.js';
+import { LEVELING } from '../../../src/game/config.js';
 import {
   GENIE_PANEL, GENIE_SET_TABS, GENIE_SKILL_SLOTS, GENIE_SLIDERS, GENIE_TOGGLES,
   SLIDER_TRACK, genieHitTest,
@@ -4953,7 +4955,7 @@ test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİ
   /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
      Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
   /* P2.17 — Sv16-20 bandı için beş slot eklendi (23 → 28). */
-  eq(FARM_AREA_SLOTS.length, 28, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 33, 'slot sayısı:');
   eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, FARM_AREA_SLOTS.length, 'id benzersiz:');
   for (const s of FARM_AREA_SLOTS) {
     ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
@@ -6349,7 +6351,21 @@ function giveItem(S: PrototypeState, ref: number): number {
   ok(r.ok, `envantere eklenmeli: ${ref}`);
   return r.ok ? r.instance.instanceId : -1;
 }
-const bowOf = (c: ItemClass): WeaponDefinition => ARCHER_WEAPONS.find((w) => w.itemClass === c)!;
+/* P2.27 — Moradon kalite tavanı YEŞİL olunca yaylar artık yalnız
+   LOW/MIDDLE taşıyor; testler onları KALİTEYE göre bulamaz. Referansla
+   bulunurlar: kalite bir BÖLGE etiketi, stat göstergesi değil. */
+const BOW_BY_ROLE = {
+  BASE: 160100002,      // Meşe Yay — sade, elemental yok
+  MID: 160100004,       // Avcı Yayı — daha yüksek attack
+  FIRE: 160100006,      // Çelik Tendon Yay — ateş
+  POISON: 160210045,    // Akrep Dişi Yayı — zehir
+  TOP: 160100005,       // Karanlık Yemin — en güçlü
+} as const;
+const bowOf = (role: keyof typeof BOW_BY_ROLE): WeaponDefinition => {
+  const found = ARCHER_WEAPONS.find((w) => w.definitionRef === BOW_BY_ROLE[role]);
+  if (!found) throw new Error(`bowOf: ${role} katalogda yok (${BOW_BY_ROLE[role]})`);
+  return found;
+};
 
 test('§1 beş item sınıfı ve renk eşlemesi TEK YERDE', () => {
   eq(ITEM_CLASSES.join(','), 'LOW,MIDDLE,HIGH,RARE,UNIQUE', 'sınıflar:');
@@ -6382,7 +6398,7 @@ test('§35 SİLAH PRIMARY STAT VERMEZ — tip düzeyinde ve çözümde', () => {
     }
   }
   /* UNIQUE silah dahil */
-  const uniq = bowOf('UNIQUE');
+  const uniq = bowOf('TOP');
   eq(resolveStats(uniq).dex, 0, 'UNIQUE silah DEX:');
   ok(uniq.stats.special.hpDrain > 0, 'UNIQUE silah özel niteliği taşıyabilir');
 });
@@ -6407,7 +6423,7 @@ test('§5/§13 RASTGELE AFFIX YOK — aynı ref her zaman AYNI statlar', () => {
   }
   /* Aynı definition'dan iki instance → aynı stat */
   const S = protoState(1901);
-  const ref = bowOf('RARE').definitionRef;
+  const ref = bowOf('POISON').definitionRef;
   const i1 = giveItem(S, ref), i2 = giveItem(S, ref);
   ok(i1 !== i2, 'iki AYRI instance');
   eq(S.inventory.get(i1)!.itemRef, S.inventory.get(i2)!.itemRef, 'aynı definitionRef:');
@@ -6415,13 +6431,19 @@ test('§5/§13 RASTGELE AFFIX YOK — aynı ref her zaman AYNI statlar', () => {
 
 test('§27/§28/§29/§30 katalog kapsamı', () => {
   eq(ARCHER_WEAPONS.length, 5, 'yay sayısı:');
-  eq(new Set(ARCHER_WEAPONS.map((w) => w.itemClass)).size, 5, 'her sınıftan bir yay:');
+  /* P2.27 — Moradon kalite tavanı YEŞİL. Beş sınıfın hepsi burada
+     TEMSİL EDİLMEZ; mavi/mor/turuncu üst haritalara ayrıldı. */
+  const classes = new Set(ARCHER_WEAPONS.map((w) => w.itemClass));
+  ok(classes.size >= 1 && classes.size <= 2, `Moradon yayları en çok iki sınıf: ${[...classes]}`);
+  for (const c of classes) {
+    ok(c === 'LOW' || c === 'MIDDLE', `Moradon'da izinsiz kalite: ${c}`);
+  }
   /* beyaz yalnız attack · mavi elemental · mor güçlü elemental · turuncu özel */
-  eq(resolveStats(bowOf('LOW')).elemental.fire, 0, 'BEYAZ elemental:');
-  ok(bowOf('MIDDLE').stats.attack > bowOf('LOW').stats.attack, 'YEŞİL daha yüksek attack');
-  ok(bowOf('HIGH').stats.elemental.fire > 0, 'MAVİ temel elemental');
-  ok(bowOf('RARE').stats.elemental.poison > 0, 'MOR güçlü elemental');
-  const u = bowOf('UNIQUE');
+  eq(resolveStats(bowOf('BASE')).elemental.fire, 0, 'BEYAZ elemental:');
+  ok(bowOf('MID').stats.attack > bowOf('BASE').stats.attack, 'üst kademe daha yüksek attack');
+  ok(bowOf('FIRE').stats.elemental.fire > 0, 'ateş yayında elemental');
+  ok(bowOf('POISON').stats.elemental.poison > 0, 'zehir yayında elemental');
+  const u = bowOf('TOP');
   ok(u.stats.special.hpDrain > 0 && u.stats.maxHp > 0, 'TURUNCU sabit kimlik kombinasyonu');
   /* tam 5 parçalık başlangıç seti */
   const low = ARCHER_ARMOR.filter((a) => a.itemClass === 'LOW');
@@ -6464,7 +6486,7 @@ test('§2 kaynak gerçekleri TAŞINIR, silah primary statı BİLEREK atılır', 
     }
   }
   /* MOR yayın zehri KAYNAKTAN gelir */
-  const rare = bowOf('RARE');
+  const rare = bowOf('POISON');
   eq(rare.stats.elemental.poison, rare.source.sourceElemental.poison, 'MOR zehir kaynaktan:');
 });
 
@@ -6478,12 +6500,12 @@ test('§32.1/§32.2 yay equip → Attack değişir · unequip → TAM eski değe
      kıyaslanır ve doğal olarak tutmaz. */
   S.equipService.unequip('weapon');
   const before = S.stats.build();
-  const id = giveItem(S, bowOf('UNIQUE').definitionRef);
+  const id = giveItem(S, bowOf('TOP').definitionRef);
   const res = S.equipService.equip(id);
   ok(res.ok, `equip başarılı olmalı: ${res.ok ? '' : res.reason}`);
   const after = S.stats.build();
   ok(after.total.attack > before.total.attack, `attack artmalı: ${before.total.attack} → ${after.total.attack}`);
-  eq(after.equipment.attack, bowOf('UNIQUE').stats.attack, 'ekipman katkısı tanımdan:');
+  eq(after.equipment.attack, bowOf('TOP').stats.attack, 'ekipman katkısı tanımdan:');
   const un = S.equipService.unequip('weapon');
   ok(un.ok, 'unequip');
   const restored = S.stats.build();
@@ -6553,7 +6575,7 @@ test('§32.9 YANLIŞ SINIF reddedilir', () => {
     equipment: S.equipment, inventory: S.inventory,
     playerLevel: () => S.player.level, playerClass: () => 'warrior',
   });
-  const id = giveItem(S, bowOf('LOW').definitionRef);
+  const id = giveItem(S, bowOf('BASE').definitionRef);
   const res = warriorGate.equip(id);
   ok(!res.ok); eq((res as { reason: string }).reason, 'wrongClass', 'gerekçe:');
   eq(S.equipment.slotOf(id), null, 'kuşanılmamalı:');
@@ -6567,7 +6589,7 @@ test('§32.10 SEVİYE yetersizse reddedilir', () => {
     equipment: S.equipment, inventory: S.inventory,
     playerLevel: () => 0, playerClass: () => 'archer',
   });
-  const id = giveItem(S, bowOf('HIGH').definitionRef);
+  const id = giveItem(S, bowOf('FIRE').definitionRef);
   const res = lowLevelGate.equip(id);
   ok(!res.ok); eq((res as { reason: string }).reason, 'levelReq', 'gerekçe:');
   eq(S.equipment.slotOf(id), null, 'kuşanılmamalı:');
@@ -6582,8 +6604,8 @@ test('katalog DIŞI item kuşanılamaz (uydurma tanım üretilmez)', () => {
 
 test('§32.11 SWAP atomik: eski item çantaya döner, kapasite aşılmaz', () => {
   const S = protoState(1919);
-  const a = giveItem(S, bowOf('LOW').definitionRef);
-  const b = giveItem(S, bowOf('RARE').definitionRef);
+  const a = giveItem(S, bowOf('BASE').definitionRef);
+  const b = giveItem(S, bowOf('POISON').definitionRef);
   ok(S.equipService.equip(a).ok, 'ilk equip');
   const used = S.inventory.usedSlots;
   const res = S.equipService.equip(b);
@@ -6598,7 +6620,7 @@ test('§32.11 SWAP atomik: eski item çantaya döner, kapasite aşılmaz', () =>
 
 test('§32.12 ÇANTA DOLU: unequip reddedilir, item KAYBOLMAZ', () => {
   const S = protoState(1920);
-  const id = giveItem(S, bowOf('MIDDLE').definitionRef);
+  const id = giveItem(S, bowOf('FIRE').definitionRef);
   ok(S.equipService.equip(id).ok, 'equip');
   while (S.inventory.add(PLAYER.starterWeaponRef).ok) { /* çantayı doldur */ }
   eq(S.inventory.usedSlots, S.inventory.capacity, 'çanta dolu:');
@@ -6614,7 +6636,7 @@ test('§33 STAT DRIFT YOK — 100 kez equip/unequip', () => {
   const S = protoState(1921);
   /* tam takım kuş: silah + zırh + aksesuar */
   const ids: number[] = [];
-  for (const d of [bowOf('UNIQUE'), ...ARCHER_ARMOR.filter((a) => a.itemClass === 'RARE'),
+  for (const d of [bowOf('TOP'), ...ARCHER_ARMOR.filter((a) => a.itemClass === 'RARE'),
     ...ARCHER_ACCESSORIES]) {
     const id = giveItem(S, d.definitionRef);
     ok(S.equipService.equip(id).ok, `${d.displayName} equip`);
@@ -6634,7 +6656,7 @@ test('§33 STAT DRIFT YOK — 100 kez equip/unequip', () => {
 
 test('§34 İKİ AYNI ITEM: definitionRef aynı, instanceUid FARKLI', () => {
   const S = protoState(1922);
-  const ref = bowOf('HIGH').definitionRef;
+  const ref = bowOf('FIRE').definitionRef;
   const a = giveItem(S, ref), b = giveItem(S, ref);
   ok(a !== b, `instanceUid farklı olmalı (${a} vs ${b})`);
   eq(S.inventory.get(a)!.itemRef, S.inventory.get(b)!.itemRef, 'definitionRef aynı:');
@@ -6655,7 +6677,7 @@ console.log('P1.8 — combat entegrasyonu:');
 test('§37 SİLAH ELEMENTALİ fiziksel hasardan AYRI bileşendir', () => {
   const S = protoState(1930);
   S.infiniteMp = true;
-  const bow = bowOf('RARE');                  // poison 50
+  const bow = bowOf('POISON');                  // poison 50
   ok(S.equipService.equip(giveItem(S, bow.definitionRef)).ok, 'zehirli yay');
   eq(S.stats.weaponElemental().poison, 50, 'silah zehri:');
   const mob = S.mobs.mobs.find((m) => m.slotId === 'fa_a3')!;
@@ -6677,7 +6699,7 @@ test('§37 SİLAH ELEMENTALİ fiziksel hasardan AYRI bileşendir', () => {
 test('§4/§37 SİLAH ZEHRİ DoT ÜRETMEZ — skill zehri AYRI sistem', () => {
   const S = protoState(1931);
   S.infiniteMp = true;
-  ok(S.equipService.equip(giveItem(S, bowOf('RARE').definitionRef)).ok, 'zehirli yay');
+  ok(S.equipService.equip(giveItem(S, bowOf('POISON').definitionRef)).ok, 'zehirli yay');
   const mob = S.mobs.mobs.find((m) => m.slotId === 'fa_a3')!;
   mob.hp = 1e9; mob.maxHp = 1e9;
   S.world.worldX = mob.worldX - 100; S.world.worldY = mob.worldY;
@@ -6701,7 +6723,7 @@ test('§4/§37 SİLAH ZEHRİ DoT ÜRETMEZ — skill zehri AYRI sistem', () => {
 test('elemental YOK silahta silah elemental bileşeni 0 olur', () => {
   const S = protoState(1932);
   S.infiniteMp = true;
-  ok(S.equipService.equip(giveItem(S, bowOf('LOW').definitionRef)).ok, 'sade yay');
+  ok(S.equipService.equip(giveItem(S, bowOf('BASE').definitionRef)).ok, 'sade yay');
   const mob = S.mobs.mobs.find((m) => m.slotId === 'fa_a3')!;
   mob.hp = 1e9; mob.maxHp = 1e9;
   S.world.worldX = mob.worldX - 100; S.world.worldY = mob.worldY;
@@ -6713,10 +6735,10 @@ test('elemental YOK silahta silah elemental bileşeni 0 olur', () => {
 });
 
 test('§20 Attack GERÇEKTEN combat çıktısını değiştirir', () => {
-  const dmg = (bowClass: ItemClass | null): number => {
+  const dmg = (role: keyof typeof BOW_BY_ROLE | null): number => {
     const S = protoState(1933);
     S.infiniteMp = true;
-    if (bowClass) ok(S.equipService.equip(giveItem(S, bowOf(bowClass).definitionRef)).ok, 'equip');
+    if (role) ok(S.equipService.equip(giveItem(S, bowOf(role).definitionRef)).ok, 'equip');
     const mob = S.mobs.mobs.find((m) => m.slotId === 'fa_a3')!;
     mob.hp = 1e9; mob.maxHp = 1e9;
     S.world.worldX = mob.worldX - 100; S.world.worldY = mob.worldY;
@@ -6725,9 +6747,9 @@ test('§20 Attack GERÇEKTEN combat çıktısını değiştirir', () => {
       .impacts.filter((i) => i.invalid === null);
     return hits.reduce((n, h) => n + h.physicalDamage, 0);
   };
-  const none = dmg(null), low = dmg('LOW'), uniq = dmg('UNIQUE');
-  ok(low > none, `BEYAZ yay hasarı artırmalı: ${none} → ${low}`);
-  ok(uniq > low, `UNIQUE yay daha fazla: ${low} → ${uniq}`);
+  const none = dmg(null), low = dmg('BASE'), uniq = dmg('TOP');
+  ok(low > none, `temel yay hasarı artırmalı: ${none} → ${low}`);
+  ok(uniq > low, `en güçlü yay daha fazla: ${low} → ${uniq}`);
 });
 
 console.log('P1.8 — drop → envanter → equip:');
@@ -6773,7 +6795,7 @@ test('§39 AUTO LOOT OFF: yerdeki ekipman → manuel toplama → equip', () => {
   S.lootPolicy.setMode('manual');
   S.mobs.mobs.length = 0;
   S.worldLoot.clear();
-  const bowRef = bowOf('RARE').definitionRef;
+  const bowRef = bowOf('POISON').definitionRef;
   const owner = S.drops.tuning.ownerPlayerId;
   /* ekipman itemini yere düşür (drop yolu ile aynı entity modeli) */
   const loot = S.worldLoot.spawn({
@@ -6791,7 +6813,7 @@ test('§39 AUTO LOOT OFF: yerdeki ekipman → manuel toplama → equip', () => {
      DEĞİL, AP zincirine girdi. Bu yüzden "önceki + yay hasarı" eşitliği
      geçersiz; doğrulanan şey saldırının GERÇEKTEN ARTTIĞIdır. */
   ok(S.stats.build().total.attack > before, 'yay kuşanınca saldırı artmalı:');
-  eq(S.stats.build().equipment.attack, bowOf('RARE').stats.attack, 'ekipman bloğu tanımdan:');
+  eq(S.stats.build().equipment.attack, bowOf('POISON').stats.attack, 'ekipman bloğu tanımdan:');
   eq(S.equipment.slotOf(entry.entry.instanceId), 'weapon', 'slot:');
 });
 
@@ -6817,7 +6839,9 @@ test('§22 on iki equipment slotu ve telemetri görünümü', () => {
 
 test('§8/§9 upgradeLevel P1.8\'de STAT DEĞİŞTİRMEZ (yalnız veri hazırlığı)', () => {
   const S = protoState(1944);
-  const armor = ARCHER_ARMOR.find((a) => a.itemClass === 'RARE')!;
+  /* P2.27 — kalite artık bölge etiketi; belirli bir kaliteyi aramak
+     yerine EN GÜÇLÜ zırhı seçeriz. */
+  const armor = [...ARCHER_ARMOR].sort((a, b) => b.stats.defense - a.stats.defense)[0]!;
   const id = giveItem(S, armor.definitionRef);
   const inst = S.inventory.get(id)!;
   ok(S.equipService.equip(id).ok, 'equip');
@@ -6850,7 +6874,7 @@ test('§31 setId veri hazırlığı VAR, set BONUSU YOK', () => {
 test('§40 ID sayaçları sızmaz — iki runtime aynı instanceId dizisi üretir', () => {
   const first = (): number[] => {
     const S = protoState(1943);
-    return [giveItem(S, bowOf('LOW').definitionRef), giveItem(S, bowOf('HIGH').definitionRef)];
+    return [giveItem(S, bowOf('BASE').definitionRef), giveItem(S, bowOf('FIRE').definitionRef)];
   };
   eq(first().join(','), first().join(','), 'instanceId dizisi:');
 });
@@ -7031,13 +7055,13 @@ test('§19/§20 ganimet ve farm boundary görünümü', () => {
   S.lootPolicy.setMode('manual');
   S.worldLoot.clear();
   S.genie.start(S.world);
-  const bow = ARCHER_WEAPONS.find((w) => w.itemClass === 'RARE')!;
+  const bow = [...ARCHER_WEAPONS].sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
   S.worldLoot.spawn(groundSpec(bow.definitionRef, 1000, 1200, S.drops.tuning.ownerPlayerId));
   const f = buildWorldFrame(S);
   eq(f.loot.length, 1, 'ganimet görünümü:');
   eq(f.loot[0]!.worldX, 1000, 'X:'); eq(f.loot[0]!.worldY, 1200, 'Y:');
   eq(f.loot[0]!.isCoin, false, 'item:');
-  eq(f.loot[0]!.colorHex, ITEM_CLASS_COLOR.RARE, 'item SINIF RENGİ (P1.8):');
+  eq(f.loot[0]!.colorHex, ITEM_CLASS_COLOR[bow.itemClass], 'item SINIF RENGİ (P1.8):');
   ok(f.boundary !== null, 'boundary görünümü olmalı');
   eq(f.boundary!.radius, S.genie.settings.farmBoundaryRadius, 'yarıçap gameplay\'den:');
   eq(f.boundary!.centerX, S.genie.farmCenter!.x, 'merkez X:');
@@ -9886,7 +9910,7 @@ console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
 
 test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
   const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
-  eq(S.mobs.slotConfigs().length, 28, 'canlı slot sayısı:');
+  eq(S.mobs.slotConfigs().length, 33, 'canlı slot sayısı:');
   eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
   ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
   /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */
@@ -10385,7 +10409,7 @@ test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () 
 
 test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
   /* Nesne SAYILARI değişmedi; alan dört katına çıktı. Yoğunluk düşmeli. */
-  eq(FARM_AREA_SLOTS.length, 28, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 33, 'slot sayısı:');
   const items = buildFoliage();
   ok(items.length > 700, `bitki sayısı düştü: ${items.length}`);
   /* En yakın iki nesne arası mesafe ARTMALI — eskiden 29 birimdi. */
@@ -10784,9 +10808,9 @@ test('§81 panel katmanı SAF — mutasyon ve three YOK', () => {
 console.log('P2.17 — Sv16-20 mob bandı:');
 
 test('§82 ek moblar KAYNAKTAN gelir ve DEPOYA tanıtılmış', () => {
-  eq(EXTRA_MONSTERS.length, 5, 'ek mob sayısı:');
+  eq(EXTRA_MONSTERS.length, 10, 'ek mob sayısı:');
   const levels = EXTRA_MONSTERS.map((m) => m.level).sort((a, b) => a - b);
-  eq(levels.join(','), '16,17,18,19,20', 'seviye merdiveni:');
+  eq(levels.join(','), '16,17,18,19,20,21,23,25,27,30', 'seviye merdiveni:');
   for (const m of EXTRA_MONSTERS) {
     /* Depoya tanıtılmış olmalı — yoksa slot tanımı kaynağı bulamaz. */
     const reg = Content.monster(m.sourceRef);
@@ -10815,20 +10839,24 @@ test('§82 SEVİYE MERDİVENİ kesintisiz: Sv1-20 arası boşluk YOK', () => {
   ok(Math.max(...levels) >= 20, `en yüksek mob Sv${Math.max(...levels)} — Sv20 beklenir`);
 });
 
-test('§82 Sv16-20 slotları EN UZAK bantta, hepsi YÜRÜNEBİLİR', () => {
-  const highRefs = new Set(EXTRA_MONSTERS.map((m) => m.sourceRef));
-  const high = FARM_AREA_SLOTS.filter((s) => highRefs.has(s.monsterRef));
-  eq(high.length, 5, 'yüksek seviye slot sayısı:');
-  /* Yeni moblar mevcut Sv1-15 slotlarının ORTALAMASINDAN uzakta olmalı. */
-  const dist = (s: typeof high[number]): number =>
+test('§82 SEVİYE GRADYANI MONOTON — uzaklaştıkça mob güçlenir', () => {
+  /* P2.27 — slotlar sıfırdan dağıtıldı. Önceki dağılımda Sv16-20 ile
+     Sv9-15 birbirine karışmıştı ve gradyan zıplıyordu. */
+  const dist = (s: typeof FARM_AREA_SLOTS[number]): number =>
     Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y);
-  const lowAvg = FARM_AREA_SLOTS
-    .filter((s) => !highRefs.has(s.monsterRef))
-    .reduce((t, s) => t + dist(s), 0) / (FARM_AREA_SLOTS.length - 5);
-  const highAvg = high.reduce((t, s) => t + dist(s), 0) / high.length;
-  ok(highAvg > lowAvg, `yüksek bant daha yakın: ${Math.round(highAvg)} < ${Math.round(lowAvg)}`);
-  /* Dikdörtgen köşeleri açık olmalı — duvarlar geri açılsa bile. */
-  for (const s of high) {
+  const rows = FARM_AREA_SLOTS
+    .map((s) => ({ d: dist(s), lv: Content.monster(s.monsterRef)?.level ?? 0 }))
+    .sort((a, b) => a.d - b.d);
+  /* Seviye GERİYE gitmemeli. Aynı seviyenin tekrarı serbest. */
+  for (let i = 1; i < rows.length; i++) {
+    ok(rows[i]!.lv >= rows[i - 1]!.lv,
+      `gradyan kırıldı: ${Math.round(rows[i - 1]!.d)}→sv${rows[i - 1]!.lv} sonra `
+      + `${Math.round(rows[i]!.d)}→sv${rows[i]!.lv}`);
+  }
+  eq(rows[0]!.lv, 1, 'en yakın slot Sv1 olmalı:');
+  eq(rows[rows.length - 1]!.lv, 30, 'en uzak slot Sv30 olmalı:');
+  /* Dikdörtgen köşeleri açık olmalı. */
+  for (const s of FARM_AREA_SLOTS) {
     const p = slotPlacement(s);
     for (const [x, y] of [[p.minX, p.minY], [p.maxX - 1, p.minY],
       [p.minX, p.maxY - 1], [p.maxX - 1, p.maxY - 1]] as const) {
@@ -10836,6 +10864,7 @@ test('§82 Sv16-20 slotları EN UZAK bantta, hepsi YÜRÜNEBİLİR', () => {
     }
   }
 });
+
 
 /* ================= P2.19 — KAMERA MODLARI ================= */
 console.log('P2.19 — kamera modları:');
@@ -11569,6 +11598,84 @@ test('§96 ÖLÜMDE hareket ve Genie kesilir — dünya AKMAYA devam eder', () =
   const before = S.mobs.mobs.length;
   for (let i = 0; i < 60; i++) S.mobs.update(1 / 60, S.world);
   eq(S.mobs.mobs.length, before, 'mob listesi ölümden etkilenmemeli:');
+});
+
+/* ================= P2.27 — MORADON SV30 GENİŞLEMESİ ================= */
+console.log('P2.27 — Sv30 içeriği, kalite tavanı, ölüm bedeli:');
+
+test('§97 SEVİYE TAVANI 30 ve eğri buna hazır', () => {
+  eq(LEVELING.maxLevel, 30, 'tavan:');
+  /* Kaynak eğrisi tavanın ÖTESİNE uzanmalı — üst harita geldiğinde
+     yeniden veri üretmek gerekmesin. */
+  const rows = Content.levelCurve.rows;
+  ok(rows[rows.length - 1]!.level >= LEVELING.maxLevel,
+    'eğri tavanı kapsamalı');
+  /* Oyuncu tavanı AŞAMAMALI. */
+  const S = new PrototypeState(3600);
+  S.player.level = LEVELING.maxLevel;
+  for (let i = 0; i < 50; i++) S.player.addExp(10_000_000);
+  eq(S.player.level, LEVELING.maxLevel, 'tavan aşılmamalı:');
+});
+
+test('§97 MORADON KALİTE TAVANI YEŞİL — mor/turuncu YOK', () => {
+  /* Kullanıcı kararı: başlangıç bölgesinde eşsiz ekipman düşmemeli. */
+  const bad: string[] = [];
+  for (const d of allDefinitions()) {
+    if (d.itemClass !== 'LOW' && d.itemClass !== 'MIDDLE') {
+      bad.push(`${d.displayName} (${d.itemClass})`);
+    }
+  }
+  eq(bad.length, 0, `Moradon'da izinsiz kalite: ${bad.join(', ')}`);
+  /* İki kalite de TEMSİL EDİLMELİ — hepsi beyaz olursa ilerleme hissi olmaz. */
+  const classes = new Set(allDefinitions().map((d) => d.itemClass));
+  eq(classes.size, 2, 'iki kalite kademesi olmalı:');
+  /* STATLAR düşmedi: en güçlü yay hâlâ 30+ hasar. */
+  const best = allDefinitions().filter((d) => d.category === 'weapon')
+    .reduce((m, d) => Math.max(m, d.stats.attack), 0);
+  ok(best >= 30, `en güçlü yay zayıfladı: ${best}`);
+});
+
+test('§97 ÖLÜM BEDELİ: seviyenin %5\'i EXP, seviye DÜŞMEZ', () => {
+  const S = new PrototypeState(3601);
+  S.player.level = 15;
+  const need = S.player.requiredExpForCurrentLevel();
+  S.player.exp = Math.floor(need * 0.8);
+  const before = S.player.exp;
+  S.player.takeDamage(999999);
+  S.reviveAtSpawn();
+  const expected = Math.floor(need * DEATH_EXP_PENALTY);
+  eq(S.player.exp, before - expected, 'EXP kaybı:');
+  eq(S.player.level, 15, 'seviye düşmemeli:');
+  eq(S.lastDeathPenalty, expected, 'raporlanan kayıp:');
+});
+
+test('§97 ölüm bedeli EXP\'yi SIFIRIN ALTINA indirmez', () => {
+  const S = new PrototypeState(3602);
+  S.player.level = 1;
+  S.player.exp = 3;                       // cezadan az
+  S.player.takeDamage(999999);
+  S.reviveAtSpawn();
+  ok(S.player.exp >= 0, `negatif EXP: ${S.player.exp}`);
+  eq(S.player.level, 1, 'seviye düşmemeli:');
+  /* Kaybedilecek bir şey yoksa ceza da yok. */
+  const T = new PrototypeState(3603);
+  T.player.exp = 0;
+  T.player.takeDamage(999999);
+  T.reviveAtSpawn();
+  eq(T.player.exp, 0, 'sıfır EXP korunmalı:');
+  eq(T.lastDeathPenalty, 0, 'ceza raporu:');
+});
+
+test('§97 Sv30 içeriği ULAŞILABİLİR — her banda mob var', () => {
+  const levels = new Set<number>();
+  for (const s of FARM_AREA_SLOTS) {
+    const m = Content.monster(s.monsterRef);
+    if (m) levels.add(m.level);
+  }
+  for (const [lo, hi] of [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30]] as const) {
+    ok([...levels].some((l) => l >= lo && l <= hi), `Sv${lo}-${hi} bandında mob yok`);
+  }
+  eq(Math.max(...levels), 30, 'en yüksek mob:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

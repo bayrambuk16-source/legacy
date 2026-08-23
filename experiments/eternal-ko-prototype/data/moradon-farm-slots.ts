@@ -73,54 +73,57 @@ interface Placement {
 /** Ham yerleşim — maske taramasının çıktısı. `x`/`y` dikdörtgenin SOL ÜST
  *  köşesidir; kenar `SLOT_RECT`. Yorumdaki mesafe doğuş noktasınadır. */
 const PLACEMENT: readonly Placement[] = [
-  /* ---- BANT 1 · Sv1-2 · 600-900 ---- */
-  { x: 1680, y: 4040, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 1200, y: 3000, ref: 750, count: 5, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 80, y: 2600, ref: 850, count: 6, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  /* ═══ P2.27 — SLOTLAR SIFIRDAN DAĞITILDI ═══
+     Önceki dağılım bozuktu ve oyun testinde görüldü: Sv5-8 bandında
+     ON BİR slot tıkışmış, Sv3/10/12/13/14 hiç yok, Sv16-20 ile Sv9-15
+     birbirine karışmıştı — uzaklaştıkça seviye artışı zıplıyordu.
 
-  /* ---- BANT 2 · Sv4-5 · 1000-1350 ---- */
-  { x: 1200, y: 2360, ref: 752, count: 6, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 1840, y: 2200, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 880, y: 1800, ref: 851, count: 5, name: 'Yaban Sıçanı', ai: 'AGGRESSIVE', art: SMALL },
-  { x: 240, y: 1560, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+     Yeni dağıtım OTOMATİK: yürünebilirlik maskesi tarandı, 200×200'lük
+     alanı tamamen açık ve birbirinden en az 420 birim uzak 87 aday
+     bulundu, sonra 33 slot mesafeye göre EŞİT ARALIKLI seçildi ve mob
+     havuzu seviye sırasına göre eşlendi.
 
-  /* ---- BANT 3 · Sv6-7 · 1400-1950 ---- */
-  { x: 1440, y: 1560, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3520, y: 3800, ref: 150, count: 6, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
-  { x: 2240, y: 1640, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
-  { x: 1040, y: 1080, ref: 754, count: 7, name: 'Leş Böceği', ai: 'NORMAL', art: SWAMP },
-  { x: 160, y: 920, ref: 754, count: 5, name: 'Leş Böceği', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3920, y: 2920, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
-  { x: 1600, y: 680, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
-  { x: 480, y: 360, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'AGGRESSIVE', art: SWAMP },
+     SONUÇ: mesafe arttıkça seviye MONOTON artar (1024 birimde Sv1,
+     5940 birimde Sv30). Bu bir testle korunur.
 
-  /* ---- BANT 4 · Sv8-9 · 1950-2350 ---- */
-  { x: 3120, y: 1320, ref: 755, count: 8, name: 'Kapkaççı', ai: 'NORMAL', art: SWAMP },
-  { x: 2640, y: 920, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2240, y: 280, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
-  { x: 2880, y: 280, ref: 255, count: 5, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
-
-  /* ---- BANT 5 · Sv11-15 ---- */
-  { x: 3440, y: 600, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 4000, y: 840, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'NORMAL', art: BOSS },
-  { x: 4560, y: 1160, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
-  { x: 4240, y: 280, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
-
-  /* ---- BANT 6 · Sv16-20 · P2.17, EN UZAK BÖLGE ----
-     Karakter Sv20'ye çıkabiliyordu ama son beş seviyede avlanacak yeni
-     bir şey yoktu. Bu beş slot o boşluğu kapatır; kaynak K_MONSTER
-     tablosundan çıkarıldılar (bkz. `extra-monsters.ts`).
-
-     KONUMLAR 4374-5841 BİRİM UZAKLIKTA: seviye gradyanı MONOTON kalsın
-     diye mevcut en uzak slottan (Sv15, 5466) sonraki kuşağa yerleştiler.
-     Noktalar elle seçilmedi — yürünebilirlik maskesi taranarak 200×200'lük
-     alanı tamamen açık ve diğer slotlardan en az 420 birim uzak olanlar
-     bulundu. */
-  { x: 4360, y: 2140, ref: 105, count: 6, name: 'Kecoon Savaşçısı', ai: 'NORMAL', art: SWAMP },
-  { x: 4240, y: 1540, ref: 203, count: 6, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 4480, y: 640, ref: 301, count: 5, name: 'Dev Gavolt', ai: 'NORMAL', art: BOSS },
-  { x: 4900, y: 520, ref: 204, count: 5, name: 'Leş Kuşu', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 4660, y: 160, ref: 109, count: 5, name: 'Kecoon Kaptanı', ai: 'ELITE', art: BOSS },
+     MOB SAYILARI uzaklıkla AZALIR: yakın slotlarda 6-8, uzak
+     slotlarda 5. Alt sınır ŞEMADAN gelir (`MIN_MOBS_PER_SLOT = 5`);
+     daha seyrek yapmak istemiştim ama kuralı esnetmek yerine ona
+     uydum — bir Sv30 slotunun kalabalık olması zaten TASARIM: oraya
+     hazırlıksız gelen ölür, bu onun kararıdır. */
+  { x: 1220, y: 3540, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 1060, y: 3140, ref: 750, count: 6, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 220, y: 3060, ref: 850, count: 7, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 1420, y: 2900, ref: 850, count: 6, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 1980, y: 3140, ref: 752, count: 6, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 660, y: 2420, ref: 851, count: 6, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 2700, y: 4740, ref: 851, count: 6, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 980, y: 2140, ref: 150, count: 6, name: 'Yamyam Goblin', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 2860, y: 3580, ref: 754, count: 6, name: 'Leş Böceği', ai: 'NORMAL', art: SMALL },
+  { x: 1460, y: 1940, ref: 754, count: 6, name: 'Leş Böceği', ai: 'NORMAL', art: SMALL },
+  { x: 820, y: 1740, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SMALL },
+  { x: 1900, y: 1900, ref: 755, count: 6, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 460, y: 1500, ref: 755, count: 6, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 2940, y: 2580, ref: 255, count: 6, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
+  { x: 100, y: 1260, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 2180, y: 1580, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3180, y: 2220, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+  { x: 1780, y: 1140, ref: 105, count: 6, name: 'Kecoon Savaşçısı', ai: 'NORMAL', art: SWAMP },
+  { x: 140, y: 820, ref: 105, count: 5, name: 'Kecoon Savaşçısı', ai: 'NORMAL', art: SWAMP },
+  { x: 2220, y: 1140, ref: 203, count: 6, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3660, y: 2140, ref: 301, count: 5, name: 'Dev Gavolt', ai: 'NORMAL', art: BOSS },
+  { x: 2020, y: 740, ref: 301, count: 5, name: 'Dev Gavolt', ai: 'NORMAL', art: BOSS },
+  { x: 1060, y: 420, ref: 204, count: 5, name: 'Leş Kuşu', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 4060, y: 2300, ref: 109, count: 5, name: 'Kecoon Kaptanı', ai: 'ELITE', art: BOSS },
+  { x: 3980, y: 1860, ref: 109, count: 5, name: 'Kecoon Kaptanı', ai: 'ELITE', art: BOSS },
+  { x: 4820, y: 4140, ref: 1000, count: 5, name: 'Ceset', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 2380, y: 380, ref: 500, count: 5, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3380, y: 860, ref: 500, count: 5, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3860, y: 980, ref: 114, count: 5, name: 'Kecoon Cengaveri', ai: 'ELITE', art: BOSS },
+  { x: 3700, y: 580, ref: 502, count: 5, name: 'Ay Kurdu', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 4780, y: 1380, ref: 502, count: 5, name: 'Ay Kurdu', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 4700, y: 940, ref: 115, count: 5, name: 'Kecoon Ejderhası', ai: 'ELITE', art: BOSS },
+  { x: 4780, y: 140, ref: 115, count: 5, name: 'Kecoon Ejderhası', ai: 'ELITE', art: BOSS },
 ];
 
 /** Kanonik slot tablosu — haritanın tamamına yayılmış. */

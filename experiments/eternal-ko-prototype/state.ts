@@ -30,6 +30,9 @@ import { EquipService } from './world/EquipService.js';
 import { ForgeSystem } from './world/ForgeSystem.js';
 import { AutoGearSystem, type EquipUpgradeEvent } from './world/AutoGearSystem.js';
 import { QuestSystem, type QuestCompletion } from './world/QuestSystem.js';
+
+/** P2.27 — ölüm başına EXP kaybı oranı (kullanıcı kararı: %5). */
+export const DEATH_EXP_PENALTY = 0.05;
 import { ProtoSaveSystem, type ProtoSaveData } from './data/proto-save.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
@@ -125,6 +128,8 @@ export class PrototypeState {
   quests!: QuestSystem;
   /** Son tamamlanan görev(ler) — HUD bildirimi okur, sonra temizler. */
   lastQuests: QuestCompletion[] = [];
+  /** Son ölümde kaybedilen EXP — ölüm ekranı bunu gösterir. */
+  lastDeathPenalty = 0;
   /** Son oto giy olayı — HUD bildirimi bunu okur, sonra temizler. */
   lastUpgrade: EquipUpgradeEvent | null = null;
   /** P2.15 — yerel kayıt. Ana oyunun `SaveSystem`inden AYRI anahtar. */
@@ -368,6 +373,20 @@ export class PrototypeState {
    *  can/mana dolar. Genie durdurulur: ölüm noktasında bıraktığı farm
    *  merkezine geri yürümeye çalışması istenmeyen bir davranıştır. */
   reviveAtSpawn(): void {
+    /* P2.27 — ÖLÜM BEDELİ: mevcut seviyenin %5'i EXP kaybı.
+       (kullanıcı kararı)
+
+       KURALLAR:
+       · Kayıp o SEVİYENİN gereksiniminin %5'i — toplam EXP'nin değil.
+         Böylece ceza her seviyede orantılı hissedilir.
+       · SEVİYE DÜŞMEZ. Biriken EXP sıfırın altına inemez; Sv1'de
+         kaybedilecek bir şey yoksa ceza da yoktur.
+       · Ceza dirilişte uygulanır, ölüm anında değil: oyuncu ölüm
+         ekranında ne kaybettiğini görebilsin. */
+    const need = this.player.requiredExpForCurrentLevel();
+    const penalty = Math.floor(need * DEATH_EXP_PENALTY);
+    this.lastDeathPenalty = Math.min(penalty, this.player.exp);
+    this.player.exp = Math.max(0, this.player.exp - penalty);
     this.player.reviveForRetry();
     this.world.worldX = this.worldCfg.spawn.x;
     this.world.worldY = this.worldCfg.spawn.y;

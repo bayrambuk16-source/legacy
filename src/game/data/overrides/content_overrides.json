@@ -64,6 +64,26 @@
   "109": {
    "displayName": "Kecoon Kaptanı",
    "visualKey": "kurt_alfa"
+  },
+  "1000": {
+   "displayName": "Ceset",
+   "visualKey": "kurt"
+  },
+  "500": {
+   "displayName": "Kurt Adam",
+   "visualKey": "kurt_alfa"
+  },
+  "114": {
+   "displayName": "Kecoon Cengaveri",
+   "visualKey": "kurt"
+  },
+  "502": {
+   "displayName": "Ay Kurdu",
+   "visualKey": "kurt_alfa"
+  },
+  "115": {
+   "displayName": "Kecoon Ejderhası",
+   "visualKey": "kurt_alfa"
   }
  },
  "zones": {

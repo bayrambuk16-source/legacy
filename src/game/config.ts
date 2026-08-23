@@ -87,6 +87,15 @@ export const UPGRADE_MODEL = {
 } as const;
 
 export const LEVELING = {
-  /** MVP seviye tavanı (level_curve.json maxLevelMvp ile uyumlu) */
-  maxLevel: 20,
+  /** P2.27 — SEVİYE TAVANI 20'den 30'a.
+   *
+   *  Kullanıcı kararı: Moradon bir BAŞLANGIÇ BÖLGESİDİR, uçtan uca
+   *  içerik değil. Oyuncu ~1,5-2 saatte Sv30'a gelir ve bir üst
+   *  haritaya geçmesi ÖNERİLİR — zorunlu değil. Sv10'da da geçebilir,
+   *  sadece orada zorlanır. Kapı seviye değil, oyuncunun kararıdır.
+   *
+   *  Tavan İÇERİĞE bağlıdır: Moradon'un en güçlü mobu Sv30 (Kecoon
+   *  Ejderhası). Üst harita geldiğinde tavan onunla birlikte artar.
+   *  Kaynak eğrisi Sv80'e kadar hazır (`level_curve.json`). */
+  maxLevel: 30,
 } as const;
