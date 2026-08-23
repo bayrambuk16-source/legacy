@@ -26,11 +26,6 @@ export const ui = (v: number): number => v * UI_SCALE;
 
 export interface UiBox { x: number; y: number; w: number; h: number }
 
-/** Maket dikdörtgeni → sahne dikdörtgeni. */
-function box(x: number, y: number, w: number, h: number): UiBox {
-  return { x: ui(x), y: ui(y), w: ui(w), h: ui(h) };
-}
-
 /** Görsel anahtarı + o görselin kaynak en-boy oranı. Yükseklik GENİŞLİKTEN
  *  türer; böylece bir varlık yeniden dışa aktarılınca yerleşim bozulmaz. */
 export interface UiSprite extends UiBox { key: string }
