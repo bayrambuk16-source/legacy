@@ -29,6 +29,7 @@ import { KoArcherPhysicalStrategy } from '../../src/game/systems/combat/KoArcher
 import { EquipService } from './world/EquipService.js';
 import { ForgeSystem } from './world/ForgeSystem.js';
 import { AutoGearSystem, type EquipUpgradeEvent } from './world/AutoGearSystem.js';
+import { QuestSystem, type QuestCompletion } from './world/QuestSystem.js';
 import { ProtoSaveSystem, type ProtoSaveData } from './data/proto-save.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
@@ -120,10 +121,16 @@ export class PrototypeState {
   forge!: ForgeSystem;
   /** P2.13 — oto giy / oto sat / güç skoru. */
   autoGear!: AutoGearSystem;
+  /** P2.21 — görevler. */
+  quests!: QuestSystem;
+  /** Son tamamlanan görev(ler) — HUD bildirimi okur, sonra temizler. */
+  lastQuests: QuestCompletion[] = [];
   /** Son oto giy olayı — HUD bildirimi bunu okur, sonra temizler. */
   lastUpgrade: EquipUpgradeEvent | null = null;
   /** P2.15 — yerel kayıt. Ana oyunun `SaveSystem`inden AYRI anahtar. */
   readonly saves = new ProtoSaveSystem();
+  /** Kurucuya verilen dünya (doğuş noktası ölümde yeniden kullanılır). */
+  private worldCfg: WorldConfig;
   /** Oyuncu görsel durum makinesi — saldırı animasyonu YALNIZ buradan tetiklenir. */
   readonly anim = new PlayerAnimator();
 
@@ -287,6 +294,9 @@ export class PrototypeState {
          `markDead()`ten (respawn sayacını başlatır) ÖNCE çözülür. Kill başına
          TEK roll — tek reap kapısı bunu garanti eder (§19). */
       const kill = this.adapter.resolveKill(m);
+      /* P2.21 — görev sayacı AYNI kapıda ilerler: kill başına bir kez. */
+      const finished = this.quests.onKill(m.monster.sourceRef);
+      if (finished.length > 0) this.lastQuests.push(...finished);
       const drop = this.drops.resolve(m, kill.exp);
       this.mobs.markDead(m);
       if (this.targets.selectedUid === m.uid) this.targets.clear();
@@ -314,6 +324,7 @@ export class PrototypeState {
       equipment,
       skills: { loadout: this.combat.skills.loadout.serialize() },
       autoGear: { ...this.autoGear.settings },
+      quests: this.quests.serialize(),
       world: { x: this.world.worldX, y: this.world.worldY },
     };
   }
@@ -340,6 +351,7 @@ export class PrototypeState {
     /* 5) skill barı ve ayarlar */
     this.combat.skills.loadout.restore(d.skills?.loadout);
     if (d.autoGear) Object.assign(this.autoGear.settings, d.autoGear);
+    this.quests.restore(d.quests);
 
     /* 6) konum ve vitaller — tavanlar ancak burada kesinleşir */
     if (d.world) {
@@ -349,6 +361,21 @@ export class PrototypeState {
     this.player.restoreVitals({
       hp: Number.isFinite(d.player.hp) ? d.player.hp : Number.POSITIVE_INFINITY,
       mp: Number.isFinite(d.player.mp) ? d.player.mp : Number.POSITIVE_INFINITY,
+    });
+  }
+
+  /** P2.22 — ÖLÜM SONRASI DOĞUŞ. Oyuncu doğuş noktasına ışınlanır ve
+   *  can/mana dolar. Genie durdurulur: ölüm noktasında bıraktığı farm
+   *  merkezine geri yürümeye çalışması istenmeyen bir davranıştır. */
+  reviveAtSpawn(): void {
+    this.player.reviveForRetry();
+    this.world.worldX = this.worldCfg.spawn.x;
+    this.world.worldY = this.worldCfg.spawn.y;
+    this.world.moveX = 0; this.world.moveY = 0; this.world.moving = false;
+    this.targets.clear();
+    this.genie.stop();
+    this.player.restoreVitals({
+      hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY,
     });
   }
 
@@ -429,6 +456,7 @@ export class PrototypeState {
     slots: readonly MobSpawnSlot[] = FARM_AREA_SLOTS,
     worldCfg: WorldConfig = ACTIVE_WORLD,
   ) {
+    this.worldCfg = worldCfg;
     registerPrototypeSkills();                 // 15 okçu skilli kayıt olsun
     this.world.worldX = worldCfg.spawn.x;
     this.world.worldY = worldCfg.spawn.y;
@@ -514,6 +542,18 @@ export class PrototypeState {
       inventory: this.inventory, equip: this.equipService,
       equipment: this.equipment, stats: this.stats, player: this.player,
     });
+    /* P2.21 — görev sistemi. Ödül EXP'si seviye farkı cezasından
+       GEÇMEZ: görev ödülü sabit bir taahhüttür. */
+    this.quests = new QuestSystem({
+      player: this.player,
+      grantExp: (amount) => { this.player.addExp(amount); },
+    });
+    /* Sınıf aşaması görevden okunur; görev yoksa seviye eşiği yedektir. */
+    this.stats.progression.bindQuestStage(() => this.quests.stageOverride);
+    /* P2.21 — BAŞLANGIÇ BARI PUANSIZ AÇIKTIR. Aksi hâlde Lv1 oyuncu
+       skill puanı olmadığı için (KO kuralı: Lv10'a kadar puan yok)
+       hiçbir yetenek kullanamaz ve aktif bar boş görünürdü. */
+    for (const ref of DEFAULT_ACTIVE_BAR) this.stats.progression.grantSkill(ref);
     this.mobs.ai.respawnOverrideSec = null;
     this.mobs.populate();
 

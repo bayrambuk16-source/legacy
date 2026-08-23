@@ -1,3 +1,4 @@
+import { ITEM_ICON_PATHS } from './item-icons.js';
 /** PROTOTİPE ÖZEL varlık manifesti.
  *
  *  Ana `src/game/data/assets-manifest.ts` DEĞİŞTİRİLMEDİ: bu dosyadaki anahtarlar
@@ -18,7 +19,10 @@
  *  farkı 5,8 → döşendiğinde dikiş görünmez). 512×512 WebP, 35 KB. */
 export const GROUND_TEXTURE_KEY = 'ground_texture';
 
+/* P2.24 — item ikonları AYRI dosyada tanımlı ve buraya yayılır.
+   39 ayrı yolu elle yazmak yerine tek kaynaktan gelir. */
 export const UI_ASSETS: Record<string, string> = {
+  ...ITEM_ICON_PATHS,
   /* P2.18 — zemin dokusu (GEÇİCİ, sonra değişecek).
      Kullanıcının ürettiği çim/toprak dokusu. Tileable olduğu ÖLÇÜLEREK
      doğrulandı: sol-sağ kenar farkı 13,9 ve üst-alt 13,1; dokunun kendi
@@ -26,6 +30,11 @@ export const UI_ASSETS: Record<string, string> = {
      döşendiğinde dikiş görünmez.
      512×512 WebP, 83 KB (kaynak 1254×1254 PNG). */
   ground_texture: 'assets/nature/ground.webp',
+  /* P2.23 — envanter paneli. TEK PARÇA: çerçeve, yuva zeminleri, etiket
+     şeritleri, yer tutucu ikonlar ve üç düğme zemini aynı görselde.
+     Parçalara ayırmadım çünkü maket zaten hizalı üretildi; kesip yeniden
+     hizalamak hata kaynağı olurdu. Metin ve item ikonları ÜSTÜNE çizilir. */
+  ui_inv_panel: 'assets/ui/inv_panel.webp',
   ui_player_card: 'assets/ui/ui_player_card.webp',
   ui_target_card: 'assets/ui/ui_target_card.webp',
   ui_genie_toggle: 'assets/ui/ui_genie_toggle.webp',

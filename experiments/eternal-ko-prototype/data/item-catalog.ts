@@ -171,21 +171,30 @@ export const ARCHER_TIER_BOWS: readonly WeaponDefinition[] = [
   }),
 ];
 
-/* A1 — OKÇU ZIRH KADEMELERİ. İki set: Rogue (Sv1-10 bandı) ve Half Plate
-   (Sv10-20 bandı). Kaynak `defense` değerleri AYNEN alındı. Kaynakta bu
-   parçalarda stat bonusu YOKTUR — DEX/HP bonusu Project Legacy tuning'i
-   olacak (SOURCE GAP, sonraki görev). */
+/* A1/P2.21 — OKÇU ZIRH KADEMELERİ. İki set: Rogue (Sv1-10) ve Half Plate
+   (Sv10-20).
+
+   `defense` değerleri KAYNAKTAN aynen alındı.
+
+   DEX ve maxHp bonusları PROJECT LEGACY TUNING'dir — kaynakta okçu
+   zırhında stat bonusu YOK (ölçüldü, SOURCE GAP). Bu boşluk döngüyü
+   kırıyordu: zırh toplamak saldırıyı hiç artırmıyor, yalnız yay
+   değiştirmek işe yarıyordu. Eklenen DEX o boşluğu kapatır.
+
+   ÖLÇEK: tam Rogue seti +12 DEX, tam Half Plate +28 DEX. Karşılaştırma
+   için Lv20'de dağıtılabilir puan 67'dir — yani ekipman, dağıtımın
+   yaklaşık yarısı kadar katkı verir. Baskın değil, ama hissedilir. */
 export const ARCHER_TIER_ARMOR: readonly ArmorDefinition[] = [
-  armor(241003000, 'Avcı Başlığı', 'LOW', 'helmet', { defense: 8, ...A0, resist: res({}) }, 'rogue'),
-  armor(241001000, 'Avcı Gömleği', 'LOW', 'chest', { defense: 14, ...A0, resist: res({}) }, 'rogue'),
-  armor(241002000, 'Avcı Dizliği', 'LOW', 'pants', { defense: 11, ...A0, resist: res({}) }, 'rogue'),
-  armor(241004000, 'Avcı Eldiveni', 'LOW', 'gloves', { defense: 5, ...A0, resist: res({}) }, 'rogue'),
-  armor(241005000, 'Avcı Çizmesi', 'LOW', 'boots', { defense: 5, ...A0, resist: res({}) }, 'rogue'),
-  armor(242003000, 'Zırhlı Avcı Miğferi', 'MIDDLE', 'helmet', { defense: 16, ...A0, resist: res({}) }, 'halfplate'),
-  armor(242001000, 'Zırhlı Avcı Göğüslüğü', 'MIDDLE', 'chest', { defense: 28, ...A0, resist: res({}) }, 'halfplate'),
-  armor(242002000, 'Zırhlı Avcı Dizliği', 'MIDDLE', 'pants', { defense: 22, ...A0, resist: res({}) }, 'halfplate'),
-  armor(242004000, 'Zırhlı Avcı Eldiveni', 'MIDDLE', 'gloves', { defense: 11, ...A0, resist: res({}) }, 'halfplate'),
-  armor(242005000, 'Zırhlı Avcı Çizmesi', 'MIDDLE', 'boots', { defense: 11, ...A0, resist: res({}) }, 'halfplate'),
+  armor(241003000, 'Avcı Başlığı', 'LOW', 'helmet', { defense: 8, ...A0, dex: 2, resist: res({}) }, 'rogue'),
+  armor(241001000, 'Avcı Gömleği', 'LOW', 'chest', { defense: 14, ...A0, dex: 3, maxHp: 20, resist: res({}) }, 'rogue'),
+  armor(241002000, 'Avcı Dizliği', 'LOW', 'pants', { defense: 11, ...A0, dex: 2, maxHp: 15, resist: res({}) }, 'rogue'),
+  armor(241004000, 'Avcı Eldiveni', 'LOW', 'gloves', { defense: 5, ...A0, dex: 3, resist: res({}) }, 'rogue'),
+  armor(241005000, 'Avcı Çizmesi', 'LOW', 'boots', { defense: 5, ...A0, dex: 2, resist: res({}) }, 'rogue'),
+  armor(242003000, 'Zırhlı Avcı Miğferi', 'MIDDLE', 'helmet', { defense: 16, ...A0, dex: 5, maxHp: 20, resist: res({}) }, 'halfplate'),
+  armor(242001000, 'Zırhlı Avcı Göğüslüğü', 'MIDDLE', 'chest', { defense: 28, ...A0, dex: 7, maxHp: 45, resist: res({}) }, 'halfplate'),
+  armor(242002000, 'Zırhlı Avcı Dizliği', 'MIDDLE', 'pants', { defense: 22, ...A0, dex: 5, maxHp: 35, resist: res({}) }, 'halfplate'),
+  armor(242004000, 'Zırhlı Avcı Eldiveni', 'MIDDLE', 'gloves', { defense: 11, ...A0, dex: 6, resist: res({}) }, 'halfplate'),
+  armor(242005000, 'Zırhlı Avcı Çizmesi', 'MIDDLE', 'boots', { defense: 11, ...A0, dex: 5, resist: res({}) }, 'halfplate'),
 ];
 
 export const ARCHER_STARTER_BOW: WeaponDefinition = weapon(

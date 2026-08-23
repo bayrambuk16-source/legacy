@@ -110,14 +110,29 @@ export const DEFAULT_ACTIVE_BAR: number[] = [
 export const GENIE_SET_MAX = 6;
 
 /** Varsayılan Genie setleri (oyuncu değiştirebilir). */
+/** Genie setleri — P2.22'den beri BOŞ BAŞLAR (kullanıcı kararı).
+ *
+ *  Eskiden üç set hazır doluydu ve oyuncu ne kullandığını bilmiyordu;
+ *  "Set 1'de 3'lü/5'li olmasın" bildirimi bundandı. Artık setler boş
+ *  gelir, oyuncu Genie ayarlarından kendi kombinasyonunu kurar.
+ *
+ *  Boş set bir HATA DEĞİLDİR: Genie boş sette temel saldırıya düşmez,
+ *  yalnız bekler (bkz. "gizli temel saldırı" kuralı). */
 export function DEFAULT_GENIE_SETS(): [number[], number[], number[]] {
+  return [[], [], []];
+}
+
+/** TEST KURULUMU — farm senaryoları dolu set varsayar. Canlı oyunun
+ *  varsayılanı DEĞİLDİR; yalnız test dünyası bunu açıkça kurar. */
+export function TEST_GENIE_SETS(): [number[], number[], number[]] {
   return [
-    /* Set 1 — Yakın Burst: yalnız 5'li ve 3'lü. Araya Standart Atış SOKULMAZ. */
+    /* Set 1 — Yakın Burst: yalnız 5'li ve 3'lü. */
     [ARCHER.BESLI_SALVO, ARCHER.UCLU_SALVO],
     /* Set 2 — Ekonomik */
     [ARCHER.DELICI_OK, ARCHER.IZCI_OKU, ARCHER.STANDART_ATIS],
     /* Set 3 — Elite */
-    [ARCHER.KARA_TAKIP, ARCHER.GOLGE_AVCISI, ARCHER.YIRTICI_OK, ARCHER.BESLI_SALVO, ARCHER.UCLU_SALVO],
+    [ARCHER.KARA_TAKIP, ARCHER.GOLGE_AVCISI, ARCHER.YIRTICI_OK,
+      ARCHER.BESLI_SALVO, ARCHER.UCLU_SALVO],
   ];
 }
 

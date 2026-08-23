@@ -34,10 +34,13 @@ import {
 import { canAttempt, forgePreview } from '../data/forge-model.js';
 import {
   PENDING_BOX, PENDING_PAGE_SIZE, SELL_PANEL, TOGGLE_LABELS,
-  bulkButtons, classButtons, keepMaxButtons, pendingRows, sellHitTest, toggleRects,
+  bulkButtons, classButtons, deathOkButton, keepMaxButtons, pendingRows, sellHitTest,
+  toggleRects, DEATH_BOX,
 } from '../ui/sell-panel.js';
 import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import { NON_GEAR_COLOR, nonGearInfo } from '../ui/non-gear-info.js';
+import { itemIconKey } from '../data/item-icons.js';
+import { ArcherProgression } from '../../../src/game/systems/combat/ArcherProgression.js';
 import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
 } from '../ui/camera-zoom.js';
@@ -206,6 +209,10 @@ export class WorldPrototypeScene implements Scene {
   private pointers = new Map<number, { x: number; y: number }>();
   private pinch: PinchState | null = null;
   private zoom = ZOOM_DEFAULT;
+  /** P2.22 — ölüm ekranı. Açıkken diğer girdiler kilitlidir. */
+  private deathOpen = false;
+  private deathAt: { x: number; y: number } | null = null;
+
   /** P2.19 — kamera modu ve yumuşatılmış yaw. */
   private camMode: CameraMode = 'overhead';
   private camYaw = CAMERA_V1.yawDeg;
@@ -621,6 +628,16 @@ export class WorldPrototypeScene implements Scene {
 
     /* Genie ayar ekranı MODAL'dır: açıkken alttaki hiçbir kontrol tetiklenmez. */
     if (this.genieOpen) { this.handleGenieSettings(p); return; }
+    /* Ölüm ekranı AÇIKKEN başka hiçbir girdi işlenmez. */
+    if (this.deathOpen) {
+      if (this.hit(p, deathOkButton())) {
+        this.host.audio.play('ui');
+        this.S.reviveAtSpawn();
+        this.deathOpen = false;
+        this.deathAt = null;
+      }
+      return;
+    }
     if (this.invOpen) { this.handleInventory(p); return; }
     if (this.charOpen) { this.handleCharacter(p); return; }
     if (this.skillOpen) { this.handleSkills(p); return; }
@@ -1250,9 +1267,19 @@ export class WorldPrototypeScene implements Scene {
          Yaw ayrıca yumuşatılır: üçüncü şahısta kamera karakterin arkasında
          durur ve dönüş anında değil, yaklaşarak gerçekleşir. */
       const base = baseTuning(this.camMode);
-      this.camYaw = approachYaw(
-        this.camYaw, modeYaw(this.camMode, this.S.world.facingAngle), dt,
+      const camTarget = this.S.targets.current(
+        this.ents(), this.S.world.worldX, this.S.world.worldY,
+        { pickRadius: this.S.ranges.pickRadius, dropDistance: this.S.ranges.targetDropDistance },
       );
+      this.camYaw = approachYaw(this.camYaw, modeYaw(this.camMode, {
+        targetAngle: camTarget
+          ? Math.atan2(camTarget.worldY - this.S.world.worldY,
+            camTarget.worldX - this.S.world.worldX)
+          : null,
+        steering: this.stickPointer !== null,
+        facingAngle: this.S.world.facingAngle,
+        currentYaw: this.camYaw,
+      }), dt);
       Object.assign(this.three!.tuning, base, applyZoom(base, this.zoom), {
         yawDeg: this.camMode === 'third' ? this.camYaw : base.yawDeg,
       });
@@ -1289,6 +1316,14 @@ export class WorldPrototypeScene implements Scene {
       this.S.saveNow();
     }
     /* P2.13 — oto giy olayını yakala ve bildirim şeridini süre ile söndür. */
+    /* P2.21 — tamamlanan görev bildirimi. */
+    if (this.S.lastQuests.length > 0) {
+      const q = this.S.lastQuests.shift()!;
+      this.say(q.promoted
+        ? `${q.quest.title} tamam · SINIF YÜKSELDİ · +${q.exp} EXP`
+        : `${q.quest.title} tamam · +${q.exp} EXP · +${q.coins} altın`);
+      this.noticeTimer = 4;
+    }
     const up = this.S.lastUpgrade;
     if (up) {
       this.powerToast = {
@@ -1300,9 +1335,13 @@ export class WorldPrototypeScene implements Scene {
       this.powerToast.t -= dt;
       if (this.powerToast.t <= 0) this.powerToast = null;
     }
-    if (!this.S.player.alive) {
-      this.S.player.reviveForRetry();
-      this.say('Yeniden doğdun');
+    /* P2.22 — ÖLÜM EKRANI. Eskiden ölüm sessizce ve anında geri
+       dönüşle geçiştiriliyordu; oyuncu ne olduğunu görmüyordu.
+       Artık ekran durur, bildirim çıkar ve TAMAM'a basınca doğuş
+       noktasına ışınlanılır. */
+    if (!this.S.player.alive && !this.deathOpen) {
+      this.deathOpen = true;
+      this.deathAt = { x: this.S.world.worldX, y: this.S.world.worldY };
     }
   }
 
@@ -1326,6 +1365,7 @@ export class WorldPrototypeScene implements Scene {
     if (this.charOpen) this.renderCharacter(g);
     if (this.skillOpen) this.renderSkills(g);
     if (this.forgeOpen) this.renderForge(g);
+    if (this.deathOpen) this.renderDeath(g);
     if (this.sellOpen) this.renderSell(g);
   }
 
@@ -1692,17 +1732,36 @@ export class WorldPrototypeScene implements Scene {
     g.text(`GÜÇ ${formatPower(power)}`, PROTO.screenW / 2, 96,
       { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
 
+    /* ---- aktif görev ---- */
+    const quest = this.S.quests.active();
+    if (quest) {
+      const pr = this.S.quests.progress(quest)!;
+      const parts = quest.objectives.map((o) => {
+        const nm = Content.monster(o.monsterRef)?.displayName ?? `#${o.monsterRef}`;
+        return `${nm} ${pr.counts[o.monsterRef] ?? 0}/${o.count}`;
+      });
+      g.text(quest.title, PROTO.screenW / 2, 112,
+        { align: 'center', size: 11, bold: true, color: '#c9a05a' });
+      g.text(parts.join('   ·   '), PROTO.screenW / 2, 128,
+        { align: 'center', size: 10, color: '#8d8272' });
+      /* İlerleme çubuğu — tek bakışta ne kadar kaldığı. */
+      const bw = 200, bx = PROTO.screenW / 2 - bw / 2;
+      g.rect(bx, 144, bw, 4, '#241c14', 0.9);
+      g.rect(bx, 144, bw * this.S.quests.ratio(quest), 4, '#c9a05a', 0.95);
+    }
+
     /* ---- oto giy bildirimi ---- */
     if (this.powerToast) {
       const t = this.powerToast;
       const alpha = Math.min(1, t.t / 0.4);
-      g.rect(PROTO.screenW / 2 - 120, 112, 240, 34, '#100d08', 0.9 * alpha);
-      g.rect(PROTO.screenW / 2 - 120, 112, 240, 2, '#7fa85c', alpha);
-      g.text(t.name, PROTO.screenW / 2 - 110, 118,
+      const ty = 160;
+      g.rect(PROTO.screenW / 2 - 120, ty, 240, 34, '#100d08', 0.9 * alpha);
+      g.rect(PROTO.screenW / 2 - 120, ty, 240, 2, '#7fa85c', alpha);
+      g.text(t.name, PROTO.screenW / 2 - 110, ty + 6,
         { size: 11, bold: true, color: '#e8e0d0', alpha });
       g.text(`${formatPower(t.before)} → ${formatPower(t.after)}`,
-        PROTO.screenW / 2 - 110, 132, { size: 10, color: '#8d8272', alpha });
-      g.text(formatPowerDelta(t.before, t.after), PROTO.screenW / 2 + 110, 122,
+        PROTO.screenW / 2 - 110, ty + 20, { size: 10, color: '#8d8272', alpha });
+      g.text(formatPowerDelta(t.before, t.after), PROTO.screenW / 2 + 110, ty + 10,
         { align: 'right', size: 15, bold: true, color: '#7fa85c', alpha });
     }
 
@@ -2204,6 +2263,16 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private renderInventory(g: DrawApi): void {
+    /* P2.23 — YENİ PANEL GÖRSELİ. Çerçeve, yuvalar ve düğme zeminleri
+       tek görselden gelir; kod yalnız METİN ve ITEM ikonu çizer.
+       Görsel yüklenmediyse eski çizim devrede kalır (aşağıdaki
+       `panelShell` yolu). */
+    const art = this.host.assets.images.get('ui_inv_panel');
+    if (art) {
+      g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
+      g.image('ui_inv_panel', INV_LAYOUT.panel.x, INV_LAYOUT.panel.y,
+        { w: INV_LAYOUT.panel.w, h: INV_LAYOUT.panel.h, alpha: 1 });
+    }
     const L = INV_LAYOUT;
     g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.72);
     g.rect(L.panel.x, L.panel.y, L.panel.w, L.panel.h, '#100d08', 0.97);
@@ -2222,17 +2291,20 @@ export class WorldPrototypeScene implements Scene {
     for (const r of equipSlotRects()) {
       const v = views.find((x) => x.slotId === r.slotId)!;
       const on = sel !== null && sel.kind === 'equip' && sel.slotId === r.slotId;
-      g.rect(r.x, r.y, r.w, r.h, on ? '#2c2417' : '#1a1610');
+      if (on) g.rect(r.x, r.y, r.w, r.h, '#2c2417', 0.7);
       g.rect(r.x, r.y, r.w, 2, v.itemClass ? ITEM_CLASS_COLOR[v.itemClass] : '#3a3128');
-      g.text(r.label, r.x + 5, r.y + 6, { size: 9, color: '#6f655a' });
+      /* P2.24 — etiket yuvanın ÜSTÜNDEKİ şeritte (maketin ayırdığı yer),
+         ikon yuvanın ortasında. Eskiden ikisi de kutunun içindeydi ve
+         item adı ikonla çakışıyordu. */
+      g.text(r.label, r.x + 4, r.y - INV_LAYOUT.equipLabelH + 4,
+        { size: 9, color: '#6f655a' });
       if (v.definition) {
-        g.text(this.shortName(v.definition.displayName), r.x + 5, r.y + 26,
-          { size: 10, color: ITEM_CLASS_COLOR[v.definition.itemClass] });
+        this.drawItemIcon(g, v.definition.definitionRef, r.x + r.w / 2, r.y + r.h / 2,
+          r.w - 12, ITEM_CLASS_COLOR[v.definition.itemClass]);
         if (v.upgradeLevel > 0) {
-          g.text(`+${v.upgradeLevel}`, r.x + r.w - 6, r.y + 54, { align: 'right', size: 11, color: '#e8d9a0' });
+          g.text(`+${v.upgradeLevel}`, r.x + r.w - 5, r.y + r.h - 16,
+            { align: 'right', size: 11, bold: true, color: '#e8d9a0' });
         }
-      } else {
-        g.text('—', r.x + r.w / 2, r.y + r.h / 2 - 8, { align: 'center', size: 14, color: '#3a3128' });
       }
       if (on) g.rect(r.x, r.y + r.h - 2, r.w, 2, '#e08a3c');
     }
@@ -2244,12 +2316,14 @@ export class WorldPrototypeScene implements Scene {
       const c = cells[i]!;
       const e = entries[i];
       const on = e !== undefined && sel !== null && sel.kind === 'bag' && sel.instanceId === e.instanceId;
-      g.rect(c.x, c.y, c.w, c.h, on ? '#2c2417' : '#1a1610');
+      if (on) g.rect(c.x, c.y, c.w, c.h, '#2c2417', 0.7);
       if (!e) continue;
       const def = definitionOf(e.itemRef);
       const col = def ? ITEM_CLASS_COLOR[def.itemClass] : '#6f655a';
       g.rect(c.x, c.y, c.w, 2, col);
-      g.circle(c.x + c.w / 2, c.y + c.h / 2, 11, col, 0.85);
+      /* P2.24 — GERÇEK İKON. Yoksa eski renkli daireye düşülür;
+         katalog büyüdükçe ikonlar sonradan eklenebilsin diye. */
+      this.drawItemIcon(g, e.itemRef, c.x + c.w / 2, c.y + c.h / 2, c.w - 8, col);
       if (e.quantity > 1) {
         g.text(String(e.quantity), c.x + c.w - 4, c.y + c.h - 15, { align: 'right', size: 10, color: '#cfc7b6' });
       }
@@ -2466,6 +2540,18 @@ export class WorldPrototypeScene implements Scene {
       this.say(`Sv ${def.requiredLevel} gerekiyor`);
       return;
     }
+    /* P2.21 — SKILL PUANI. Seviye şartı geçse bile skill AÇILMAMIŞSA
+       yuvaya konamaz; dokunuş önce açma denemesi yapar. */
+    const prog = this.S.stats.progression;
+    if (!prog.isUnlocked(ref)) {
+      const r = prog.unlockSkill(ref);
+      if (!r.ok) {
+        this.say(r.reason === 'noPoints' ? 'Skill puanı yetmiyor' : 'Açılamadı');
+        return;
+      }
+      this.say(`${def.displayName} açıldı`);
+      return;
+    }
     const ok = this.S.combat.skills.loadout.setSlot(this.skillBarSel, ref);
     this.say(ok ? `${def.displayName} → yuva ${this.skillBarSel + 1}` : 'Bu yuvaya atanamadı');
   }
@@ -2475,7 +2561,8 @@ export class WorldPrototypeScene implements Scene {
     const pageCount = Math.max(1, Math.ceil(pool.length / SKILL_PAGE_SIZE));
     const shown = pool.slice(this.skillPage * SKILL_PAGE_SIZE,
       this.skillPage * SKILL_PAGE_SIZE + SKILL_PAGE_SIZE);
-    this.panelShell(g, 'YETENEKLER', `${this.skillPage + 1}/${pageCount}`);
+    const sp = this.S.stats.progression.skillUnspent;
+    this.panelShell(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
 
     /* ---- aktif bar ---- */
     const slots = this.S.combat.skills.slots();
@@ -2495,7 +2582,9 @@ export class WorldPrototypeScene implements Scene {
           { align: 'center', size: 11, color: '#3a3128' });
       }
     });
-    g.text('Yuva seç, sonra alttan yetenek seç · aynı yuvaya iki kez dokun = boşalt',
+    g.text(sp > 0
+      ? `${sp} skill puanın var — kilitli yeteneğe dokunarak aç`
+      : 'Yuva seç, sonra alttan yetenek seç · aynı yuvaya iki kez dokun = boşalt',
       PANEL_FRAME.x + PANEL_FRAME.w / 2, PANEL_FRAME.y + 178,
       { align: 'center', size: 10, color: '#6f655a' });
 
@@ -2505,7 +2594,9 @@ export class WorldPrototypeScene implements Scene {
       const ref = shown[i]!;
       const def = SkillRegistry.get(ref);
       if (!def) return;
-      const locked = def.requiredLevel > this.S.player.level;
+      const levelLocked = def.requiredLevel > this.S.player.level;
+      const unlocked = this.S.stats.progression.isUnlocked(ref);
+      const locked = levelLocked || !unlocked;
       const inBar = equipped.has(ref);
       g.rect(r.x, r.y, r.w, r.h, inBar ? '#1c1710' : '#141009', 0.95);
       g.rect(r.x, r.y, 3, r.h, inBar ? '#e08a3c' : '#3a3128');
@@ -2515,7 +2606,8 @@ export class WorldPrototypeScene implements Scene {
         + (def.cooldownSec > 0 ? ` · ${def.cooldownSec.toFixed(1)}s` : ''),
         r.x + 14, r.y + 30, { size: 10, color: locked ? '#4a4239' : '#8d8272' });
       if (inBar) g.text('kuşanılı', r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#e08a3c' });
-      else if (locked) g.text('kilitli', r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#c96a5a' });
+      else if (levelLocked) g.text(`Sv ${def.requiredLevel}`, r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#c96a5a' });
+      else if (!unlocked) g.text(`AÇ · ${ArcherProgression.SKILL_COST} puan`, r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#7fa85c' });
     });
 
     for (const b of skillPageButtons()) {
@@ -2789,6 +2881,46 @@ export class WorldPrototypeScene implements Scene {
       g.text(this.sellMsg, SELL_PANEL.x + 20, SELL_PANEL.y + SELL_PANEL.h - 84,
         { size: 11, color: '#e8d9a0' });
     }
+  }
+
+
+  /** P2.22 — ÖLÜM EKRANI. Tek düğme: ölüm anında seçenek yığmak yerine
+   *  ne olduğunu söyle ve tek bir onayla devam et. */
+  private renderDeath(g: DrawApi): void {
+    const B = DEATH_BOX;
+    g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.82);
+    g.rect(B.x, B.y, B.w, B.h, '#150d0b', 0.97);
+    g.rect(B.x, B.y, B.w, 3, '#c96a5a');
+    g.text('ÖLDÜN', B.x + B.w / 2, B.y + 26,
+      { align: 'center', size: 22, bold: true, color: '#e8b8b0' });
+    g.text(`Sv ${this.S.player.level} · ${this.S.player.coins} altın`,
+      B.x + B.w / 2, B.y + 62, { align: 'center', size: 12, color: '#8d8272' });
+    if (this.deathAt) {
+      const d = Math.round(Math.hypot(
+        this.deathAt.x - MORADON_PLAY_SPAWN.x, this.deathAt.y - MORADON_PLAY_SPAWN.y));
+      g.text(`Doğuş noktasına ${d} birim uzakta düştün.`,
+        B.x + B.w / 2, B.y + 86, { align: 'center', size: 11, color: '#6f655a' });
+    }
+    g.text('TAMAM dediğinde doğuş noktasına ışınlanırsın.',
+      B.x + B.w / 2, B.y + 112, { align: 'center', size: 11, color: '#8d8272' });
+    const b = deathOkButton();
+    g.rect(b.x, b.y, b.w, b.h, '#2c2417');
+    g.rect(b.x, b.y, b.w, 3, '#e08a3c');
+    g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 8,
+      { align: 'center', size: 15, bold: true, color: '#e8d9a0' });
+  }
+
+  /** P2.24 — item ikonu. Eşleme `data/item-icons.ts` içinde; ikon yoksa
+   *  kalite renginde daireye düşer (eksik ikon HATA DEĞİL). */
+  private drawItemIcon(
+    g: DrawApi, itemRef: number, cx: number, cy: number, size: number, fallback: string,
+  ): void {
+    const key = itemIconKey(itemRef);
+    if (key !== null && this.host.assets.has(key)) {
+      g.image(key, cx, cy, { w: size, h: size, originX: 0.5, originY: 0.5, alpha: 1 });
+      return;
+    }
+    g.circle(cx, cy, Math.max(6, size * 0.24), fallback, 0.85);
   }
 
   private drawItemTooltip(g: DrawApi, itemRef: number | null, coin: number): void {

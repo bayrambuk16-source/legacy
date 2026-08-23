@@ -24,14 +24,33 @@ import {
 
 /* ───────────────────────── yerleşim sabitleri ───────────────────────── */
 
+/* ═══════════════ P2.23 — YENİ MAKET YERLEŞİMİ ═══════════════
+ *
+ *  Koordinatlar MAKET PİKSELİNDE (941×1672) yazılır ve tek çarpanla
+ *  (`UI_SCALE`) sahneye taşınır — HUD'da kurulan düzenin aynısı.
+ *
+ *  DEĞERLER ÖLÇÜLDÜ, TAHMİN EDİLMEDİ: maketin parlaklık profilinden
+ *  otokorelasyonla adım bulundu (çanta 76 px, ekipman 158×191 px) ve
+ *  ilk çizgi konumları tepe noktalarından okundu.
+ *
+ *  KOORDİNATLAR SAHNE PİKSELİNDE tutulur (620×1100): maket 941×1672
+ *  ölçüldü, sonra `620/941 ≈ 0.659` çarpanıyla indirildi. Böylece panel
+ *  kodu ölçek bilmez ve dokunma çözümlemesi doğrudan çalışır.
+ *
+ *  ÇANTA 7×14 = 98 HÜCRE. Satırlar maketin koyu hücre bantlarından
+ *  SAYILDI (göz kararı ilk seferde 11 demişti, ölçüm 14 çıkardı).
+ *  Kapasite de 98'e çekildi: boş görünen ama kullanılamayan hücre
+ *  bırakmaktansa ızgaraya eşitlemek oyuncunun lehine. */
 export const INV_LAYOUT = {
-  panel: { x: 16, y: 132, w: 588, h: 856 },
-  /** Ekipman ızgarası — 2 sütun × 6 satır. */
-  equip: { x: 32, y: 196, cell: 74, gap: 6, cols: 2 },
-  /** Çanta ızgarası — 7 sütun. */
-  bag: { x: 206, y: 196, cell: 46, gap: 5, cols: 7, rows: 9 },
+  panel: { x: 0, y: 0, w: 620, h: 1100 },
+  /** Ekipman ızgarası — 2 sütun × 6 satır, maketin sol bloğu. */
+  equip: { x: 40, y: 96, cell: 80, gap: 18, cols: 2, pitchX: 104, pitchY: 126 },
+  /** Yuva etiketi şeridi — yuvanın ÜSTÜNDE, maketten ölçüldü. */
+  equipLabelH: 20,
+  /** Çanta ızgarası — 7 sütun × 11 satır. */
+  bag: { x: 244, y: 105, cell: 45, gap: 5, cols: 7, rows: 14, pitch: 50 },
   /** Alt detay/karşılaştırma bloğu. */
-  detail: { x: 32, y: 664, w: 556, h: 246 },
+  detail: { x: 26, y: 819, w: 567, h: 165 },
 } as const;
 
 export interface UiRect { x: number; y: number; w: number; h: number }
@@ -42,8 +61,10 @@ export function equipSlotRects(): Array<UiRect & { slotId: string; label: string
   return EQUIP_SLOTS.map((s, i) => ({
     slotId: s.id,
     label: s.label,
-    x: e.x + (i % e.cols) * (e.cell + e.gap),
-    y: e.y + Math.floor(i / e.cols) * (e.cell + e.gap),
+    /* Adım maketten ölçüldü; `cell + gap` yerine ADIM kullanılır çünkü
+       maketin yuvaları arasında etiket şeridi de var. */
+    x: e.x + (i % e.cols) * e.pitchX,
+    y: e.y + Math.floor(i / e.cols) * e.pitchY,
     w: e.cell,
     h: e.cell,
   }));
@@ -55,8 +76,8 @@ export function bagCellRects(): UiRect[] {
   const out: UiRect[] = [];
   for (let i = 0; i < b.cols * b.rows; i++) {
     out.push({
-      x: b.x + (i % b.cols) * (b.cell + b.gap),
-      y: b.y + Math.floor(i / b.cols) * (b.cell + b.gap),
+      x: b.x + (i % b.cols) * b.pitch,
+      y: b.y + Math.floor(i / b.cols) * b.pitch,
       w: b.cell,
       h: b.cell,
     });

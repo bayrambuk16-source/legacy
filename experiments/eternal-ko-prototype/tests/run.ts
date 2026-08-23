@@ -4,7 +4,8 @@
 import { mulberry32 } from '../../../src/engine/rng.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
 import { PlayerState } from '../../../src/game/systems/PlayerState.js';
-import { InventoryState } from '../../../src/game/systems/InventoryState.js';
+import { INVENTORY_CAPACITY, InventoryState } from '../../../src/game/systems/InventoryState.js';
+import { ITEM_ICONS, ITEM_ICON_PATHS, itemIconKey } from '../data/item-icons.js';
 import { resolveJoystick, WorldMovementSystem } from '../world/WorldMovementSystem.js';
 import { WorldCameraController, smoothFactor } from '../world/WorldCameraController.js';
 import { WorldTargetSystem } from '../world/WorldTargetSystem.js';
@@ -57,6 +58,7 @@ import {
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
 import { NON_GEAR_COLOR, nonGearInfo, nonGearRole } from '../ui/non-gear-info.js';
+import { QUESTS, promotionQuests, questById } from '../data/quests.js';
 import {
   CAMERA_MODES, CAMERA_MODE_LABEL, CAMERA_THIRD, approachYaw, baseTuning, modeYaw, nextMode,
 } from '../ui/camera-mode.js';
@@ -64,7 +66,8 @@ import { MIN_EXP_MULTIPLIER, expLevelGapMultiplier, killExp } from '../data/exp-
 import { PROTO_SAVE_VERSION, ProtoSaveSystem, type ProtoSaveData } from '../data/proto-save.js';
 import {
   KEEP_MAX_OPTIONS, PENDING_BOX, PENDING_PAGE_SIZE, SELL_PANEL, TOGGLE_IDS,
-  bulkButtons, classButtons, keepMaxButtons, pendingRows, sellHitTest, toggleRects,
+  bulkButtons, classButtons, deathOkButton, keepMaxButtons, pendingRows, sellHitTest,
+  toggleRects, DEATH_BOX,
 } from '../ui/sell-panel.js';
 import {
   HP_POTION_REF, MP_POTION_REF, POTION_DROP_CHANCE, TROPHY_DROP_CHANCE, TROPHY_ITEM_REF,
@@ -216,6 +219,7 @@ import { ProjectileFxSystem } from '../world/Projectiles.js';
 import { registerPrototypeSkills } from '../state.js';
 import {
   ARCHER, ARCHER_SKILL_ORDER, ACTIVE_BAR_SLOTS, DEFAULT_ACTIVE_BAR, DEFAULT_GENIE_SETS,
+  TEST_GENIE_SETS,
   ARROW_SHOWER_REF, MULTI_SHOT_REF, sourceCooldownSec,
 } from '../data/archer-skills.js';
 import { ARCHER_ACTION_TIME, ArcherCombatTimingProfile } from '../data/archer-timing.js';
@@ -291,6 +295,12 @@ function protoState(seed?: number, slots?: readonly MobSpawnSlot[]): PrototypeSt
   /* Seviye HP/MP TAVANINI değiştirir; kurucu bunları seviye 1'e göre
      doldurmuştu. Tavanı yeniden doldur, yoksa testler yarım MP ile başlar. */
   S.player.restoreVitals({ hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY });
+  /* P2.22 — Genie setleri artık BOŞ başlıyor (kullanıcı kararı: oyuncu
+     kendi kombinasyonunu kursun). Farm senaryoları dolu set varsayıyor,
+     bu yüzden test dünyası setleri AÇIKÇA kurar — tıpkı dünyayı ve
+     seviyeyi açıkça kurduğu gibi. */
+  const sets = TEST_GENIE_SETS();
+  for (let i = 0; i < sets.length; i++) S.genie.settings.sets[i] = [...sets[i]!];
   return S;
 }
 
@@ -1236,8 +1246,10 @@ test('set değişince ilgili setin cursor\'u KORUNUR', () => {
   eq(calls.join(','), '11,44,22', 'set 1 kaldığı yerden devam etmeli:');
 });
 
-test('Set 1 varsayılan rotasyonu: Ok Yağmuru → Çoklu Atış → Alev Oku → Çoklu Atış → wrap', () => {
-  const sets = DEFAULT_GENIE_SETS();
+test('Set 1 rotasyonu: yalnız 5\'li + 3\'lü, araya Standart Atış girmez', () => {
+  /* P2.22 — canlı setler artık BOŞ başlıyor; rotasyon davranışı test
+     setiyle sınanır (`TEST_GENIE_SETS`). */
+  const sets = TEST_GENIE_SETS();
   const { genie, calls } = fakeGenie(sets, ['sequence', 'priority', 'priority']);
   const p = fakePlayer(); const mob = closeMob();
   genie.start(p);
@@ -3251,8 +3263,17 @@ test('zehir skillinde anlık elemental 0, DoT beklenen toplam raporlanıyor', ()
 
 console.log('\n[P1.3] Genie / regresyon:');
 
-test('varsayılan Genie setleri KORUNUYOR', () => {
-  const sets = DEFAULT_GENIE_SETS();
+test('P2.22 — canlı Genie setleri BOŞ başlar (kullanıcı kendi kurar)', () => {
+  const live = DEFAULT_GENIE_SETS();
+  eq(live.length, 3, 'set sayısı:');
+  for (let i = 0; i < live.length; i++) eq(live[i]!.length, 0, `set ${i + 1} boş olmalı:`);
+  /* Boş set bir HATA DEĞİL: Genie gizli temel saldırıya düşmez, bekler. */
+  const S = new PrototypeState(3400);
+  for (const set of S.genie.settings.sets) eq(set.length, 0, 'canlı set boş:');
+});
+
+test('test kurulumundaki Genie setleri KORUNUYOR', () => {
+  const sets = TEST_GENIE_SETS();
   eq(sets[0].join(','), `${ARCHER.BESLI_SALVO},${ARCHER.UCLU_SALVO}`, 'Set 1:');
   eq(sets[1].join(','), `${ARCHER.DELICI_OK},${ARCHER.IZCI_OKU},${ARCHER.STANDART_ATIS}`, 'Set 2:');
   eq(sets[2].join(','),
@@ -9645,6 +9666,12 @@ test('§56 her HUD görseli MANİFESTTE kayıtlı', () => {
       ok(path.startsWith('assets/nature/'), `${k} yanlış klasörde: ${path}`);
       continue;
     }
+    /* P2.24 — item ikonları `assets/items/` altında durur. HUD parçası
+       değiller; ayrı klasör kalabalığı önlüyor (39 dosya). */
+    if (k.startsWith('item_')) {
+      ok(path.startsWith('assets/items/'), `${k} yanlış klasörde: ${path}`);
+      continue;
+    }
     ok(path.startsWith('assets/ui/'), `${k} yanlış klasörde: ${path}`);
   }
 });
@@ -10802,19 +10829,36 @@ console.log('P2.19 — kamera modları:');
 test('§83 iki mod: kuş bakışı SABİT, üçüncü şahıs KARAKTERİ İZLER', () => {
   eq(CAMERA_MODES.length, 2, 'mod sayısı:');
   /* Kuş bakışı: bakış açısı ne olursa olsun yaw DEĞİŞMEZ. */
-  const a = modeYaw('overhead', 0);
-  const b = modeYaw('overhead', Math.PI);
+  const free = (facing: number): Parameters<typeof modeYaw>[1] =>
+    ({ targetAngle: null, steering: false, facingAngle: facing, currentYaw: 123 });
+  const a = modeYaw('overhead', free(0));
+  const b = modeYaw('overhead', free(Math.PI));
   eq(a, b, 'kuş bakışı yaw sabit olmalı:');
   eq(a, CAMERA_V1.yawDeg, 'kuş bakışı varsayılan yaw:');
   /* Üçüncü şahıs: karakter dönünce kamera da döner. */
-  ok(modeYaw('third', 0) !== modeYaw('third', Math.PI), 'üçüncü şahıs yaw dönmeli');
-  eq(modeYaw('third', 0), 0, '0 radyan → 0 derece:');
-  eq(Math.round(modeYaw('third', Math.PI)), 180, 'π radyan → 180 derece:');
-  /* Yaw her zaman [0,360) aralığında olmalı. */
+  ok(modeYaw('third', free(0)) !== modeYaw('third', free(Math.PI)), 'üçüncü şahıs dönmeli');
+  eq(modeYaw('third', free(0)), 0, '0 radyan → 0 derece:');
+  eq(Math.round(modeYaw('third', free(Math.PI))), 180, 'π radyan → 180 derece:');
   for (const rad of [-Math.PI, -0.1, 0, 3, 7, 12]) {
-    const y = modeYaw('third', rad);
+    const y = modeYaw('third', free(rad));
     ok(y >= 0 && y < 360, `yaw aralık dışı: ${y}`);
   }
+
+  /* ═══ GERİ BESLEME DÖNGÜSÜ KIRILDI MI ═══
+     Oyun testi: üçüncü şahısta karakter saldırmıyordu; joystick yönü
+     kameradan, kamera bakıştan, bakış hareketten geliyordu. */
+  /* 1) HEDEF VARSA yaw hedefe bakar — joystick etkilemez. */
+  eq(modeYaw('third', {
+    targetAngle: 0, steering: true, facingAngle: Math.PI, currentYaw: 200,
+  }), 0, 'hedef varken yaw hedefe bakmalı:');
+  /* 2) MANUEL SÜRÜŞTE yaw DONAR. */
+  eq(modeYaw('third', {
+    targetAngle: null, steering: true, facingAngle: Math.PI, currentYaw: 200,
+  }), 200, 'sürerken yaw donmalı:');
+  /* 3) Hedefsiz ve sürüşsüzken bakışı izler. */
+  eq(Math.round(modeYaw('third', {
+    targetAngle: null, steering: false, facingAngle: Math.PI / 2, currentYaw: 200,
+  })), 90, 'boştayken bakışı izlemeli:');
 });
 
 test('§83 üçüncü şahıs ayarı: DAHA YAKIN, DAHA ALÇAK, DAHA GENİŞ', () => {
@@ -10976,6 +11020,314 @@ test('§86 açıklama katmanı SAF', () => {
     .replace(/\/\*[\s\S]*?\*\//g, '');
   ok(!/from\s+'three/.test(src), 'three import etmemeli');
   ok(!/Math\.random/.test(src), 'Math.random kullanmamalı');
+});
+
+/* ================= P2.21 — GÖREVLER · SKILL PUANI · DEX ================= */
+console.log('P2.21 — görevler, skill puanı, ekipman DEX:');
+
+test('§87 görev zinciri TUTARLI: sıra, seviye, mob kaynakta', () => {
+  ok(QUESTS.length >= 6, `görev sayısı az: ${QUESTS.length}`);
+  eq(new Set(QUESTS.map((q) => q.id)).size, QUESTS.length, 'id benzersiz:');
+  let prevLevel = 0;
+  for (const q of QUESTS) {
+    ok(q.minLevel >= prevLevel, `${q.id} seviye geriye gidiyor`);
+    prevLevel = q.minLevel;
+    ok(q.objectives.length > 0, `${q.id} hedefsiz`);
+    for (const o of q.objectives) {
+      ok(Content.monster(o.monsterRef) !== undefined,
+        `${q.id}: mob kaynakta yok (${o.monsterRef})`);
+      ok(o.count > 0, `${q.id}: hedef adedi geçersiz`);
+    }
+    /* Önkoşul VAR OLAN ve ÖNCEKİ bir görev olmalı — döngü olamaz. */
+    if (q.requires) {
+      const dep = questById(q.requires);
+      ok(dep !== undefined, `${q.id}: önkoşul yok (${q.requires})`);
+      ok(QUESTS.indexOf(dep!) < QUESTS.indexOf(q), `${q.id}: önkoşul sonra geliyor`);
+    }
+    ok(q.reward.exp > 0 && q.reward.coins > 0, `${q.id} ödülsüz`);
+  }
+  /* Sınıf yükselten görev TEK olmalı — iki tane olsaydı aşama sessizce
+     iki kez atlardı. */
+  eq(promotionQuests().length, 1, 'sınıf görevi sayısı:');
+});
+
+test('§87 görev ilerler ve OTOMATİK tamamlanır', () => {
+  const S = new PrototypeState(3300);
+  const q = S.quests.active();
+  ok(q !== null, 'Lv1\'de açık görev olmalı');
+  const target = q!.objectives[0]!;
+  eq(S.quests.ratio(q!), 0, 'başlangıç ilerlemesi:');
+  /* Hedef DIŞI mob sayacı ilerletmez. */
+  const other = QUESTS.find((x) => x.id !== q!.id)!.objectives[0]!.monsterRef;
+  if (other !== target.monsterRef) {
+    S.quests.onKill(other);
+    eq(S.quests.ratio(q!), 0, 'alakasız mob ilerletmemeli:');
+  }
+  /* Hedefi doldur — son kill'de tamamlanmalı. */
+  const coins = S.player.coins;
+  let done: ReturnType<typeof S.quests.onKill> = [];
+  for (let i = 0; i < target.count; i++) done = S.quests.onKill(target.monsterRef);
+  if (q!.objectives.length === 1) {
+    eq(done.length, 1, 'görev tamamlanmalı:');
+    ok(S.quests.isCompleted(q!.id), 'tamamlandı işaretlenmeli');
+    eq(S.player.coins, coins + q!.reward.coins, 'altın ödülü:');
+    /* Sıradaki görev açılmalı (seviye yeterse). */
+    ok(S.quests.active()?.id !== q!.id, 'aynı görev tekrar aktif olmamalı');
+  }
+});
+
+test('§87 SINIF GEÇİŞİ görev ödülüdür, seviye eşiği YEDEK', () => {
+  const S = new PrototypeState(3301);
+  S.player.level = 30;                       // seviye eşiği zaten geçildi
+  eq(S.stats.progression.stage.stage, 'hunter', 'seviye eşiği yedek olarak çalışmalı:');
+  /* Görevle kazanılmışsa o kazanır. */
+  const T = new PrototypeState(3302);
+  eq(T.quests.stageOverride, null, 'başlangıçta görev kazanımı yok:');
+  eq(T.stats.progression.stage.stage, 'beginner', 'Lv1 aşaması:');
+  const promo = promotionQuests()[0]!;
+  T.player.level = promo.minLevel;
+  /* Zinciri sırayla tamamla. */
+  for (const q of QUESTS) {
+    if (q.id === promo.id) break;
+    for (const o of q.objectives) {
+      for (let i = 0; i < o.count; i++) T.quests.onKill(o.monsterRef);
+    }
+  }
+  let promoted = false;
+  for (const o of promo.objectives) {
+    for (let i = 0; i < o.count; i++) {
+      for (const c of T.quests.onKill(o.monsterRef)) if (c.promoted) promoted = true;
+    }
+  }
+  ok(promoted, 'sınıf görevi yükseltmeliydi');
+  eq(T.quests.stageOverride, 'hunter', 'kazanılmış aşama:');
+  eq(T.stats.progression.stage.stage, 'hunter', 'aşama uygulanmalı:');
+});
+
+test('§87 görev ilerlemesi KAYDA yazılır ve geri gelir', () => {
+  const S = new PrototypeState(3303);
+  const q = S.quests.active()!;
+  S.quests.onKill(q.objectives[0]!.monsterRef);
+  const snap = S.snapshot();
+  const T = new PrototypeState(3304);
+  T.restore(snap);
+  const p = T.quests.progress(q)!;
+  eq(p.counts[q.objectives[0]!.monsterRef], 1, 'sayaç geri gelmeli:');
+  /* Bozuk kayıt oyunu düşürmez. */
+  T.quests.restore({ completed: ['yok_boyle_bir_gorev'], counts: {}, stage: null });
+  ok(T.quests.active() !== null, 'bozuk kayıt sonrası görev akışı sürmeli');
+});
+
+test('§88 SKILL PUANI: bütçe seviyeden türer, aşım REDDEDİLİR', () => {
+  let level = 9;
+  const p = new ArcherProgression(() => level);
+  eq(p.skillBudget, 0, 'Lv9 skill bütçesi:');
+  eq(p.skillUnspent, 0, 'Lv9 harcanmamış:');
+  const ref = GENIE_SKILL_POOL[0]!;
+  ok(!p.unlockSkill(ref).ok, 'puansız açılmamalı');
+  /* Lv10 → 2 puan → tam bir skill. */
+  level = 10;
+  eq(p.skillBudget, 2, 'Lv10 bütçe:');
+  ok(p.unlockSkill(ref).ok, 'Lv10\'da bir skill açılmalı');
+  ok(p.isUnlocked(ref), 'açık görünmeli');
+  eq(p.skillUnspent, 0, 'puan tükenmeli:');
+  ok(!p.unlockSkill(GENIE_SKILL_POOL[1]!).ok, 'ikinci skill için puan yok');
+  /* Aynı skill iki kez açılamaz. */
+  ok(!p.unlockSkill(ref).ok, 'zaten açık skill tekrar açılmamalı');
+});
+
+test('§88 BAŞLANGIÇ BARI puansız açık — Lv1 oyuncu skillsiz kalmaz', () => {
+  const S = new PrototypeState(3305);
+  eq(S.player.level, 1, 'başlangıç seviyesi:');
+  eq(S.stats.progression.skillBudget, 0, 'Lv1 skill puanı:');
+  for (const ref of DEFAULT_ACTIVE_BAR) {
+    ok(S.stats.progression.isUnlocked(ref), `başlangıç skilli kilitli: ${ref}`);
+  }
+  /* Bedava verilenler BÜTÇE HARCAMAMALI. */
+  eq(S.stats.progression.skillUnspent, 0, 'Lv1 harcanmamış puan:');
+  S.player.level = 12;
+  eq(S.stats.progression.skillUnspent, S.stats.progression.skillBudget,
+    'bedava skiller bütçe yememeli:');
+});
+
+test('§89 OKÇU ZIRHI ARTIK DEX VERİYOR — döngü kapandı', () => {
+  /* Kaynakta okçu zırhında stat bonusu YOKTU; zırh toplamak saldırıyı
+     hiç artırmıyordu. DEX bonusu Project Legacy tuning'idir. */
+  const armors = allDefinitions().filter((d) => d.category === 'armor');
+  const withDex = armors.filter((d) => (d.stats.dex ?? 0) > 0);
+  ok(withDex.length >= 10, `DEX veren zırh az: ${withDex.length}/${armors.length}`);
+  /* Üst kademe alt kademeden DAHA ÇOK DEX vermeli. */
+  const low = allDefinitions().find((d) => d.definitionRef === 241001000)!;
+  const mid = allDefinitions().find((d) => d.definitionRef === 242001000)!;
+  ok((mid.stats.dex ?? 0) > (low.stats.dex ?? 0), 'üst kademe daha çok DEX vermeli');
+
+  /* CANLI: zırh kuşanınca saldırı GERÇEKTEN artmalı.
+     ÖNEMLİ: KO formülünde DEX katkısı SİLAH HASARIYLA ÇARPILIR
+     (`0.005 × bow × (DEX+40) + coef × bow × Lv × DEX`). Başlangıç yayıyla
+     (8 hasar) 7 DEX'lik fark trunc sınırında kayboluyor. Bu bir kusur
+     değil, formülün kendisi: DEX ancak iyi bir yayla anlam kazanır.
+     Test bu yüzden ÖNCE iyi yayı kuşanır. */
+  const S = new PrototypeState(3306);
+  S.player.level = 20;
+  const bow = allDefinitions().filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
+  const bowAdd = S.inventory.add(bow.definitionRef, { upgradeLevel: 0 });
+  if (bowAdd.ok) S.equipService.equip(bowAdd.instance.instanceId);
+  const before = Math.round(S.stats.finalStats().attack);
+  /* TEK parça küçük bir fark yaratır (%5-10); anlamlı ölçü TAM SETtir. */
+  const single = S.inventory.add(mid.definitionRef, { upgradeLevel: 0 });
+  if (single.ok) S.equipService.equip(single.instance.instanceId);
+  ok(Math.round(S.stats.finalStats().attack) > before, 'tek parça bile artırmalı');
+  /* Tam Half Plate seti kuşan. */
+  for (const d of allDefinitions()) {
+    if (d.category !== 'armor' || d.setId !== 'halfplate') continue;
+    const a = S.inventory.add(d.definitionRef, { upgradeLevel: 0 });
+    if (a.ok) S.equipService.equip(a.instance.instanceId);
+  }
+  const full = Math.round(S.stats.finalStats().attack);
+  ok(full >= before * 1.2,
+    `tam set etkisi zayıf: ${before} → ${full} (%${Math.round((full / before - 1) * 100)})`);
+});
+
+/* ================= P2.22 — ÖLÜM · KAMERA · GENIE SETLERİ ================= */
+console.log('P2.22 — ölüm ekranı ve doğuşa dönüş:');
+
+test('§90 ÖLÜM SONRASI doğuş noktasına ışınlanılır', () => {
+  const S = new PrototypeState(3401);
+  /* Uzak bir noktada öl. */
+  S.world.worldX = MORADON_PLAY_SPAWN.x + 3000;
+  S.world.worldY = MORADON_PLAY_SPAWN.y - 2000;
+  S.player.takeDamage(999999);
+  ok(!S.player.alive, 'ölmüş olmalı');
+  S.reviveAtSpawn();
+  ok(S.player.alive, 'dirilmiş olmalı');
+  eq(S.world.worldX, MORADON_PLAY_SPAWN.x, 'doğuş X:');
+  eq(S.world.worldY, MORADON_PLAY_SPAWN.y, 'doğuş Y:');
+  eq(Math.round(S.player.hp), Math.round(S.player.maxHp), 'can dolmalı:');
+  eq(Math.round(S.player.mp), Math.round(S.player.maxMp), 'mana dolmalı:');
+  /* Genie durmalı: ölüm noktasındaki farm merkezine yürümeye çalışmasın. */
+  ok(!S.genie.running, 'Genie durdurulmalı');
+  eq(S.targets.selectedUid, null, 'hedef temizlenmeli:');
+  /* Hareket kalıntısı kalmamalı. */
+  eq(S.world.moving, false, 'hareket durmalı:');
+});
+
+test('§90 ölüm kutusu ekran İÇİNDE, düğme kutunun içinde', () => {
+  ok(DEATH_BOX.x >= 0 && DEATH_BOX.x + DEATH_BOX.w <= PROTO.screenW, 'kutu yatay taşıyor');
+  ok(DEATH_BOX.y >= 0 && DEATH_BOX.y + DEATH_BOX.h <= PROTO.screenH, 'kutu dikey taşıyor');
+  const b = deathOkButton();
+  ok(b.x >= DEATH_BOX.x && b.x + b.w <= DEATH_BOX.x + DEATH_BOX.w, 'düğme yatay taşıyor');
+  ok(b.y >= DEATH_BOX.y && b.y + b.h <= DEATH_BOX.y + DEATH_BOX.h, 'düğme dikey taşıyor');
+  /* Dokunma hedefi mobilde parmak boyunda olmalı. */
+  ok(b.w >= 120 && b.h >= 44, `düğme küçük: ${b.w}×${b.h}`);
+});
+
+/* ================= P2.23 — YENİ ENVANTER MAKETİ ================= */
+console.log('P2.23 — envanter maketi yerleşimi:');
+
+test('§91 çanta ızgarası KAPASİTEYLE eşleşir', () => {
+  /* Maket 7×11 üretti; kapasite de 77 olmalı. Uyuşmazlık olsaydı ya
+     görünmez yuva ya da kullanılamayan hücre kalırdı. */
+  const b = INV_LAYOUT.bag;
+  eq(b.cols * b.rows, INVENTORY_CAPACITY, 'ızgara = kapasite:');
+  eq(bagCellRects().length, INVENTORY_CAPACITY, 'çizilen hücre sayısı:');
+});
+
+test('§91 bütün yuvalar panel İÇİNDE ve ÇAKIŞMIYOR', () => {
+  const P = INV_LAYOUT.panel;
+  const within = (r: UiRect, n: string): void => {
+    ok(r.x >= P.x && r.x + r.w <= P.x + P.w, `${n} yatay taşıyor`);
+    ok(r.y >= P.y && r.y + r.h <= P.y + P.h, `${n} dikey taşıyor`);
+  };
+  const eq12 = equipSlotRects();
+  eq(eq12.length, 12, 'ekipman yuvası sayısı:');
+  for (const r of eq12) within(r, `ekipman ${r.slotId}`);
+  for (const [i, r] of bagCellRects().entries()) within(r, `çanta ${i}`);
+  within(INV_LAYOUT.detail, 'detay bloğu');
+  for (const b of invButtons()) within(b, b.id);
+
+  /* Ekipman ve çanta blokları birbirine girmemeli. */
+  const lastEquip = eq12[eq12.length - 1]!;
+  const firstBag = bagCellRects()[0]!;
+  ok(firstBag.x >= INV_LAYOUT.equip.x + INV_LAYOUT.equip.pitchX * 2 - 4,
+    'çanta ekipman bloğunun üstüne biniyor');
+  /* Detay bloğu ızgaraların ALTINDA olmalı. */
+  ok(INV_LAYOUT.detail.y >= lastEquip.y + lastEquip.h, 'detay ekipmanla çakışıyor');
+  const lastBag = bagCellRects()[INVENTORY_CAPACITY - 1]!;
+  ok(INV_LAYOUT.detail.y >= lastBag.y + lastBag.h, 'detay çantayla çakışıyor');
+});
+
+test('§91 hücreler ADIM aralıklı — maketle hizalı kalır', () => {
+  /* Maketin ızgarası sabit adımlı; kod `cell + gap` yerine ADIM
+     kullanmalı, yoksa alt satırlarda kayma birikir. */
+  const cells = bagCellRects();
+  const b = INV_LAYOUT.bag;
+  eq(cells[1]!.x - cells[0]!.x, b.pitch, 'yatay adım:');
+  eq(cells[b.cols]!.y - cells[0]!.y, b.pitch, 'dikey adım:');
+  /* Son satır ilk satırla AYNI hizada başlamalı (birikimli kayma yok). */
+  eq(cells[(b.rows - 1) * b.cols]!.x, cells[0]!.x, 'son satır hizası:');
+});
+
+test('§91 dokunma çözümlemesi her hücreyi bulur', () => {
+  const mid = (r: UiRect): [number, number] => [r.x + r.w / 2, r.y + r.h / 2];
+  for (const [i, r] of bagCellRects().entries()) {
+    const h = invHitTest(...mid(r));
+    ok(h !== null, `çanta hücresi ${i} çözülemedi`);
+  }
+  for (const r of equipSlotRects()) {
+    const h = invHitTest(...mid(r));
+    ok(h !== null, `ekipman yuvası ${r.slotId} çözülemedi`);
+  }
+});
+
+/* ================= P2.24 — ITEM İKONLARI ================= */
+console.log('P2.24 — item ikonları:');
+
+test('§92 KATALOGDAKİ HER EŞYANIN ikonu var', () => {
+  /* İkonsuz eşya oyunda renkli daire olarak görünür — kabul edilebilir
+     bir yedek ama katalogdaki 35 eşyanın hepsi kapsanmalı. */
+  const missing: string[] = [];
+  for (const d of allDefinitions()) {
+    if (itemIconKey(d.definitionRef) === null) missing.push(d.displayName);
+  }
+  eq(missing.length, 0, `ikonsuz eşya: ${missing.join(', ')}`);
+});
+
+test('§92 EKİPMAN DIŞI eşyaların da ikonu var', () => {
+  for (const ref of [SCROLL_ITEM_REF, TROPHY_ITEM_REF, HP_POTION_REF, MP_POTION_REF]) {
+    ok(itemIconKey(ref) !== null,
+      `ikonsuz: ${ref} (${Content.item(ref)?.displayName ?? '?'})`);
+  }
+});
+
+test('§92 her ikon anahtarı MANİFESTTE ve BENZERSİZ', () => {
+  const keys = Object.values(ITEM_ICONS);
+  eq(new Set(keys).size, keys.length, 'aynı ikon iki eşyaya verilmiş:');
+  for (const k of keys) {
+    ok(ITEM_ICON_PATHS[k] !== undefined, `manifest yolu yok: ${k}`);
+    ok(UI_ASSETS[k] !== undefined, `yükleme listesinde yok: ${k}`);
+  }
+  /* Referanslar geçerli olmalı — yanlış ref sessizce ikonsuz bırakır. */
+  for (const ref of Object.keys(ITEM_ICONS).map(Number)) {
+    ok(Content.item(ref) !== undefined || definitionOf(ref) !== null,
+      `bilinmeyen referansa ikon verilmiş: ${ref}`);
+  }
+});
+
+test('§92 aynı YUVADAKİ eşyalar FARKLI ikon taşır', () => {
+  /* Bütün yaylar aynı ikonu kullansaydı çantada ayırt edilemezlerdi. */
+  const bySlot = new Map<string, Set<string>>();
+  for (const d of allDefinitions()) {
+    const key = itemIconKey(d.definitionRef);
+    if (key === null) continue;
+    const set = bySlot.get(d.equipSlot) ?? new Set<string>();
+    set.add(key);
+    bySlot.set(d.equipSlot, set);
+  }
+  for (const [slot, set] of bySlot) {
+    const count = allDefinitions().filter((d) => d.equipSlot === slot).length;
+    eq(set.size, count, `${slot} yuvasında ikon tekrarı:`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

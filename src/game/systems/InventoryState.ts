@@ -15,7 +15,11 @@ export interface ItemInstance {
   equippedSlot: string | null;
 }
 
-export const INVENTORY_CAPACITY = 60;
+/** P2.23 — 60'tan 98'e. Yeni envanter maketi 7×14 ızgara üretti
+ *  (satırlar maketin koyu hücre bantlarından SAYILDI, göz kararı değil);
+ *  kapasiteyi ızgaraya eşitlemek, boş görünen ama kullanılamayan hücre
+ *  bırakmaktan iyidir. */
+export const INVENTORY_CAPACITY = 98;
 
 export type AddResult = { ok: true; instance: ItemInstance } | { ok: false; reason: 'full' };
 

@@ -66,17 +66,41 @@ export function baseTuning(mode: CameraMode): CameraTuning {
  *  KUŞ BAKIŞI: SABİT. Kamera dönmez; joystick ekran ekseniyle hizalı
  *  kalır (`yawDeg 270` — bkz. `CameraRig` başlığı).
  *
- *  ÜÇÜNCÜ ŞAHIS: karakterin ARKASI. Karakter `facingAngle` yönüne
- *  bakıyorsa kamera ters yönde, yani `facing + 180°` konumundadır.
+ *  ÜÇÜNCÜ ŞAHIS: karakterin ARKASI.
+ *
+ *  ══════════════ GERİ BESLEME TUZAĞI ══════════════
+ *  Oyun testi bulgusu: üçüncü şahısta karakter saldırmıyordu. Sebep bir
+ *  DÖNGÜ idi —
+ *      joystick → kameraya göre yön → hareket → bakış açısı → kamera yaw
+ *      → joystick yönü DEĞİŞTİ → ...
+ *  "İleri" tuşunu basılı tutmak karakteri sürekli kavis çizdiriyordu;
+ *  moba varılamıyor, dolayısıyla saldırı da olmuyordu.
+ *
+ *  Çözüm: yaw kaynağı DURUMA göre seçilir ve hiçbirinde döngü kurulmaz.
+ *      · HEDEF VARSA  → yaw hedefe bakar. Hedef joystickle dönmediği
+ *        için kararlıdır ve kamera doğal olarak düşmanı çerçeveler.
+ *      · MANUEL SÜRÜŞ → yaw DONAR. Oyuncu yönlendirdiği sürece kamera
+ *        dönmez; döngü kırılır.
+ *      · İKİSİ DE YOKSA → yaw bakış açısını izler (Genie yürürken).
  *
  *  @param facingAngle oyuncunun bakış açısı (radyan, +X = 0)
- *  @returns derece cinsinden yaw */
-export function modeYaw(mode: CameraMode, facingAngle: number): number {
+ *  @param currentYaw  kameranın şu anki yaw'ı (donma durumunda korunur)
+ *  @returns derece cinsinden HEDEF yaw */
+export interface YawInput {
+  /** Seçili hedefe bakış açısı (radyan). Hedef yoksa `null`. */
+  readonly targetAngle: number | null;
+  /** Oyuncu bu kare joystickle sürüyor mu? */
+  readonly steering: boolean;
+  readonly facingAngle: number;
+  readonly currentYaw: number;
+}
+
+export function modeYaw(mode: CameraMode, input: YawInput): number {
   if (mode !== 'third') return CAMERA_V1.yawDeg;
-  const deg = (facingAngle * 180) / Math.PI;
-  /* Kamera hedefin GERİSİNDE: `cameraPosition` yaw yönünün TERSİNE
-     yerleşiyor (target - cos(yaw)*d), yani yaw doğrudan bakış yönüdür. */
-  return ((deg % 360) + 360) % 360;
+  const norm = (rad: number): number => (((rad * 180) / Math.PI % 360) + 360) % 360;
+  if (input.targetAngle !== null) return norm(input.targetAngle);
+  if (input.steering) return input.currentYaw;      // DONAR — döngü kırılır
+  return norm(input.facingAngle);
 }
 
 /** Sıradaki mod (tuş her basışta döner). */

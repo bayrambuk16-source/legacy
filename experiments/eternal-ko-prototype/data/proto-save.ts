@@ -22,6 +22,7 @@
 
 import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import type { AutoGearSettings } from '../world/AutoGearSystem.js';
+import type { QuestSaveData } from '../world/QuestSystem.js';
 
 export const PROTO_SAVE_VERSION = 1;
 const KEY = 'project-legacy-proto';
@@ -37,6 +38,8 @@ export interface ProtoSaveData {
   /** 5 slotluk aktif bar (null = boş). */
   skills: { loadout: Array<number | null> };
   autoGear: AutoGearSettings;
+  /** P2.21 — görev ilerlemesi ve kazanılmış sınıf aşaması. */
+  quests?: QuestSaveData;
   /** Oyuncunun dünyadaki konumu. */
   world: { x: number; y: number };
 }

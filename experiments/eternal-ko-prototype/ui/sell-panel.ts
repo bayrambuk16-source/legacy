@@ -133,3 +133,20 @@ export function sellHitTest(x: number, y: number, pendingCount: number): SellHit
   }
   return null;
 }
+
+/* ═══════════════════════ ÖLÜM EKRANI ═══════════════════════ */
+
+/** P2.22 — ölüm bildirimi kutusu. Ekranın ortasında, küçük ve tek
+ *  düğmeli: ölüm anında oyuncuya seçenek yığmak yerine tek bir onay. */
+/** P2.23 — envanter maketi panel ölçüsünü değiştirdi (`SELL_PANEL`
+ *  artık tam ekran). Ölüm kutusu ekran ORTASINA sabitlendi; panel
+ *  ölçüsüne bağlı kalması onu ekran dışına taşıyordu. */
+export const DEATH_BOX: UiRect = { x: 70, y: 420, w: 480, h: 260 };
+
+export function deathOkButton(): UiRect & { id: string; label: string } {
+  return {
+    id: 'death_ok', label: 'TAMAM',
+    x: DEATH_BOX.x + DEATH_BOX.w / 2 - 90, y: DEATH_BOX.y + DEATH_BOX.h - 66,
+    w: 180, h: 50,
+  };
+}
