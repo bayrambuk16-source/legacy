@@ -540,11 +540,13 @@ export class ThreeWorldRenderer {
   get foliageKinds(): number { return this.foliage.size; }
 
   /** P2.11 — zemin dokusunu uygular. Doku tileable olduğu için `repeat`
-   *  ile döşenir; tek karo 320 dünya birimi (≈ oyuncunun iki adımı).
+   *  ile döşenir; tek karo 260 dünya birimi. Harita 5120 olduğu için
+   *  yaklaşık 20×20 karo çıkar — daha küçük karo dokuyu bulanık,
+   *  daha büyüğü tekrar desenini görünür yapıyor.
    *  Renk çarpanı beyaza çekilir, yoksa doku yeşil filtreden geçer. */
   private groundMat: MeshLambertMaterial | null = null;
 
-  applyGroundTexture(image: TexImageSource, worldSize = 2560, tile = 320): boolean {
+  applyGroundTexture(image: TexImageSource, worldSize = 5120, tile = 260): boolean {
     if (!this.groundMat) return false;
     const tex = new Texture(image as unknown as HTMLImageElement);
     tex.wrapS = RepeatWrapping;
@@ -552,7 +554,10 @@ export class ThreeWorldRenderer {
     tex.repeat.set(worldSize / tile, worldSize / tile);
     tex.needsUpdate = true;
     this.groundMat.map = tex;
-    this.groundMat.color.set(0x9aa88a);   // dokuyu hafif yeşile boya
+    /* P2.18 — doku ARTIK KENDİ RENGİNİ TAŞIYOR (çim/toprak). Eskiden
+       çıplak kaya dokusu vardı ve yeşile boyanıyordu; artık boyamaya
+       gerek yok, beyaz çarpan dokuyu olduğu gibi gösterir. */
+    this.groundMat.color.set(0xffffff);
     this.groundMat.needsUpdate = true;
     return true;
   }

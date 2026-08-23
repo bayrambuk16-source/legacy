@@ -19,11 +19,12 @@
 export const GROUND_TEXTURE_KEY = 'ground_texture';
 
 export const UI_ASSETS: Record<string, string> = {
-  /* P2.11 — zemin dokusu. Kaynak: Poly Haven "rocky_terrain_02" 4K diffuse.
-     Tileable olduğu ÖLÇÜLEREK doğrulandı: sol-sağ kenar farkı 6,0 ve
-     üst-alt 6,9; dokunun kendi iç komşu-sütun farkı 5,8. Kenarlar iç
-     dokudan ayırt edilemiyor → döşendiğinde dikiş görünmez.
-     512×512 WebP, 35 KB (kaynak 4K JPG 11 MB idi). */
+  /* P2.18 — zemin dokusu (GEÇİCİ, sonra değişecek).
+     Kullanıcının ürettiği çim/toprak dokusu. Tileable olduğu ÖLÇÜLEREK
+     doğrulandı: sol-sağ kenar farkı 13,9 ve üst-alt 13,1; dokunun kendi
+     iç komşu-sütun farkı 11,8. Kenarlar iç dokudan ayırt edilemiyor →
+     döşendiğinde dikiş görünmez.
+     512×512 WebP, 83 KB (kaynak 1254×1254 PNG). */
   ground_texture: 'assets/nature/ground.webp',
   ui_player_card: 'assets/ui/ui_player_card.webp',
   ui_target_card: 'assets/ui/ui_target_card.webp',
