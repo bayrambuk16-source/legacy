@@ -124,12 +124,6 @@ const SELL_FAIL: Record<string, string> = {
   noPrice: 'Satış değeri yok',
 };
 
-/** Kalite kısa adı — satış ekranında yer dar. */
-const ITEM_CLASS_LABEL: Record<string, string> = {
-  LOW: 'Sıradan', MIDDLE: 'Kaliteli', HIGH: 'Nadir',
-  RARE: 'Destansı', UNIQUE: 'Efsanevi',
-};
-
 const FORGE_FAIL: Record<string, string> = {
   notFound: 'Eşya bulunamadı',
   noDefinition: 'Katalogda yok',
