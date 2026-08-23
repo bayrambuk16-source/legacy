@@ -28,6 +28,13 @@
  *  ══════════ CRIT YOK ══════════
  *  Hiçbir tanımda kritik şansı/hasarı YOKTUR — tip düzeyinde de imkânsızdır. */
 import { Content } from '../../../src/game/data/GameContentRepository.js';
+import { archerSourceItem, registerArcherSourceItems } from './archer-source-items.js';
+
+/* A1 — EK KAYNAK KAYITLARI MODÜL YÜKLENİRKEN TANITILIR.
+   Katalog tanımları modül gövdesinde `facts()` çağırıyor; kayıt daha
+   sonra yapılırsa `Content.item()` boş döner ve item KUŞANILAMAZ
+   (envanter/ekipman katmanları da aynı depodan okuyor). */
+registerArcherSourceItems();
 import {
   ZERO_ELEMENTAL, ZERO_RESIST, ZERO_SPECIAL,
   type AccessoryDefinition, type ArmorDefinition, type ElementalDamage,
@@ -37,7 +44,10 @@ import {
 
 /** Üretilmiş içerikten kaynak gerçeklerini okur (KOPYALAMAZ — referans alır). */
 function facts(sourceRef: number): ItemSourceFacts {
-  const it = Content.item(sourceRef);
+  /* A1 — generated/items.json MVP kapsamıyla üretildi ve okçu ilerlemesi
+     için gereken yay/zırh ailelerini içermiyor. Eksik kayıtlar
+     `archer-source-items.ts` içinden gelir (kaynağı orada belgeli). */
+  const it = Content.item(sourceRef) ?? archerSourceItem(sourceRef);
   if (!it) {
     throw new Error(`P1.8 katalog: kaynak item bulunamadı (${sourceRef})`);
   }
@@ -133,6 +143,56 @@ function armor(
 }
 const A0 = { str: 0, dex: 0, int: 0, sta: 0, maxHp: 0, maxMp: 0 };
 
+/* P2.5A — BAŞLANGIÇ YAYI.
+   KÖK BUG: `PLAYER.starterWeaponRef = 160100000` oyuncuya kuşanılı olarak
+   veriliyordu ama bu referans katalogda YOKTU. `equipmentResolved()` katalog
+   dışı itemleri KATKI VERMEDEN geçtiği için yay saldırıya SIFIR ekliyordu;
+   Lv1 karakteri 2 saldırı gücüyle dolaşıp 1 hasar vuruyordu.
+   Kaynak: items.json 160100000 "Long Bow (+0)", damage 8.
+
+   SIRA ÖNEMLİ: listenin SONUNDA duruyor. `ARCHER_WEAPONS.find(itemClass)`
+   ile ilk eşleşeni arayan yerler (testler dahil) LOW sınıfında Meşe Yay'ı
+   bulmaya devam etsin diye. */
+/* A1 — OKÇU YAY KADEMELERİ (kaynak: MYKO ITEM tablosu, parity doğrulandı).
+   Sv1-20 ilerlemesi için üç aile: Bow 8 → Short Bow 15 → Rapt Bow 26.
+   Örs yükseltmesi bunları +8'e kadar ~2,6 katına çıkarır (8→21, 15→39,
+   26→68), böylece bant Sv20'ye kadar yetiyor.
+
+   İLERLEME KAPISI reqLevel DEĞİL, DROP KAYNAĞIDIR: kaynakta bütün yayların
+   reqLevel'i 1'dir ve DEX gereksinimleri (56-74) okçunun 70 taban DEX'inin
+   altında kalır. Uydurma seviye şartı yazmak yerine iyi yaylar UZAKTAKİ
+   GÜÇLÜ MOBLARDAN düşer (bkz. drop-profile.ts okçu filtresi). */
+export const ARCHER_TIER_BOWS: readonly WeaponDefinition[] = [
+  weapon(160210000, 'Kısa Avcı Yayı', 'MIDDLE', {
+    attack: 15, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+  weapon(160410000, 'Yırtıcı Yay', 'RARE', {
+    attack: 26, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+];
+
+/* A1 — OKÇU ZIRH KADEMELERİ. İki set: Rogue (Sv1-10 bandı) ve Half Plate
+   (Sv10-20 bandı). Kaynak `defense` değerleri AYNEN alındı. Kaynakta bu
+   parçalarda stat bonusu YOKTUR — DEX/HP bonusu Project Legacy tuning'i
+   olacak (SOURCE GAP, sonraki görev). */
+export const ARCHER_TIER_ARMOR: readonly ArmorDefinition[] = [
+  armor(241003000, 'Avcı Başlığı', 'LOW', 'helmet', { defense: 8, ...A0, resist: res({}) }, 'rogue'),
+  armor(241001000, 'Avcı Gömleği', 'LOW', 'chest', { defense: 14, ...A0, resist: res({}) }, 'rogue'),
+  armor(241002000, 'Avcı Dizliği', 'LOW', 'pants', { defense: 11, ...A0, resist: res({}) }, 'rogue'),
+  armor(241004000, 'Avcı Eldiveni', 'LOW', 'gloves', { defense: 5, ...A0, resist: res({}) }, 'rogue'),
+  armor(241005000, 'Avcı Çizmesi', 'LOW', 'boots', { defense: 5, ...A0, resist: res({}) }, 'rogue'),
+  armor(242003000, 'Zırhlı Avcı Miğferi', 'MIDDLE', 'helmet', { defense: 16, ...A0, resist: res({}) }, 'halfplate'),
+  armor(242001000, 'Zırhlı Avcı Göğüslüğü', 'MIDDLE', 'chest', { defense: 28, ...A0, resist: res({}) }, 'halfplate'),
+  armor(242002000, 'Zırhlı Avcı Dizliği', 'MIDDLE', 'pants', { defense: 22, ...A0, resist: res({}) }, 'halfplate'),
+  armor(242004000, 'Zırhlı Avcı Eldiveni', 'MIDDLE', 'gloves', { defense: 11, ...A0, resist: res({}) }, 'halfplate'),
+  armor(242005000, 'Zırhlı Avcı Çizmesi', 'MIDDLE', 'boots', { defense: 11, ...A0, resist: res({}) }, 'halfplate'),
+];
+
+export const ARCHER_STARTER_BOW: WeaponDefinition = weapon(
+  160100000, 'Kül Ağacı Avcı Yayı', 'LOW',
+  { attack: 8, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}) },
+);
+
 export const ARCHER_ARMOR: readonly ArmorDefinition[] = [
   /* ---- BEYAZ başlangıç seti: yalnız Defense (+ kaynaktaki STA) ---- */
   armor(241003503, 'Deri Başlık', 'LOW', 'helmet',
@@ -208,7 +268,8 @@ export const ARCHER_ACCESSORIES: readonly AccessoryDefinition[] = [
 /* ═══════════════════════════ REGISTRY ═══════════════════════════ */
 
 export const ARCHER_CATALOG: readonly ItemDefinition[] = [
-  ...ARCHER_WEAPONS, ...ARCHER_ARMOR, ...ARCHER_ACCESSORIES,
+  ...ARCHER_WEAPONS, ARCHER_STARTER_BOW, ...ARCHER_TIER_BOWS,
+  ...ARCHER_ARMOR, ...ARCHER_TIER_ARMOR, ...ARCHER_ACCESSORIES,
 ];
 
 const BY_REF = new Map<number, ItemDefinition>(

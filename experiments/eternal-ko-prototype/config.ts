@@ -103,6 +103,11 @@ export const PROTO: ProtoConstants = {
   ],
   /** Sv55 oyuncuya karşı Sv1-15 mobları anlamlı kalsın diye PROTOTİP denge katsayıları.
    *  Kaynak DB değerleri DEĞİŞMEZ — BalanceProfile runtime çarpanıdır. */
-  monsterHpMultiplier: 8,
+  /* P2.5A — MOB CANI ARTIK KAYNAK DEĞERİDİR.
+     Çarpan 8 idi: KO hasar formülü gelmeden önce oyuncu hasarı çok düşük
+     olduğu için mob canı yapay olarak şişirilmişti. KO zinciri kendi
+     dengesini taşıdığı için çarpan 1'e çekildi — Sv1 solucan (7 can) iki
+     atışta ölür, kaynak temposu budur. Mob HASARI çarpanına DOKUNULMADI. */
+  monsterHpMultiplier: 1,
   monsterDamageMultiplier: 8,
 };

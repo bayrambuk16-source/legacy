@@ -46,7 +46,10 @@ export function statRows(final: FinalStats, base: StatBlock, shotSec: number): S
     return d === 0 ? null : `${d > 0 ? '+' : ''}${d}`;
   };
   return [
-    { label: 'Saldırı', value: String(Math.round(final.attack)), fromGear: gear(final.attack, base.attack) },
+    /* P2.5A — "Saldırı" artık KO Archer AP'sidir (`ArcherBuildResolver`
+       finalStats'ı okçu değerleriyle ezer). Eski generic `level × 2`
+       sayısı ana mimaride duruyor ama oyuncuya GÖSTERİLMEZ. */
+    { label: 'Saldırı (AP)', value: String(Math.round(final.attack)), fromGear: gear(final.attack, base.attack) },
     { label: 'Savunma', value: String(Math.round(final.defense)), fromGear: gear(final.defense, base.defense) },
     /* DPS UYDURULMAZ: temel atışın süresi zamanlama profilinden (`ArcherCombatTimingProfile`)
        gelir, hasar `attack`tan. Kritik sistemi YOKTUR (§12), formüle de girmez. */
@@ -61,9 +64,33 @@ export function statRows(final: FinalStats, base: StatBlock, shotSec: number): S
   ];
 }
 
+/* ═══════════════════ STAT DAĞITIMI (P2.5B) ═══════════════════ */
+
+/** Dağıtım satırı — DEX ve HP için birer tane. */
+export const ALLOC_ROWS = ['dex', 'hp'] as const;
+export type AllocStatId = typeof ALLOC_ROWS[number];
+
+/** Artı düğmelerinin dikdörtgenleri. `+1` ve `+5` iki ayrı düğmedir:
+ *  67 puanı tek tek harcamak mobilde işkence olur. */
+export function allocButtons(): Array<UiRect & { id: string; stat: AllocStatId; amount: number }> {
+  const out: Array<UiRect & { id: string; stat: AllocStatId; amount: number }> = [];
+  ALLOC_ROWS.forEach((stat, i) => {
+    const y = PANEL_FRAME.y + 62 + i * 40;
+    out.push({ id: `alloc_${stat}_1`, stat, amount: 1, x: PANEL_FRAME.x + 214, y, w: 44, h: 34 });
+    out.push({ id: `alloc_${stat}_5`, stat, amount: 5, x: PANEL_FRAME.x + 264, y, w: 44, h: 34 });
+  });
+  return out;
+}
+
+/** Dağıtım bloğunun tamamı (başlık + iki satır). */
+export const ALLOC_BOX: UiRect = {
+  x: PANEL_FRAME.x + 20, y: PANEL_FRAME.y + 44,
+  w: PANEL_FRAME.w - 40, h: 84,
+};
+
 /** Stat satırlarının çizileceği blok. */
 export const CHAR_STATS_BOX: UiRect = {
-  x: PANEL_FRAME.x + 20, y: PANEL_FRAME.y + 108,
+  x: PANEL_FRAME.x + 20, y: PANEL_FRAME.y + 136,
   w: PANEL_FRAME.w - 40, h: 330,
 };
 
@@ -82,7 +109,16 @@ export type CharHit = { readonly kind: 'button'; readonly id: string } | null;
 
 export function charHitTest(x: number, y: number): CharHit {
   const c = invCloseButton();
-  return inside(c, x, y) ? { kind: 'button', id: c.id } : null;
+  if (inside(c, x, y)) return { kind: 'button', id: c.id };
+  for (const b of allocButtons()) if (inside(b, x, y)) return { kind: 'button', id: b.id };
+  return null;
+}
+
+/** Düğme kimliğinden stat ve miktarı çözer. Kimlik biçimi tek yerde
+ *  tanımlı olsun diye ayrıştırma da burada. */
+export function parseAllocId(id: string): { stat: AllocStatId; amount: number } | null {
+  const m = /^alloc_(dex|hp)_(\d+)$/.exec(id);
+  return m ? { stat: m[1] as AllocStatId, amount: Number(m[2]) } : null;
 }
 
 /* ═══════════════════════ YETENEK PANELİ ═══════════════════════ */

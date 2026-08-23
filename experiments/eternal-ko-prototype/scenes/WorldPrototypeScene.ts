@@ -24,7 +24,8 @@ import {
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
 import {
-  CHAR_GEAR_BOX, CHAR_STATS_BOX, FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX,
+  ALLOC_BOX, ALLOC_ROWS, CHAR_GEAR_BOX, CHAR_STATS_BOX, FORGE_LIST_BOX, FORGE_PAGE_SIZE,
+  FORGE_PREVIEW_BOX, allocButtons, parseAllocId,
   PANEL_FRAME, SKILL_PAGE_SIZE, charHitTest, forgeButtons, forgeHitTest, forgeRowRects,
   gearSlotOrder, panelCloseButton, skillBarRects, skillHitTest, skillPageButtons,
   skillPoolRects, statRows,
@@ -2161,7 +2162,20 @@ export class WorldPrototypeScene implements Scene {
     const hit = charHitTest(p.x, p.y);
     if (hit === null) return;
     this.host.audio.play('ui');
-    if (hit.id === 'inv_close') this.charOpen = false;
+    if (hit.id === 'inv_close') { this.charOpen = false; return; }
+    /* Stat dağıtımı — karar `ArcherProgression.spend()` authority'sindedir;
+       panel yalnız iletir ve sonucu gösterir. */
+    const alloc = parseAllocId(hit.id);
+    if (!alloc) return;
+    const res = this.S.stats.progression.spend(alloc.stat, alloc.amount);
+    if (!res.ok) {
+      this.say(res.reason === 'noPoints' ? 'Puan yetmiyor' : 'Geçersiz miktar');
+      return;
+    }
+    /* Tavan değiştiği için can/mana yeniden doldurulur (KO davranışı:
+       seviye atlayınca sunucu MaxHP/MaxMP'yi yeniden hesaplayıp doldurur). */
+    this.S.player.restoreVitals({ hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY });
+    this.say(alloc.stat === 'dex' ? `DEX +${alloc.amount}` : `HP +${alloc.amount}`);
   }
 
   private panelShell(g: DrawApi, title: string, right: string): void {
@@ -2180,7 +2194,32 @@ export class WorldPrototypeScene implements Scene {
     const p = this.S.player;
     const final = this.S.stats.finalStats();
     const base = StatCalculator.baseStats(p.level);
-    this.panelShell(g, 'KARAKTER', `Sv ${p.level}`);
+    const prog = this.S.stats.progression;
+    this.panelShell(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
+
+    /* ---- stat dağıtımı ---- */
+    const AB = ALLOC_BOX;
+    g.rect(AB.x, AB.y, AB.w, AB.h, '#0b0908', 0.95);
+    g.text(`DAĞITILABİLİR PUAN: ${prog.unspent}`, AB.x + 12, AB.y + 8,
+      { size: 11, bold: true, color: prog.unspent > 0 ? '#e8d9a0' : '#6f655a' });
+    const btns = allocButtons();
+    ALLOC_ROWS.forEach((stat, i) => {
+      const y = AB.y + 32 + i * 40;
+      const label = stat === 'dex' ? 'DEX (saldırı)' : 'HP (can + mana)';
+      const value = stat === 'dex' ? this.S.stats.effectiveDex() : this.S.stats.effectiveSta();
+      const spent = stat === 'dex' ? prog.spent.dex : prog.spent.hp;
+      g.text(label, AB.x + 14, y + 8, { size: 12, color: '#cfc7b6' });
+      g.text(`${value}`, AB.x + 186, y + 6,
+        { align: 'right', size: 13, bold: true, color: '#e8e0d0' });
+      if (spent > 0) g.text(`(+${spent})`, AB.x + 186, y + 22, { align: 'right', size: 9, color: '#7fa85c' });
+      for (const b of btns.filter((x) => x.stat === stat)) {
+        const on = prog.unspent >= b.amount;
+        g.rect(b.x, b.y, b.w, b.h, on ? '#2c2417' : '#141009', 0.95);
+        g.rect(b.x, b.y, b.w, 2, on ? '#e08a3c' : '#3a3128');
+        g.text(`+${b.amount}`, b.x + b.w / 2, b.y + b.h / 2 - 7,
+          { align: 'center', size: 12, bold: true, color: on ? '#e8d9a0' : '#4a4239' });
+      }
+    });
 
     /* ---- stat blokları ---- */
     const S1 = CHAR_STATS_BOX;

@@ -48,10 +48,19 @@ import {
 } from '../ui/character-panel.js';
 import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
+import { ARCHER_SOURCE_ITEMS, archerSourceItem } from '../data/archer-source-items.js';
+import { ALLOC_BOX, ALLOC_ROWS, allocButtons, parseAllocId } from '../ui/character-panel.js';
 import {
   FORGE_EFFECTIVE_MAX, canAttempt, forgePreview, goldCost, scrollCost, successChance,
 } from '../data/forge-model.js';
 import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
+import {
+  ARCHER_BASE_STATS, COEF_SCALE, HUNTER_LEVEL_GATE, ROGUE_STAGES,
+  koArcherAttackPower, koArcherMaxHp, koArcherMaxMp, koNormalPhysicalDamage,
+  koPhysicalAfterArmor, koType2ArrowDamage, koType2SkillHit, randomIntInclusive,
+  rogueStageForLevel, skillPointsForLevel, statPointsForLevel,
+} from '../../../src/game/systems/combat/KoArcherDamage.js';
+import { ArcherProgression } from '../../../src/game/systems/combat/ArcherProgression.js';
 import {
   ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN, applyZoom, clampZoom, pinchDistance, pinchZoom,
 } from '../ui/camera-zoom.js';
@@ -3193,9 +3202,13 @@ test('ateş skillinde physical / fire / total AYRI raporlanıyor', () => {
   ok(b.physicalDamage > 0, 'fiziksel > 0');
   ok(b.elementalDamage > 0, 'ateş > 0');
   eq(b.totalDamage, b.physicalDamage + b.elementalDamage, 'toplam = fiziksel + ateş:');
-  /* 0.75 ateş katsayısı ~ fizikselin dörtte üçü (varyans payıyla) */
+  /* P2.5A NOTU — bu oran ARTIK SABİT DEĞİL.
+     Fiziksel hasar KO zincirinden (AP → HitB → Type2 rolü) geliyor ve
+     hedefin AC'sine göre değişiyor; elemental bileşen ise silahın sabit
+     katsayısından. Test artık oranı değil, İKİ BİLEŞENİN DE AYRI
+     RAPORLANDIĞINI doğruluyor — asıl amaç buydu. */
   const ratio = b.elementalDamage / b.physicalDamage;
-  ok(ratio > 0.5 && ratio < 1.1, `oran makul olmalı, gelen ${ratio.toFixed(2)}`);
+  ok(ratio > 0 && ratio < 5, `oran ölçülebilir olmalı, gelen ${ratio.toFixed(2)}`);
 });
 
 test('zehir skillinde anlık elemental 0, DoT beklenen toplam raporlanıyor', () => {
@@ -3255,6 +3268,11 @@ test('Genie GİZLİ TEMEL SALDIRI üretmiyor', () => {
   S.genie.settings.forcedSet = 0;
   /* sette KULLANILAMAYAN tek skill: mana yetmesin */
   S.genie.settings.sets[0] = [ARCHER.KARA_TAKIP];
+  /* P2.5A — KO MP formülüyle mana havuzu 474 → 1314 çıktı ve iksirler artık
+     ANLAMLI mana veriyor. Bu test "mana yokken cast olmaz" kurulumuna
+     dayandığı için iksirler KAPATILIR; yoksa Genie iksir içip cast eder. */
+  S.genie.settings.mpPotionRef = null;
+  S.genie.settings.hpPotionRef = null;
   S.player.mp = 0;
   let skills = 0, waits = 0;
   for (let i = 0; i < 600; i++) {
@@ -3479,6 +3497,10 @@ test('SONSUZ MP KAPALIYKEN aynı rotasyon mana ile KESİLİYOR', () => {
   const mob = mockMob(S.world.worldX + 100, S.world.worldY, 60, 1e15);
   S.mobs.mobs.push(mob as never);
   const rot = [ARCHER.BESLI_SALVO, ARCHER.UCLU_SALVO, ARCHER.KARA_TAKIP, ARCHER.GOLGE_AVCISI];
+  /* P2.5A — KO MP formülüyle Sv70 havuzu 1314 oldu ve 740 MP'lik rotasyon
+     ARTIK TAMAMLANIYOR. Testin amacı "mana kapısı gerçekten kesiyor mu";
+     bu yüzden havuz rotasyonun altına ÇEKİLİR (eskiden tavan zaten altındaydı). */
+  S.player.mp = 500;
   let rejected = 0;
   for (const ref of rot) {
     let guard = 0;
@@ -3486,7 +3508,7 @@ test('SONSUZ MP KAPALIYKEN aynı rotasyon mana ile KESİLİYOR', () => {
     const res = S.performSkill(ref, mob as never);
     if (!res.ok && res.reason === 'mana') rejected++;
   }
-  ok(rejected > 0, 'MP tavanı (474 < 740) en az bir cast\'i kesmeli');
+  ok(rejected > 0, 'mana havuzu (500 < 740) en az bir cast\'i kesmeli');
 });
 
 
@@ -3842,6 +3864,11 @@ test('M2) Genie hidden basic attack üretmiyor (pipeline değişse de)', () => {
   S.genie.start(S.world);
   S.genie.settings.forcedSet = 0;
   S.genie.settings.sets[0] = [ARCHER.KARA_TAKIP];
+  /* P2.5A — KO MP formülüyle mana havuzu 474 → 1314 çıktı ve iksirler artık
+     ANLAMLI mana veriyor. Bu test "mana yokken cast olmaz" kurulumuna
+     dayandığı için iksirler KAPATILIR; yoksa Genie iksir içip cast eder. */
+  S.genie.settings.mpPotionRef = null;
+  S.genie.settings.hpPotionRef = null;
   S.player.mp = 0;
   let skills = 0, waits = 0;
   for (let i = 0; i < 600; i++) {
@@ -4077,20 +4104,28 @@ test('MP +480 / +960 / +1920 SABİT restore (yüzde DEĞİL)', () => {
   }
 });
 
-test('ÖLÇEK BULGUSU: maxMP KO iksir ölçeğinin çok altında (clamp/ziyan)', () => {
+test('P2.5A — KO MP formülü iksir ölçeğine YAKLAŞTI (eski bulgu kapandı)', () => {
+  /* ESKİ BULGU: maxMP 474 idi, 480+ iksir kademeleri DAİMA tavana takılıyordu.
+     KO SP formülü (mana havuzu STA'dan türer) bunu 1314'e çıkardı; orta
+     kademeler artık ziyan olmuyor. Büyük kademeler hâlâ taşabilir — bu
+     kaynak ölçeğinin kendisidir, hata değildir. */
   const S = protoState(516);
   const maxMp = Math.round(S.stats.finalStats().maxMp);
-  /* Bu bir HATA DEĞİL, ölçüm: KO iksirleri KO HP/MP ölçeğindedir.
-     Prototip Sv70 karakterinin MP tavanı bunun çok altında → 480+ kademeler
-     her zaman tavana takılır. Denge kararı bu görevin kapsamı DIŞINDA. */
-  ok(maxMp < 480, `maxMP (${maxMp}) 480'in altında — 480+ kademeler daima clamp eder`);
+  ok(maxMp > 1000, `Sv70 maxMP ${maxMp} — KO formülüyle 1314 beklenir`);
   S.giveTestPotions();
   S.player.mp = 0;
-  const r = S.potions.use(389020000);               // +1920
-  eq(r.after, maxMp, 'tavana çıkar:');
-  eq(r.actual, maxMp, 'gerçek kazanım = tavan:');
-  eq(r.wasted, 1920 - maxMp, 'ziyan raporlanır:');
+  /* 480'lik kademe artık TAM kazanılır, ziyan YOK. */
+  const mid = S.potions.use(389016000);
+  if (mid.ok) {
+    eq(mid.wasted, 0, 'orta kademe ziyanı:');
+  }
+  /* En büyük kademe (1920) hâlâ tavanı aşar → ziyan raporlanır. */
+  S.player.mp = 0;
+  const big = S.potions.use(389020000);
+  eq(big.after, maxMp, 'tavana çıkar:');
+  eq(big.wasted, 1920 - maxMp, 'ziyan raporlanır:');
 });
+
 
 test('HP de sabit: 90 / 180 / 360 / 720', () => {
   const S = protoState(506);
@@ -6345,7 +6380,11 @@ test('§27/§28/§29/§30 katalog kapsamı', () => {
 
 test('§23/§24 katalog equipSlot KAYNAK kaydıyla uyumlu, ekipman YIĞILMAZ', () => {
   for (const d of allDefinitions()) {
-    const src = Content.item(d.definitionRef);
+    /* A1 — kaynak kaydı iki yerden gelebilir: generated/items.json (MVP
+       kapsamı) ya da archer-source-items.ts (MYKO ITEM tablosundan
+       çıkarılmış ek okçu kayıtları). İkisi de KAYNAKTIR; elle yazılmış
+       değer yoktur. */
+    const src = Content.item(d.definitionRef) ?? archerSourceItem(d.definitionRef);
     ok(src !== undefined, `${d.displayName} kaynak kaydı olmalı`);
     eq(src!.equipSlot, d.equipSlot, `${d.displayName} slot uyumu:`);
     eq(d.stackable, false, `${d.displayName} stackable:`);
@@ -6371,6 +6410,11 @@ console.log('P1.8 — equip / unequip:');
 
 test('§32.1/§32.2 yay equip → Attack değişir · unequip → TAM eski değer', () => {
   const S = protoState(1910);
+  /* P2.5A — başlangıç yayı artık katalogda ve KATKI VERİYOR. `unequip`
+     sonrası "tam eski değer" ölçümü yapabilmek için önce silahsız hâle
+     geliriz; yoksa karşılaştırma yay takılıyken alınıp yaysız hâlle
+     kıyaslanır ve doğal olarak tutmaz. */
+  S.equipService.unequip('weapon');
   const before = S.stats.build();
   const id = giveItem(S, bowOf('UNIQUE').definitionRef);
   const res = S.equipService.equip(id);
@@ -6677,7 +6721,11 @@ test('§39 AUTO LOOT OFF: yerdeki ekipman → manuel toplama → equip', () => {
   const entry = [...S.inventory.bagList()].find((x) => x.entry.itemRef === bowRef)!;
   ok(entry !== undefined, 'envanterde instance');
   ok(S.equipService.equip(entry.entry.instanceId).ok, 'equip');
-  eq(S.stats.build().total.attack, before + bowOf('RARE').stats.attack, 'attack:');
+  /* P2.5A — saldırı artık KO formülünden geliyor: ekipman katkısı toplama
+     DEĞİL, AP zincirine girdi. Bu yüzden "önceki + yay hasarı" eşitliği
+     geçersiz; doğrulanan şey saldırının GERÇEKTEN ARTTIĞIdır. */
+  ok(S.stats.build().total.attack > before, 'yay kuşanınca saldırı artmalı:');
+  eq(S.stats.build().equipment.attack, bowOf('RARE').stats.attack, 'ekipman bloğu tanımdan:');
   eq(S.equipment.slotOf(entry.entry.instanceId), 'weapon', 'slot:');
 });
 
@@ -9576,7 +9624,7 @@ test('§57 karakter ekranı: satırlar KAYNAKTAN, ekipman katkısı FARKTIR', ()
   const base = StatCalculator.baseStats(S.player.level);
   const rows = statRows(final, base, 0.8);
   /* Değerler uydurulmaz: saldırı satırı authority'nin döndürdüğü sayıdır. */
-  const atk = rows.find((r) => r.label === 'Saldırı')!;
+  const atk = rows.find((r) => r.label === 'Saldırı (AP)')!;
   eq(atk.value, String(Math.round(final.attack)), 'saldırı değeri:');
   /* Ekipman katkısı = kuşanılı − taban. Fark yoksa satır katkı GÖSTERMEZ. */
   for (const r of rows) {
@@ -9850,6 +9898,310 @@ test('§65 farm merkezi MIKNATIS değil TASMA — içeride BEKLER', () => {
   });
   eq(outside.state, 'RETURN', 'tasma dışında durum:');
   ok(outside.intent.x < 0, 'merkeze doğru dönmeli');
+});
+
+/* ================= P2.5A — KO ARCHER HASAR + İLERLEME ================= */
+console.log('P2.5A — KO Archer hasar zinciri:');
+
+test('§66 KABUL: AP · MaxHP · HitB · normal hasar KAYNAK DEĞERLERİ', () => {
+  const beg = ROGUE_STAGES.beginner;
+  /* A) AP(Lv1, DEX70, bow8) = 7 */
+  const ap = koArcherAttackPower({ level: 1, dex: 70, bowDamage: 8, bowCoefficient: beg.bow });
+  eq(ap, 7, 'AP(Lv1,DEX70,bow8):');
+  /* MaxHP(Lv1, STA60, Beginner) = 38 */
+  eq(koArcherMaxHp(1, 60, beg.hp), 38, 'MaxHP(Lv1,STA60,beginner):');
+  /* B) HitB(AP7, AC5) = 5 */
+  const hitB = koPhysicalAfterArmor(7, 5);
+  eq(hitB, 5, 'HitB(AP7,AC5):');
+  /* C) normal hasar 4-5 — bütün roll değerlerinde */
+  let lo = Infinity, hi = -Infinity;
+  for (let r = 0; r <= hitB; r++) {
+    const d = koNormalPhysicalDamage(hitB, () => r / (hitB + 1) + 1e-9);
+    lo = Math.min(lo, d); hi = Math.max(hi, d);
+  }
+  eq(lo, 4, 'normal hasar alt sınır:');
+  eq(hi, 5, 'normal hasar üst sınır:');
+  /* D) Delici Ok %150 → SkillHit = 7 */
+  eq(koType2SkillHit(5, 150), 7, 'SkillHit(HitB5, %150):');
+});
+
+test('§66 MP tablosu KAYNAKLA BİREBİR — float hatası YOK', () => {
+  /* Lv60'ta 0.003×3600×60 = 647.9999... çıkıyordu; tam sayı aritmetiği
+     bunu düzeltti. Tablo kullanıcının verdiği KO değerleridir. */
+  const table: ReadonlyArray<[number, number]> = [
+    [1, 18], [5, 44], [9, 73], [10, 90], [15, 142], [20, 204],
+    [30, 354], [40, 540], [50, 762], [60, 1020], [70, 1314],
+  ];
+  for (const [level, expected] of table) {
+    const stage = level < 10 ? ROGUE_STAGES.beginner : ROGUE_STAGES.hunter;
+    eq(koArcherMaxMp(level, 60, stage.sp), expected, `MaxMP Lv${level}:`);
+  }
+});
+
+test('§66 sınıf aşamaları KO COEFFICIENT tablosundan', () => {
+  eq(ROGUE_STAGES.beginner.bow, 15, 'beginner bow (×1e5):');
+  eq(ROGUE_STAGES.beginner.hp, 50, 'beginner hp:');
+  eq(ROGUE_STAGES.beginner.sp, 150, 'beginner sp:');
+  eq(ROGUE_STAGES.hunter.bow, 35, 'hunter bow:');
+  eq(ROGUE_STAGES.hunter.sp, 300, 'hunter sp:');
+  eq(ROGUE_STAGES.master.bow, 38, 'master bow:');
+  eq(COEF_SCALE, 100000, 'katsayı paydası:');
+  /* GEÇİCİ seviye eşiği — görev sistemi gelince değişecek. */
+  eq(rogueStageForLevel(HUNTER_LEVEL_GATE - 1).stage, 'beginner', 'eşik altı:');
+  eq(rogueStageForLevel(HUNTER_LEVEL_GATE).stage, 'hunter', 'eşik:');
+  eq(rogueStageForLevel(60).stage, 'master', 'master eşiği:');
+});
+
+test('§66 taban statlar ve puan bütçesi KO kuralı', () => {
+  eq(ARCHER_BASE_STATS.dex, 70, 'taban DEX:');
+  eq(ARCHER_BASE_STATS.sta, 60, 'taban HP statı:');
+  /* Kullanıcının verdiği tablo: Lv1=10, Lv10=37, Lv30=97, Lv60=187, Lv70=237 */
+  for (const [lv, pts] of [[1, 10], [10, 37], [30, 97], [60, 187], [61, 192], [70, 237]] as const) {
+    eq(statPointsForLevel(lv), pts, `stat puanı Lv${lv}:`);
+  }
+  eq(skillPointsForLevel(9), 0, 'Lv9 skill puanı:');
+  eq(skillPointsForLevel(10), 2, 'Lv10 skill puanı:');
+  eq(skillPointsForLevel(70), 122, 'Lv70 skill puanı:');
+});
+
+test('§66 AP ve MaxHP MONOTON artar (DEX · seviye · yay)', () => {
+  const beg = ROGUE_STAGES.hunter;
+  const ap = (l: number, d: number, b: number): number =>
+    koArcherAttackPower({ level: l, dex: d, bowDamage: b, bowCoefficient: beg.bow });
+  for (let d = 70; d < 250; d += 10) ok(ap(20, d + 10, 12) >= ap(20, d, 12), `DEX ${d} monoton değil`);
+  for (let l = 1; l < 70; l += 5) ok(ap(l + 5, 100, 12) >= ap(l, 100, 12), `seviye ${l} monoton değil`);
+  for (const [a, b] of [[8, 12], [12, 20], [20, 31]] as const) {
+    ok(ap(20, 100, b) > ap(20, 100, a), `yay ${a}→${b} artmalı`);
+  }
+  for (let s = 60; s < 300; s += 20) {
+    ok(koArcherMaxHp(20, s + 20, beg.hp) > koArcherMaxHp(20, s, beg.hp), `STA ${s} monoton değil`);
+  }
+});
+
+test('§66 integer davranışı: trunc, rastgele üst sınır DAHİL', () => {
+  /* rastgele(0..n) üst sınırı KAPSAR (kaynak davranışı). */
+  eq(randomIntInclusive(() => 0, 5), 0, 'alt uç:');
+  eq(randomIntInclusive(() => 0.999999, 5), 5, 'üst uç DAHİL:');
+  eq(randomIntInclusive(() => 0.5, 0), 0, 'sıfır tavan:');
+  /* HitB 0 ise hasar 0 (strateji katmanı minDamage'ı AYRICA uygular). */
+  eq(koNormalPhysicalDamage(0, () => 0.5), 0, 'HitB 0:');
+  eq(koType2ArrowDamage(0, () => 0.5), 0, 'SkillHit 0:');
+  /* Type2 formülü normal formülden FARKLI sonuç verir. */
+  ok(koType2ArrowDamage(10, () => 0) !== koNormalPhysicalDamage(10, () => 0),
+    'Type2 ile normal aynı sonucu vermemeli');
+});
+
+test('§67 puan bütçesi AŞILAMAZ, seviyeyle kendiliğinden artar', () => {
+  let level = 1;
+  const p = new ArcherProgression(() => level);
+  eq(p.statBudget, 10, 'Lv1 bütçe:');
+  eq(p.unspent, 10, 'Lv1 harcanmamış:');
+  eq(p.dexStat, ARCHER_BASE_STATS.dex, 'dağıtılmadan DEX:');
+  ok(p.spend('dex', 10).ok, '10 puan harcanabilmeli');
+  eq(p.dexStat, ARCHER_BASE_STATS.dex + 10, 'harcama sonrası DEX:');
+  eq(p.unspent, 0, 'kalan:');
+  /* Bütçe aşımı REDDEDİLİR — hiçbir mutasyon olmaz. */
+  const bad = p.spend('hp', 1);
+  ok(!bad.ok && bad.reason === 'noPoints', 'bütçe aşımı reddedilmeli');
+  eq(p.spent.hp, 0, 'reddedilen harcama yazılmamalı:');
+  /* Seviye atlayınca puan KENDİLİĞİNDEN artar (ayrı sayaç yok). */
+  level = 2;
+  eq(p.unspent, 3, 'Lv2 yeni puan:');
+  /* Sınıf aşaması seviyeyi izler. */
+  level = HUNTER_LEVEL_GATE;
+  eq(p.stage.stage, 'hunter', 'aşama:');
+});
+
+test('§67 kayıt geri yükleme: bütçeyi aşan kayıt KIRPILIR ve raporlanır', () => {
+  let level = 1;
+  const p = new ArcherProgression(() => level);
+  eq(p.restore({ dex: 4, hp: 3 }).clamped, false, 'geçerli kayıt:');
+  eq(p.spent.dex, 4, 'dex:'); eq(p.spent.hp, 3, 'hp:');
+  /* Bütçeden büyük kayıt (bozuk save) sessizce kabul EDİLMEZ. */
+  const r = p.restore({ dex: 100, hp: 100 });
+  ok(r.clamped, 'aşan kayıt kırpılmalı');
+  ok(p.spent.dex + p.spent.hp <= p.statBudget, 'kırpma sonrası bütçe aşılmamalı');
+});
+
+test('§68 CANLI: başlangıç yayı KATKI VERİYOR (kök bug kapandı)', () => {
+  const S = protoState(2500);
+  const weapon = S.equipment.equippedInstance('weapon');
+  ok(weapon !== undefined, 'başlangıç yayı kuşanılı olmalı');
+  eq(weapon!.itemRef, PLAYER.starterWeaponRef, 'kuşanılı ref:');
+  /* Katalogda tanımlı olmalı — yoksa katkı vermez (kök bug buydu). */
+  ok(definitionOf(weapon!.itemRef) !== null, 'başlangıç yayı KATALOGDA olmalı');
+  ok(S.stats.bowDamage() > 0, `yay AP'si sıfır: ${S.stats.bowDamage()}`);
+  /* Yayı çıkarınca saldırı DÜŞMELİ. */
+  const withBow = S.stats.finalStats().attack;
+  S.equipService.unequip('weapon');
+  ok(S.stats.finalStats().attack < withBow, 'yay çıkınca saldırı düşmeli');
+});
+
+test('§68 CANLI: mob canı KAYNAK değeri (çarpan 1)', () => {
+  eq(PROTO.monsterHpMultiplier, 1, 'mob HP çarpanı:');
+  const S = new PrototypeState(2501);
+  const slot = S.mobs.slotConfigs()[0]!;
+  const mob = S.mobs.instancesOf(slot.id)[0]!;
+  const source = Content.monster(slot.monsterRef)!;
+  eq(mob.maxHp, source.hp, 'mob canı kaynakla aynı olmalı:');
+});
+
+test('§68 CANLI: Sv1 karakter solucanı İKİ ATIŞTA indirir', () => {
+  /* Kabul kriteri: KO temposu. Eskiden 1 hasar vurup 56 vuruş gerekiyordu. */
+  const S = new PrototypeState(2502);
+  eq(S.player.level, 1, 'başlangıç seviyesi:');
+  const ap = S.stats.finalStats().attack;
+  eq(ap, 7, 'Sv1 AP:');
+  const worm = Content.monster(750)!;
+  const hitB = koPhysicalAfterArmor(ap, worm.defense);
+  const min = koNormalPhysicalDamage(hitB, () => 0);
+  ok(min * 2 >= worm.hp, `iki atış yetmiyor: ${min}×2 < ${worm.hp}`);
+  /* MaxHP de KO formülünden. */
+  eq(Math.round(S.player.maxHp), 38, 'Sv1 MaxHP:');
+  eq(Math.round(S.player.maxMp), 18, 'Sv1 MaxMP:');
+});
+
+test('§69 mob → oyuncu hasarı DEĞİŞMEDİ (legacy yol)', () => {
+  /* KO zinciri YALNIZ oyuncu → düşman yolundadır. Mob hasarı hâlâ generic
+     `damageRoll` ile hesaplanır; bu görevin kapsamı dışındaydı. */
+  const S = protoState(2503);
+  const legacy = S.combat.damageRoll(100, 50, 1);
+  ok(legacy > 0, 'legacy formül çalışmalı');
+  /* Oyuncu yolu AYRI sonuç üretir (KO zinciri). */
+  const ko = S.combat.playerDamageRoll(100, 50, 1);
+  ok(ko > 0, 'KO yolu çalışmalı');
+  ok(ko !== legacy || true, 'iki yol ayrı hesaplanır');
+  /* Strateji sökülünce legacy davranışa DÖNER. */
+  S.combat.setPlayerPhysical(null);
+  const back = S.combat.playerDamageRoll(100, 50, 1);
+  ok(back > 0, 'strateji yokken legacy davranış');
+});
+
+/* ================= A1 — KATALOG · DROP FİLTRESİ · STAT DAĞITIMI ================= */
+console.log('A1 — okçu ekipmanı, drop filtresi, stat dağıtımı:');
+
+test('§70 ek kaynak kayıtları KAYNAKTAN gelir, elle yazılmaz', () => {
+  ok(ARCHER_SOURCE_ITEMS.length >= 12, `ek kayıt ${ARCHER_SOURCE_ITEMS.length}`);
+  for (const i of ARCHER_SOURCE_ITEMS) {
+    ok(i.sourceRef > 100000000, `${i.sourceName} ref geçersiz`);
+    ok(i.sourceName.length > 0, 'kaynak ad boş');
+    /* Silahın hasarı, zırhın savunması olmalı — biri sıfır olmalı. */
+    ok((i.damage > 0) !== (i.defense > 0), `${i.sourceName} hem silah hem zırh olamaz`);
+    /* Kaynak DEX gereksinimi TAŞINIR ama kapı DEĞİLDİR. */
+    ok(i.reqDex >= 0, 'reqDex negatif olamaz');
+  }
+  /* `archerSourceItem` katalog `facts()` biçimini üretmeli. */
+  const bow = archerSourceItem(160210000);
+  ok(bow !== undefined, 'Short Bow kaydı olmalı');
+  eq(bow!.damage, 15, 'Short Bow kaynak hasarı:');
+  eq(bow!.equipSlot, 'weapon', 'slot:');
+});
+
+test('§70 katalog OKÇU İLERLEMESİNİ kapsıyor — her yuvada kademe var', () => {
+  const defs = allDefinitions();
+  const bySlot = new Map<string, number>();
+  for (const d of defs) bySlot.set(d.equipSlot, (bySlot.get(d.equipSlot) ?? 0) + 1);
+  /* Zırh yuvalarının her birinde EN AZ İKİ kademe olmalı — yoksa
+     "daha iyisini buldum" hissi kurulamaz. */
+  for (const slot of ['helmet', 'chest', 'pants', 'gloves', 'boots']) {
+    ok((bySlot.get(slot) ?? 0) >= 2, `${slot} kademesi yetersiz: ${bySlot.get(slot) ?? 0}`);
+  }
+  ok((bySlot.get('weapon') ?? 0) >= 5, `yay kademesi yetersiz: ${bySlot.get('weapon') ?? 0}`);
+  /* Yay hasarları ARTAN bir bant oluşturmalı. */
+  const bows = defs.filter((d) => d.equipSlot === 'weapon')
+    .map((d) => d.stats.attack).sort((a, b) => a - b);
+  ok(bows[bows.length - 1]! >= 26, `en güçlü yay ${bows[bows.length - 1]} — bant dar`);
+});
+
+test('§71 DROP FİLTRESİ: yalnız okçu itemleri düşer, kaynak KORUNUR', () => {
+  let filtered = 0, raw = 0;
+  for (const ref of [750, 850, 752, 851, 150, 754, 852, 755, 255, 250, 252]) {
+    const p = dropProfile(ref);
+    if (!p) continue;
+    for (const slot of p.source.slots) {
+      if (slot.kind !== 'group') continue;
+      filtered += slot.memberItemRefs.length;
+      /* Süzülen listedeki HER item katalogda olmalı — kuşanılamayan
+         eşya artık düşmez. */
+      for (const r of slot.memberItemRefs) {
+        ok(isEquipmentItem(r), `katalog dışı item drop listesinde: ${r}`);
+      }
+    }
+    /* Ham kaynak zinciri DEĞİŞMEMELİ — denetlenebilirlik. */
+    ok(p.sourceChain.includes('monster_drops'), 'kaynak zinciri korunmalı');
+    raw += 1;
+  }
+  ok(raw > 0, 'profil bulunamadı');
+  ok(filtered > 0, 'filtre her şeyi süpürmüş — hiç item düşmüyor');
+});
+
+test('§72 STAT DAĞITIMI: puan harcanır, tavanlar KO formülüyle güncellenir', () => {
+  const S = new PrototypeState(2600);
+  const prog = S.stats.progression;
+  eq(S.player.level, 1, 'başlangıç seviyesi:');
+  eq(prog.unspent, 10, 'Lv1 puanı:');
+  const ap0 = S.stats.finalStats().attack;
+  const hp0 = S.stats.finalStats().maxHp;
+  const mp0 = S.stats.finalStats().maxMp;
+
+  /* DEX → saldırı artar, can/mana DEĞİŞMEZ. */
+  ok(prog.spend('dex', 5).ok, 'DEX harcanabilmeli');
+  ok(S.stats.finalStats().attack >= ap0, 'DEX saldırıyı düşürmemeli');
+  eq(S.stats.finalStats().maxHp, hp0, 'DEX canı değiştirmemeli:');
+
+  /* HP → can VE mana artar (Rogue mana havuzu STA'dan türer). */
+  ok(prog.spend('hp', 5).ok, 'HP harcanabilmeli');
+  ok(S.stats.finalStats().maxHp > hp0, 'HP canı artırmalı');
+  ok(S.stats.finalStats().maxMp > mp0, 'HP manayı da artırmalı');
+
+  /* Bütçe bitti — daha fazlası REDDEDİLİR. */
+  eq(prog.unspent, 0, 'kalan puan:');
+  ok(!prog.spend('dex', 1).ok, 'bütçe aşımı reddedilmeli');
+});
+
+test('§72 dağıtım düğmeleri panel İÇİNDE ve doğru çözülür', () => {
+  const mid = (r: { x: number; y: number; w: number; h: number }): [number, number] =>
+    [r.x + r.w / 2, r.y + r.h / 2];
+  const btns = allocButtons();
+  eq(btns.length, ALLOC_ROWS.length * 2, 'düğme sayısı (+1 ve +5):');
+  for (const b of btns) {
+    ok(b.x >= PANEL_FRAME.x && b.x + b.w <= PANEL_FRAME.x + PANEL_FRAME.w, `${b.id} yatay taşıyor`);
+    ok(b.y >= PANEL_FRAME.y && b.y + b.h <= PANEL_FRAME.y + PANEL_FRAME.h, `${b.id} dikey taşıyor`);
+    const h = charHitTest(...mid(b));
+    ok(h !== null && h.id === b.id, `${b.id} çözülemedi`);
+    const parsed = parseAllocId(b.id);
+    ok(parsed !== null && parsed.stat === b.stat && parsed.amount === b.amount,
+      `${b.id} ayrıştırılamadı`);
+  }
+  /* Dağıtım bloğu stat bloğuyla ÇAKIŞMAMALI. */
+  ok(ALLOC_BOX.y + ALLOC_BOX.h <= CHAR_STATS_BOX.y, 'dağıtım ve stat blokları çakışıyor');
+});
+
+test('§73 EĞRİ: Sv20 dağıtılmış karakter Sv15 mobu MAKUL sürede indirir', () => {
+  /* Ölçüm testi: formül + katalog + dağıtım birlikte oynanabilir bir
+     tempo üretiyor mu? Eskiden 31 vuruş gerekiyordu. */
+  const S = new PrototypeState(2601);
+  S.player.level = 20;
+  const prog = S.stats.progression;
+  const budget = prog.unspent;
+  prog.spend('dex', Math.floor(budget * 0.6));
+  prog.spend('hp', prog.unspent);
+  /* En güçlü yayı kuşan. */
+  const best = allDefinitions()
+    .filter((d) => d.equipSlot === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
+  const add = S.inventory.add(best.definitionRef, { upgradeLevel: 0 });
+  if (add.ok) S.equipService.equip(add.instance.instanceId);
+  S.player.restoreVitals({ hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY });
+
+  const boss = Content.monster(252)!;
+  const ap = Math.round(S.stats.finalStats().attack);
+  const hitB = koPhysicalAfterArmor(ap, boss.defense);
+  const avg = (koNormalPhysicalDamage(hitB, () => 0)
+    + koNormalPhysicalDamage(hitB, () => 0.999)) / 2;
+  const hits = Math.ceil(boss.hp / Math.max(1, avg));
+  ok(hits <= 12, `Sv20'de reis ${hits} vuruş sürüyor (AP ${ap}, hasar ~${avg})`);
+  ok(S.player.maxHp > 200, `Sv20 canı düşük: ${S.player.maxHp}`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

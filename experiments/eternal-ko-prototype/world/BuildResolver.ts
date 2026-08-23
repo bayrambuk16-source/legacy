@@ -29,6 +29,11 @@ import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import type { EquipmentState } from '../../../src/game/systems/EquipmentState.js';
 import { EQUIP_SLOTS } from '../../../src/game/systems/EquipmentState.js';
 import { itemDefinition } from '../data/item-catalog.js';
+import { UPGRADE_MODEL } from '../../../src/game/config.js';
+import { ArcherProgression } from '../../../src/game/systems/combat/ArcherProgression.js';
+import {
+  koArcherAttackPower, koArcherMaxHp, koArcherMaxMp,
+} from '../../../src/game/systems/combat/KoArcherDamage.js';
 import {
   resolveStats, zeroStats,
   type ItemClass, type ItemDefinition, type ResolvedItemStats,
@@ -61,12 +66,63 @@ export interface BuildBreakdown {
 }
 
 export class ArcherBuildResolver extends CharacterStats {
+  /** P2.5A — KO ilerleme durumu (dağıtılan DEX/HP, sınıf aşaması). */
+  readonly progression: ArcherProgression;
+
   constructor(
     private level: () => number,
     private equip: EquipmentState,
     buffs: () => { attackSpeedMult: number },
   ) {
     super(level, equip, buffs);
+    this.progression = new ArcherProgression(level);
+  }
+
+  /* ═══════════ P2.5A — KO ARCHER YOLU ═══════════
+     Generic `finalStats()` DEĞİŞMEDİ: ana oyunun `level × 2` saldırısı ve
+     `baseHp + level × 14` canı olduğu gibi duruyor. Okçuya özel değerler
+     AYRI okunur; iki hesap birbirini kirletmez (§24). */
+
+  /** Kuşanılı yayın kaynak AP değeri. Silah yoksa 0. */
+  bowDamage(): number {
+    const inst = this.equip.equippedInstance('weapon');
+    if (!inst) return 0;
+    const def = itemDefinition(inst.itemRef);
+    if (!def || def.category !== 'weapon') return 0;
+    /* Yükseltme çarpanı ana modelle AYNI: +N başına %20. */
+    return Math.round(def.stats.attack * (1 + inst.upgradeLevel * UPGRADE_MODEL.statPerLevel));
+  }
+
+  /** Efektif DEX = taban + dağıtılan + ekipman. */
+  effectiveDex(): number {
+    return this.progression.dexStat + this.equipmentResolved().dex;
+  }
+
+  /** Efektif HP statı = taban + dağıtılan + ekipman STA. */
+  effectiveSta(): number {
+    return this.progression.staStat + this.equipmentResolved().sta;
+  }
+
+  /** KO Archer Attack Power — hasar zincirinin GİRDİSİ. */
+  archerAttackPower(): number {
+    return koArcherAttackPower({
+      level: this.level(),
+      dex: this.effectiveDex(),
+      bowDamage: this.bowDamage(),
+      bowCoefficient: this.progression.stage.bow,
+    });
+  }
+
+  /** KO Archer Max HP (ekipman maxHp bonusu dahil). */
+  archerMaxHp(): number {
+    return koArcherMaxHp(this.level(), this.effectiveSta(),
+      this.progression.stage.hp, this.equipmentResolved().maxHp);
+  }
+
+  /** KO Archer Max MP — Rogue mana havuzu STA'dan türer. */
+  archerMaxMp(): number {
+    return koArcherMaxMp(this.level(), this.effectiveSta(),
+      this.progression.stage.sp, this.equipmentResolved().maxMp);
   }
 
   /** Kuşanılı Project Legacy tanımlarının HAM toplamı — her çağrıda sıfırdan. */
@@ -100,7 +156,25 @@ export class ArcherBuildResolver extends CharacterStats {
     return acc;
   }
 
-  /** ANA SİSTEM KÖPRÜSÜ — `finalStats()` bunu çağırır.
+  /** P2.5A — OKÇU DEĞERLERİ generic bloğa YANSITILIR.
+   *
+   *  `PlayerState.maxHp/maxMp` ve `CombatSystem.playerAttack()` bu bloğu
+   *  okur; okçu için doğru sayı KO formülünden gelmelidir. Ana
+   *  `CharacterStats` DEĞİŞMEDİ — orada hâlâ `level × 2` saldırı ve
+   *  `baseHp + level × 14` can var; bu override YALNIZ okçu çözücüsündedir. */
+  override finalStats(): ReturnType<CharacterStats['finalStats']> {
+    const base = super.finalStats();
+    return {
+      ...base,
+      attack: this.archerAttackPower(),
+      maxHp: this.archerMaxHp(),
+      maxMp: this.archerMaxMp(),
+      dex: this.effectiveDex(),
+      sta: this.effectiveSta(),
+    };
+  }
+
+  /** ANA SİSTEM KÖPRÜSÜ — `equipmentStats()` bunu çağırır.
    *  Elemental burada BİLEREK BOŞ bırakılır: silah elementali ana damage
    *  formülüne KARIŞTIRILMAZ, ayrı bir bileşen olarak taşınır (§21). */
   override equipmentStats(): StatBlock {

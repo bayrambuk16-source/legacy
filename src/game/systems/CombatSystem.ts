@@ -2,6 +2,7 @@
  *  Skill mantığı SkillSystem'e devredilmiştir (effect handler registry).
  *  Statlar HER ZAMAN CharacterStats.finalStats() üzerinden gelir. */
 import { COMBAT, PLAYER } from '../config.js';
+import type { PlayerPhysicalStrategy } from './combat/PlayerPhysicalStrategy.js';
 import { range, type Rng } from '../../engine/rng.js';
 import type { EnemyUnit } from './SpawnSystem.js';
 import type { PlayerState } from './PlayerState.js';
@@ -31,11 +32,29 @@ export class CombatSystem {
       player: this.player,
       stats: this.stats,
       balance: this.balance,
-      damageRoll: (a, d, c) => this.damageRoll(a, d, c),
+      /* Skill hasarı OYUNCU yoludur → KO zincirine gider. */
+      damageRoll: (a, d, c) => this.playerDamageRoll(a, d, c),
       playerAttack: () => this.playerAttack(),
       effectiveDefense: (e) => this.effectiveDefense(e),
     };
     this.skills = new SkillSystem(ctx, this.player, loadout);
+  }
+
+  /* ═══════════ P2.5A — OYUNCU FİZİKSEL HASAR STRATEJİSİ ═══════════
+     KO Archer zinciri generic formülden AYRIDIR. Strateji verilirse
+     OYUNCU → DÜŞMAN hasarı ondan geçer; DÜŞMAN → OYUNCU hasarı legacy
+     `damageRoll` yolunda KALIR (§ mob hasarı değişmedi).
+     Strateji verilmezse davranış P2.4 ile birebir aynıdır. */
+  private playerPhysical: PlayerPhysicalStrategy | null = null;
+
+  setPlayerPhysical(strategy: PlayerPhysicalStrategy | null): void {
+    this.playerPhysical = strategy;
+  }
+
+  /** OYUNCU → DÜŞMAN hasarı. Strateji varsa KO zinciri, yoksa legacy. */
+  playerDamageRoll(attack: number, defense: number, coefficient = 1): number {
+    if (this.playerPhysical) return this.playerPhysical.roll(attack, defense, coefficient);
+    return this.damageRoll(attack, defense, coefficient);
   }
 
   /* ---------- ortak hasar formülü (tek kaynak) ---------- */
@@ -70,7 +89,7 @@ export class CombatSystem {
     if (!this.basicReady || !this.player.alive || target.state === 'dying') return null;
     if (!this.stats.finalStats().hasWeapon) return null; // silahsız saldırı yok
     this.basicCooldown = PLAYER.basicAttackCooldownSec / this.player.attackSpeedMult;
-    const dmg = this.damageRoll(this.playerAttack(), this.effectiveDefense(target));
+    const dmg = this.playerDamageRoll(this.playerAttack(), this.effectiveDefense(target));
     target.hp -= dmg;
     const killed = target.hp <= 0;
     if (killed) target.state = 'dying';

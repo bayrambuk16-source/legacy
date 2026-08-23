@@ -52,6 +52,7 @@
  *  KOPYALAMAZ — hepsi `Content.item()` üzerinden çözülür (§15). Yeni item
  *  balance'ı YOKTUR (§41). */
 import { Content, type LootTable } from '../../../src/game/data/GameContentRepository.js';
+import { isEquipmentItem } from './item-catalog.js';
 
 /* ───────────────────────── SOURCE FACT ───────────────────────── */
 
@@ -125,6 +126,20 @@ export interface MonsterDropProfile {
 /** Üretilmiş içerikten (loot_tables.json) profil kurar.
  *  ÜRETİLMİŞ JSON DEĞİŞTİRİLMEZ — yalnız OKUNUR ve etiketlenir. */
 function fromLootTable(monsterRef: number, table: LootTable): MonsterDropProfile {
+  /* ═══ A1 — OKÇU FİLTRESİ ═══
+     Kaynak ganimet tabloları BÜTÜN sınıfların eşyasını taşır: bir mobun
+     62 üyeli grubunun yalnız 9-13'ü okçuya uygun. Diğerleri kuşanılamıyor,
+     yalnız çantayı dolduruyordu.
+
+     Filtre kaynağı DEĞİŞTİRMEZ: `source` bloğu ham kaydı olduğu gibi
+     saklamaya devam eder (denetlenebilirlik). Yalnız oyuncuya ULAŞAN
+     üye listesi süzülür.
+
+     Ölçüt: Project Legacy kataloğunda tanımı OLAN item. Katalog zaten
+     okçu-yalnız olduğu için ayrıca sınıf kodu kontrolüne gerek yok. */
+  const keepForArcher = (refs: readonly number[]): number[] =>
+    refs.filter((r) => isEquipmentItem(r));
+
   const slots: DropSlotSourceFact[] = table.slots.map((s, i) => ({
     slotNo: i + 1,
     kind: s.kind === 'direct' ? 'direct' : 'group',
@@ -133,7 +148,7 @@ function fromLootTable(monsterRef: number, table: LootTable): MonsterDropProfile
     rateRaw: Math.round(s.triggerPercent * 100),
     itemRef: s.kind === 'direct' ? (s.itemId ?? null) : null,
     groupRef: s.kind === 'direct' ? null : (s.sourceGroupId ?? null),
-    memberItemRefs: s.kind === 'direct' ? [] : (s.memberItemIds ?? []),
+    memberItemRefs: s.kind === 'direct' ? [] : keepForArcher(s.memberItemIds ?? []),
     selection: s.kind === 'direct' ? null : 'uniform',
   }));
   const parts = slots.map((s) => (s.kind === 'direct'

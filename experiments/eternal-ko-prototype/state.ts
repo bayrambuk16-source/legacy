@@ -25,6 +25,7 @@ import { ProjectileFxSystem } from './world/Projectiles.js';
 import { LootPolicy } from './world/LootPolicy.js';
 import { DropSystem, type DropEvent } from './world/DropSystem.js';
 import { ArcherBuildResolver } from './world/BuildResolver.js';
+import { KoArcherPhysicalStrategy } from '../../src/game/systems/combat/KoArcherPhysicalStrategy.js';
 import { EquipService } from './world/EquipService.js';
 import { ForgeSystem } from './world/ForgeSystem.js';
 import { allDefinitions } from './data/item-catalog.js';
@@ -363,6 +364,9 @@ export class PrototypeState {
     this.player.restoreVitals({ hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY });
 
     this.combat = new CombatSystem(rng, this.player, this.stats, this.balance, this.skills);
+    /* P2.5A — OYUNCU → DÜŞMAN hasarı KO Archer zincirinden geçer.
+       Mob → oyuncu hasarı DEĞİŞMEDİ (legacy formül). */
+    this.combat.setPlayerPhysical(new KoArcherPhysicalStrategy(rng));
     this.consumables = new ConsumableSystem(this.inventory, this.player, this.stats);
     this.potions = new KoPotionSystem(this.inventory, this.player, this.stats);
     this.loot = new LootSystem(rng);

@@ -72,6 +72,28 @@ class Repository {
   private lootById = new Map(this.lootTables.map((l) => [l.id, l]));
 
   item(sourceRef: number): GameItem | undefined { return this.itemByRef.get(sourceRef); }
+
+  /** EK KAYNAK KAYITLARI (A1).
+   *
+   *  `generated/items.json` MVP kapsamıyla üretildi ve 169 item içeriyor;
+   *  okçu ilerlemesi için gereken yay/zırh aileleri orada yok. Bu metot,
+   *  KAYNAKTAN çıkarılmış ek kayıtları depoya ekler.
+   *
+   *  · Generated dosyalar DEĞİŞTİRİLMEZ — "kaynaktan yeniden üretilebilir"
+   *    kuralı korunur.
+   *  · VAR OLAN kayıt EZİLMEZ: aynı ref ikinci kez gelirse yok sayılır,
+   *    böylece canonical kayıt her zaman öncelikli kalır.
+   *  · Dönen sayı gerçekten eklenen kayıt adedidir (test bunu doğrular). */
+  registerSourceItems(extra: readonly GameItem[]): number {
+    let added = 0;
+    for (const it of extra) {
+      if (this.itemByRef.has(it.sourceRef)) continue;
+      this.itemByRef.set(it.sourceRef, it);
+      this.items.push(it);
+      added += 1;
+    }
+    return added;
+  }
   monster(sourceRef: number): GameMonster | undefined { return this.monsterByRef.get(sourceRef); }
   loot(id: string): LootTable | undefined { return this.lootById.get(id); }
   zone(id: string): GameZone | undefined { return this.zones.find((z) => z.id === id); }
