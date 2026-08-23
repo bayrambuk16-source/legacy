@@ -178,6 +178,11 @@ export const PROTO_MODELS: Record<string, string> = {
      3bb19b3ad5e4689bd7996cfbe1bbba3978832683836139ac44ca276e8c9700db.
      Statik mesh: skin/iskelet/animasyon YOK. */
   arrow_glb: 'assets/models/arrow_mobile_v1.glb',
+  /* P2.28 — ZAYIF MOB MODELİ (Sv1-10). Kecoon iskeletine bağlanmış
+     goblin mesh'i; 747 064 bayt. Güçlü moblar mutant modelini
+     kullanmaya devam eder — silüet farkı seviye bandını okutur.
+     LİSANS: mesh CC-BY-4.0 / RapidAssets, GÖRÜNÜR künye zorunlu. */
+  kecoon_glb: 'assets/models/kecoon_goblin_mobile_v1.glb',
 
   /* ═══════════ P2.11 — DOĞA VARLIKLARI ═══════════
      Kaynak: Stylized Nature MegaKit (68 model). Yalnız 7 aile alındı;

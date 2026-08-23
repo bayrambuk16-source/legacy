@@ -49,6 +49,8 @@ export function buildWorldFrame(S: PrototypeState): WorldFrame {
       /* P2.9 — ceset ömrü. Mob respawn'a kadar gameplay listesinde KALIR
          (yuva sahipliği bunu gerektirir), görseli ise `CORPSE_VISIBLE_SEC`
          sonra kaybolur. Gameplay'e hiçbir şey yazılmaz. */
+      /* P2.28 — model seçimi için (zayıf goblin, güçlü mutant). */
+      level: m.monster.level,
       corpseFaded: m.ai === 'dead' && m.deathTimer > CORPSE_VISIBLE_SEC,
     });
   }

@@ -48,6 +48,29 @@ export const MUTANT_ANIM_TUNING = {
 
 /* ───────────────────────────── klip eşleme tablosu ───────────────────────────── */
 
+/** P2.28 — MODELE GÖRE KLİP TABLOSU. Goblin'in klip kümesi dardır:
+ *  nefes, koşu ve kükreme YOK. Eksik faz için EN YAKIN klip kullanılır;
+ *  uydurma klip adı ÜRETİLMEZ.
+ *
+ *  Model, oynayan klip adlarından anlaşılır — ayrı bir bayrak taşımaya
+ *  gerek yok ve `MobRig` model bilmez. */
+export function clipMapFor(available: readonly string[]): {
+  idle: string; idleLong: string; walk: string; run: string;
+  roar: string | null; death: string;
+} {
+  const goblin = available.includes('02_WALK');
+  if (goblin) {
+    return {
+      idle: '01_IDLE', idleLong: '01_IDLE', walk: '02_WALK',
+      run: '02_WALK', roar: null, death: '05_DEATH',
+    };
+  }
+  return {
+    idle: '01_IDLE', idleLong: '02_IDLE_BREATHE', walk: '03_WALK',
+    run: '04_RUN', roar: '07_ROAR', death: '08_DEATH',
+  };
+}
+
 /** FAZ → KLİP eşlemesi TEK YERDE. Yeni bir klip gelirse yalnız burası değişir. */
 export const MUTANT_CLIP_MAP = {
   idle: '01_IDLE',
@@ -117,6 +140,15 @@ const RUN_PHASES: readonly MobPhase[] = ['CHASE'];
 type OneShot = { clip: MutantClipName; remaining: number; cutOnMove: boolean };
 
 export class MutantAnimator {
+  /** P2.28 — MODELE GÖRE klip tablosu. Varsayılan mutanttır; goblin
+   *  rig'i için `useClipMap()` ile değiştirilir. `MobRig` model
+   *  bilmez, animatör bilir. */
+  private map: ReturnType<typeof clipMapFor> = clipMapFor([]);
+
+  useClipMap(availableClips: readonly string[]): void {
+    this.map = clipMapFor(availableClips);
+  }
+
   private oneShot: OneShot | null = null;
   private dead = false;
   private idleElapsed = 0;
@@ -146,10 +178,10 @@ export class MutantAnimator {
 
     /* ── 1. ÖLÜM: her şeyi ezer ── */
     if (phase === 'DYING' || phase === 'DEAD') {
-      if (!this.dead) { this.dead = true; this.oneShot = null; this.note(MUTANT_CLIP_MAP.death); }
-      this.current = MUTANT_CLIP_MAP.death;
+      if (!this.dead) { this.dead = true; this.oneShot = null; this.note((this.map.death as MutantClipName)); }
+      this.current = (this.map.death as MutantClipName);
       return {
-        clip: MUTANT_CLIP_MAP.death, loop: false, clamp: true, timeScale: 1,
+        clip: (this.map.death as MutantClipName), loop: false, clamp: true, timeScale: 1,
         fadeSec: MUTANT_ANIM_TUNING.fadeSec, restart: false,
         visualYOffsetMeters: MUTANT_DEATH_VISUAL_Y_OFFSET_METERS, deathActive: true,
       };
@@ -179,7 +211,7 @@ export class MutantAnimator {
 
     /* ── 3. AGGRO KÜKREMESİ (yükselen kenar) ── */
     if (phase === 'AGGRO' && prevPhase !== 'AGGRO' && this.oneShot === null) {
-      const roar = mutantClip(MUTANT_CLIP_MAP.roar);
+      const roar = mutantClip((this.map.roar as MutantClipName));
       this.oneShot = {
         clip: roar.name, remaining: roar.durationSec,
         cutOnMove: MUTANT_ANIM_TUNING.roarCutOnMove,
@@ -204,7 +236,7 @@ export class MutantAnimator {
     /* ── 5. lokomosyon: AİLE FAZDAN, HIZ ORANI ÖLÇÜMDEN ── */
     if (moving && (WALK_PHASES.includes(phase) || RUN_PHASES.includes(phase))) {
       this.idleElapsed = 0;
-      const name = RUN_PHASES.includes(phase) ? MUTANT_CLIP_MAP.run : MUTANT_CLIP_MAP.walk;
+      const name = RUN_PHASES.includes(phase) ? (this.map.run as MutantClipName) : (this.map.walk as MutantClipName);
       const clip = mutantClip(name);
       const scale = clampScale(speed / Math.max(0.01, clip.sourceSpeedMetersPerSec));
       if (this.current !== name) this.note(name);
@@ -215,7 +247,7 @@ export class MutantAnimator {
     /* ── 6. duruş ── */
     this.idleElapsed += dt;
     const name = this.idleElapsed >= MUTANT_ANIM_TUNING.breatheAfterSec
-      ? MUTANT_CLIP_MAP.idleLong : MUTANT_CLIP_MAP.idle;
+      ? (this.map.idleLong as MutantClipName) : (this.map.idle as MutantClipName);
     if (this.current !== name) this.note(name);
     this.current = name;
     return this.decide(name, true, false, 1, false);

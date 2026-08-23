@@ -104,6 +104,21 @@ async function attachThree(): Promise<void> {
       console.warn('[P2.4] Ok GLB yüklenemedi, primitive silüet:',
         err instanceof Error ? err.message : err);
     }
+    /* ══ P2.28 — GOBLIN MOB MODELİ (zayıf moblar) ══
+       Bağımsız `try`: yüklenemezse bütün moblar mutant modeline
+       düşer ve oyun çalışmaya devam eder. */
+    try {
+      const [{ loadGlb }, { modelSrc }] = await Promise.all([
+        import('./render3d/GlbLoader.js'),
+        import('./data/proto-assets.js'),
+      ]);
+      const url = modelSrc('kecoon_glb');
+      if (url) renderer.attachKecoon(await loadGlb(url));
+    } catch (err) {
+      console.warn('[P2.28] Goblin GLB yüklenemedi, mutant modeli:',
+        err instanceof Error ? err.message : err);
+    }
+
     /* ══ P2.11 — ZEMİN DOKUSU ══
        Görsel ön-yükleyici bu anahtarı zaten indirdi; burada yalnız
        materyale bağlanır. Doku yoksa düz renk devrede kalır. */

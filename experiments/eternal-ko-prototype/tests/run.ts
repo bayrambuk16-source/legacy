@@ -64,6 +64,11 @@ import { QUESTS, promotionQuests, questById } from '../data/quests.js';
 import { DEATH_EXP_PENALTY } from '../state.js';
 import { LEVELING } from '../../../src/game/config.js';
 import {
+  GOBLIN_MAX_LEVEL, KECOON_ATTRIBUTION, KECOON_CLIPS, KECOON_CLIP_MAP,
+  kecoonAttackClipFor, kecoonScaleFor, usesGoblinModel,
+} from '../data/kecoon-model.js';
+import { clipMapFor } from '../render3d/MutantAnimator.js';
+import {
   GENIE_PANEL, GENIE_SET_TABS, GENIE_SKILL_SLOTS, GENIE_SLIDERS, GENIE_TOGGLES,
   SLIDER_TRACK, genieHitTest,
 } from '../ui/genie-panel.js';
@@ -11676,6 +11681,82 @@ test('§97 Sv30 içeriği ULAŞILABİLİR — her banda mob var', () => {
     ok([...levels].some((l) => l >= lo && l <= hi), `Sv${lo}-${hi} bandında mob yok`);
   }
   eq(Math.max(...levels), 30, 'en yüksek mob:');
+});
+
+/* ================= P2.28 — GOBLIN MOB MODELİ ================= */
+console.log('P2.28 — ikinci mob modeli (goblin):');
+
+test('§98 klip gerçekleri VARLIK RAPORUNDAN — uydurma yok', () => {
+  eq(KECOON_CLIPS.length, 5, 'klip sayısı:');
+  const names = KECOON_CLIPS.map((c) => c.name);
+  eq(names.join(','), '01_IDLE,02_WALK,03_ATTACK_SLAM,04_LEAP_ATTACK,05_DEATH', 'klipler:');
+  /* Kaynakta OLMAYAN klipler uydurulmamalı. */
+  for (const missing of ['RUN', 'HIT_REACT', '04_RUN', '07_ROAR']) {
+    ok(!names.includes(missing as never), `uydurma klip: ${missing}`);
+  }
+  /* Ölçülen değerler makul aralıkta olmalı — bozuk manifest buradan yakalanır. */
+  for (const c of KECOON_CLIPS) {
+    ok(c.durationSec > 0 && c.durationSec < 10, `${c.name} süresi saçma: ${c.durationSec}`);
+    ok(c.keys > 0, `${c.name} anahtar yok`);
+    if (c.hitTimeSec !== null) {
+      ok(c.hitTimeSec > 0 && c.hitTimeSec < c.durationSec,
+        `${c.name} vuruş anı klip dışında`);
+    }
+  }
+  /* ÖLÜM klibi TEK SEFERLİK olmalı — döngüye girerse ceset kalkar. */
+  eq(KECOON_CLIPS.find((c) => c.name === '05_DEATH')!.loop, false, 'ölüm döngüsü:');
+});
+
+test('§98 MODEL SEÇİMİ seviyeye göre — zayıf goblin, güçlü mutant', () => {
+  eq(GOBLIN_MAX_LEVEL, 10, 'goblin bandı tavanı:');
+  for (const lv of [1, 5, 9, 10]) ok(usesGoblinModel(lv), `Sv${lv} goblin olmalı`);
+  for (const lv of [11, 15, 20, 30]) ok(!usesGoblinModel(lv), `Sv${lv} mutant olmalı`);
+  /* Moradon'un HER İKİ bandında da mob olmalı — yoksa bir model
+     hiç görünmez ve ayrım anlamsızlaşır. */
+  const levels = FARM_AREA_SLOTS
+    .map((s) => Content.monster(s.monsterRef)?.level ?? 0);
+  ok(levels.some((l) => usesGoblinModel(l)), 'goblin bandında mob yok');
+  ok(levels.some((l) => !usesGoblinModel(l)), 'mutant bandında mob yok');
+});
+
+test('§98 KLİP TABLOSU modele göre seçilir, eksik faz UYDURULMAZ', () => {
+  const goblin = clipMapFor(['01_IDLE', '02_WALK', '03_ATTACK_SLAM', '05_DEATH']);
+  const mutant = clipMapFor(['01_IDLE', '02_IDLE_BREATHE', '03_WALK', '04_RUN']);
+  eq(goblin.walk, '02_WALK', 'goblin yürüyüş:');
+  eq(mutant.walk, '03_WALK', 'mutant yürüyüş:');
+  /* Goblin'de nefes ve koşu YOK → en yakın klibe düşülür. */
+  eq(goblin.idleLong, goblin.idle, 'nefes yoksa boşta klibi:');
+  eq(goblin.run, goblin.walk, 'koşu yoksa yürüyüş:');
+  eq(goblin.roar, null, 'kükreme yoksa null:');
+  /* Mutantın kendi tablosu DEĞİŞMEDİ. */
+  eq(mutant.idleLong, '02_IDLE_BREATHE', 'mutant nefes:');
+  eq(mutant.roar, '07_ROAR', 'mutant kükreme:');
+  /* Tablo ile klip listesi TUTARLI olmalı. */
+  eq(KECOON_CLIP_MAP.death, '05_DEATH', 'goblin ölüm klibi:');
+});
+
+test('§98 saldırı klibi vuruş anına EN YAKIN olan seçilir', () => {
+  /* Slam 0,533 sn, leap 0,400 sn. */
+  eq(kecoonAttackClipFor(0.55).name, '03_ATTACK_SLAM', 'geç vuruş → slam:');
+  eq(kecoonAttackClipFor(0.35).name, '04_LEAP_ATTACK', 'erken vuruş → sıçrama:');
+});
+
+test('§98 ölçek modele göre — goblin mutanttan KISA', () => {
+  for (const t of ['NORMAL', 'AGGRESSIVE', 'ELITE'] as const) {
+    const k = kecoonScaleFor(t);
+    ok(k > 0 && Number.isFinite(k), `${t} ölçeği geçersiz: ${k}`);
+  }
+  /* Hiyerarşi korunmalı: elit > saldırgan > normal. */
+  ok(kecoonScaleFor('ELITE') > kecoonScaleFor('AGGRESSIVE'), 'elit daha büyük');
+  ok(kecoonScaleFor('AGGRESSIVE') > kecoonScaleFor('NORMAL'), 'saldırgan daha büyük');
+});
+
+test('§98 LİSANS künyesi kodda TAŞINIYOR', () => {
+  /* Mesh CC-BY-4.0; görünür künye zorunlu. Metin kodda durmalı ki
+     ileride künye ekranı yazılırken kaynağı aranmasın. */
+  ok(KECOON_ATTRIBUTION.includes('RapidAssets'), 'künye sahibi eksik');
+  ok(KECOON_ATTRIBUTION.includes('CC-BY'), 'lisans adı eksik');
+  ok(PROTO_MODELS['kecoon_glb'] !== undefined, 'model manifestte yok');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

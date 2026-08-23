@@ -22,6 +22,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import {
   MUTANT_BONES, mutantScaleFor, type MutantClipName,
 } from '../data/mutant-model.js';
+import { kecoonScaleFor } from '../data/kecoon-model.js';
 import type { MobAiType } from '../data/mob-ai-profiles.js';
 import { MutantAnimator, type MutantAnimDecision, type MutantAnimInput } from './MutantAnimator.js';
 import { findNode, type LoadedGlb } from './GlbLoader.js';
@@ -72,7 +73,12 @@ export class MobRig {
     readonly aiType: MobAiType,
   ) {
     this.root.name = `mobRig:${aiType}`;
-    const s = mutantScaleFor(aiType);
+    /* P2.28 — ÖLÇEK MODELE GÖRE. Goblin mutanttan kısadır; kendi
+       doğal boyu üzerinden ölçeklenir ki placeholder yükseklik
+       hiyerarşisi korunsun. Model, klip adından ANLAŞILIR: goblin
+       klipleri `02_WALK` taşır, mutantınki `03_WALK`. */
+    const isGoblin = clips.some((c) => c.name === '02_WALK');
+    const s = isGoblin ? kecoonScaleFor(aiType) : mutantScaleFor(aiType);
     this.root.scale.set(s, s, s);
     this.root.add(this.model);
 
@@ -86,6 +92,9 @@ export class MobRig {
 
     this.mixer = new AnimationMixer(this.model);
     for (const c of clips) this.clipMap.set(c.name as MutantClipName, c);
+    /* P2.28 — animatöre HANGİ KLİPLERİN var olduğunu söyle; tablo
+       ona göre seçilir. Rig model adı bilmez, klip listesi bilir. */
+    this.animator.useClipMap(clips.map((c) => c.name));
   }
 
   get clipNames(): MutantClipName[] { return [...this.clipMap.keys()]; }

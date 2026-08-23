@@ -33,6 +33,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { facingToYaw } from './coords.js';
+import { usesGoblinModel } from '../data/kecoon-model.js';
 import {
   FOLIAGE_BASE_SCALE, type FoliageItem, type FoliageKind,
 } from '../data/moradon-foliage.js';
@@ -390,6 +391,28 @@ export class ThreeWorldRenderer {
 
   /** Yüklenmiş mutant GLB'sini mob görseline bağlar.
    *  Silindir fallback SİLİNMEZ; model kaldırılırsa anında geri gelir. */
+  /** P2.28 — goblin fabrikası. Mutantınkiyle AYNI sınıf: `MobRig`
+   *  klip adlarını tablodan okur, model farkı rig'e sızmaz. */
+  private kecoonFactory: MutantRigFactory | null = null;
+  private kecoonGlb: LoadedGlb | null = null;
+
+  attachKecoon(glb: LoadedGlb): MutantRigFactory {
+    this.detachKecoon();
+    this.kecoonGlb = glb;
+    this.kecoonFactory = new MutantRigFactory(glb);
+    this.rebuildMobVisuals();
+    return this.kecoonFactory;
+  }
+
+  detachKecoon(): void {
+    this.kecoonFactory?.dispose();
+    this.kecoonFactory = null;
+    this.kecoonGlb = null;
+    this.rebuildMobVisuals();
+  }
+
+  get usingKecoon(): boolean { return this.kecoonFactory !== null; }
+
   attachMutant(glb: LoadedGlb): MutantRigFactory {
     this.detachMutant();
     this.mutantGlb = glb;
@@ -835,9 +858,15 @@ export class ThreeWorldRenderer {
   }
 
   private fillMobVisual(g: Group, m: MobView, key: string): void {
-    /* GERÇEK MODEL: klonlanmış mutant örneği (geometri/materyal PAYLAŞILIR). */
-    if (this.mutantFactory) {
-      const rig = this.mutantFactory.create(m.aiType);
+    /* ═══ P2.28 — İKİ MODEL, SEVİYEYE GÖRE ═══
+       Zayıf moblar (Sv1-10) goblin, güçlüler mutant. Silüet farkı
+       seviye bandını uzaktan okutur. İstenen fabrika yoksa diğerine
+       düşülür — model yüklenmediği için mob görünmez kalmasın. */
+    const wantGoblin = usesGoblinModel(m.level);
+    const factory = (wantGoblin ? this.kecoonFactory : this.mutantFactory)
+      ?? this.mutantFactory ?? this.kecoonFactory;
+    if (factory) {
+      const rig = factory.create(m.aiType);
       g.add(rig.root);
       this.mobRigs.set(key, rig);
       this.rigByGroup.set(g, rig);

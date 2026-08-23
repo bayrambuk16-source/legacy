@@ -49,6 +49,10 @@ export interface MobView {
   attackTimer: number;
   /** Profilin vuruş anı (sn) — saldırı klibi seçimi + hizalama. */
   hitMomentSec: number;
+  /** P2.28 — MOBUN SEVİYESİ. Renderer bunu YALNIZ MODEL SEÇİMİ için
+   *  okur (zayıf → goblin, güçlü → mutant); gameplay'e yazmaz.
+   *  Seviye zaten `MobAi` runtime'ında var, kopyalanır. */
+  level: number;
   /** P2.9 — CESET SÜRESİ DOLDU MU? Ölen mob respawn'a kadar listede kalır
    *  (yuva sahipliği bunu gerektirir), ama görseli birkaç saniye sonra
    *  KAYBOLUR. Bu bir GÖRÜNÜM alanıdır; gameplay'de karşılığı yoktur. */
