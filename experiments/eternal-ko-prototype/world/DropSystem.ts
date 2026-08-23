@@ -24,6 +24,8 @@ import type { LootSystem } from '../../../src/game/systems/LootSystem.js';
 import type { InventoryState } from '../../../src/game/systems/InventoryState.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
+import type { Rng } from '../../../src/engine/rng.js';
+import { SCROLL_ITEM_REF } from './ForgeSystem.js';
 import {
   DROP_TUNING_V1, dropProfile, effectiveCoin,
   type DropTuning, type MonsterDropProfile,
@@ -44,7 +46,9 @@ export interface DropRecord {
   quantity: number;
   kind: 'item' | 'coin';
   /** Hangi kaynak yuvasından geldi. */
-  from: 'direct' | 'group' | 'coin';
+  /** Hangi kaynaktan geldi. `scroll` P2.8'de eklendi: parşömen ganimet
+   *  tablosundan DEĞİL, Örs'e özel sabit şanstan gelir. */
+  from: 'direct' | 'group' | 'coin' | 'scroll';
   delivery: LootDelivery;
   ownerPlayerId: number;
   /** Yere düştüyse entity kimliği. */
@@ -73,6 +77,9 @@ export interface DropEvent {
 }
 
 export interface DropSystemDeps {
+  /** P2.8 — parşömen zarı. `LootSystem`'inkiyle AYNI tohumlu akış olmalı;
+   *  ayrı bir akış açmak tekrar üretilebilirliği bozar. */
+  rng: Rng;
   loot: LootSystem;
   inventory: InventoryState;
   player: PlayerState;
@@ -80,6 +87,10 @@ export interface DropSystemDeps {
   /** Auto Loot açık mı? OYUNCU TERCİHİ — Genie durumundan bağımsız. */
   autoLoot: () => boolean;
 }
+
+/** Parşömen düşme şansı (mob başına). PROJECT LEGACY KARARI — kaynaktan
+ *  gelmez. %6: yaklaşık 17 mobda bir parşömen, elitlerde iki katı. */
+export const SCROLL_DROP_CHANCE = 0.06;
 
 export class DropSystem {
   tuning: DropTuning = { ...DROP_TUNING_V1 };
@@ -123,6 +134,15 @@ export class DropSystem {
     /* ── 2) ITEM'LER — her drop AYRI kayıt / AYRI teslimat (§17) ── */
     for (const d of rolled.drops) {
       ev.records.push(this.deliverItem(mob, d.itemRef, 1, d.from, autoLoot, owner));
+    }
+
+    /* ── 2b) YÜKSELTME PARŞÖMENİ (P2.8) ──
+       Örs'ün malzemesi. Ganimet tablosundan DEĞİL, ayrı ve sabit bir şanstan
+       gelir: kaynak loot tablolarında böyle bir kayıt yoktur, uydurma bir
+       satır eklemek yerine ayrı bir kural olarak durur. Elit moblar iki kat.
+       Zar aynı tohumlu akıştandır. */
+    if (this.deps.rng() < SCROLL_DROP_CHANCE * (mob.monster.tier === 'elite' ? 2 : 1)) {
+      ev.records.push(this.deliverItem(mob, SCROLL_ITEM_REF, 1, 'scroll', autoLoot, owner));
     }
 
     /* ── 3) COIN — envanter slotu KAPLAMAZ, tek authority (§14) ── */

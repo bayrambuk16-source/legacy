@@ -26,6 +26,7 @@ import { LootPolicy } from './world/LootPolicy.js';
 import { DropSystem, type DropEvent } from './world/DropSystem.js';
 import { ArcherBuildResolver } from './world/BuildResolver.js';
 import { EquipService } from './world/EquipService.js';
+import { ForgeSystem } from './world/ForgeSystem.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
 import { PlayerAnimator } from './world/PlayerAnimation.js';
@@ -112,6 +113,8 @@ export class PrototypeState {
    *  Ana `ConsumableSystem` (yüzdelik) DEĞİŞTİRİLMEDİ ve hâlâ mevcuttur. */
   readonly potions: KoPotionSystem;
   readonly timing = new ArcherCombatTimingProfile();
+  /** P2.8 — Örs. Yükseltmenin TEK mutasyon kapısı. */
+  forge!: ForgeSystem;
   /** Oyuncu görsel durum makinesi — saldırı animasyonu YALNIZ buradan tetiklenir. */
   readonly anim = new PlayerAnimator();
 
@@ -376,7 +379,7 @@ export class PrototypeState {
     /* P1.7 — drop RNG oyunun TOHUMLU rng'sinden gelir (LootSystem içinde);
        bu katmanda `Math.random()` YOKTUR → aynı tohum aynı loot dizisi. */
     this.drops = new DropSystem({
-      loot: this.loot, inventory: this.inventory, player: this.player,
+      rng, loot: this.loot, inventory: this.inventory, player: this.player,
       ground: this.worldLoot,
       autoLoot: () => this.lootPolicy.autoLoot,
     });
@@ -402,6 +405,9 @@ export class PrototypeState {
       playerAlive: () => this.player.alive,
       strike: (mob) => this.mobAttack.strike(mob),
       stepAllowed: worldCfg.stepAllowed,      // oyuncuyla AYNI kapı
+    });
+    this.forge = new ForgeSystem({
+      rng, inventory: this.inventory, equipment: this.equipment, player: this.player,
     });
     this.mobs.ai.respawnOverrideSec = RESPAWN_DEFAULT;
     this.mobs.populate();

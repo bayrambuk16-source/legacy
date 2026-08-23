@@ -90,7 +90,9 @@ export const PROTO: ProtoConstants = {
    *  seviyesi 70. (P1.1'de 55'ti — arrow shower şartı.)
    *  Ana oyunun MVP tavanı (LEVELING.maxLevel = 20) DEĞİŞMEDİ; bu yalnız prototip
    *  state'inde doğrudan alan ataması ile yapılır (bkz. state.ts). */
-  startLevel: 70,
+  /* P2.8 — oyun testi için 1'e çekildi. Denge eğrisini baştan görmek gerekiyor;
+     70 ile başlamak ilk saatleri atlıyordu. DEV panelinden değişmez, buradan. */
+  startLevel: 1,
   /** Genie iksir eşiklerini test edebilmek için başlangıç iksirleri.
    *  İki farklı güç seviyesi var: Genie "eksiği karşılayan en küçük iksir"i seçer. */
   startPotions: [

@@ -42,6 +42,17 @@ import {
   HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_TARGET_BTN, UI_MOCK, UI_SCALE,
   hudNavBoxes, hudSkillBoxes, hudSpriteKeys,
 } from '../ui/hud-layout.js';
+import {
+  CHAR_GEAR_BOX, CHAR_STATS_BOX, PANEL_FRAME, SKILL_PAGE_SIZE, charHitTest, gearSlotOrder,
+  skillBarRects, skillHitTest, skillPageButtons, skillPoolRects, statRows,
+} from '../ui/character-panel.js';
+import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
+import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
+import {
+  FORGE_EFFECTIVE_MAX, canAttempt, forgePreview, goldCost, scrollCost, successChance,
+} from '../data/forge-model.js';
+import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
+import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
 import { UI_ASSETS } from '../data/proto-assets.js';
 /* MORADON_WORLD_SPAWN ve SPAWN_POINT dosyanın ilerisinde ZATEN import edilir
    (P2.4A bloğu / world-map). Burada yalnız P2.4C'ye özgü adlar alınır. */
@@ -225,12 +236,23 @@ function fireAndResolve(S: PrototypeState, ref: number, target: WorldMob | null,
  *  ŞEYİ ölçemez olur. Bu yüzden P1.x testleri dünyayı AÇIKÇA enjekte eder.
  *  Canlı oyun etkilenmez: `PrototypeState` varsayılanı `ACTIVE_WORLD`tur ve
  *  Moradon'u kullanmaya devam eder. */
+/** P2.8 — P1.x testleri SEVİYE 70 varsayar (skill gereksinimleri, MP tavanı,
+ *  hasar eğrileri hep o seviyede ölçüldü). Canlı oyun artık seviye 1'den
+ *  başlıyor (`PROTO.startLevel`), bu yüzden test dünyası seviyeyi de AÇIKÇA
+ *  kurar — tıpkı dünyayı açıkça kurduğu gibi. */
+const TEST_LEVEL = 70;
+
 function protoState(seed?: number, slots?: readonly MobSpawnSlot[]): PrototypeState {
   /* Dünya ile slot tablosu BİRLİKTE gider: test dünyasının doğuş noktası
      (1240, 1650) etrafına P1.6 yerleşimi kurulur. Moradon slotları (şehir
      meydanı) bu dünyada oyuncudan yüzlerce birim uzağa düşerdi ve menzil /
      aggro / çok-ok senaryoları anlamını yitirirdi. */
-  return new PrototypeState(seed, slots ?? TEST_FARM_AREA_SLOTS, TEST_WORLD);
+  const S = new PrototypeState(seed, slots ?? TEST_FARM_AREA_SLOTS, TEST_WORLD);
+  S.player.level = TEST_LEVEL;
+  /* Seviye HP/MP TAVANINI değiştirir; kurucu bunları seviye 1'e göre
+     doldurmuştu. Tavanı yeniden doldur, yoksa testler yarım MP ile başlar. */
+  S.player.restoreVitals({ hp: Number.POSITIVE_INFINITY, mp: Number.POSITIVE_INFINITY });
+  return S;
 }
 
 function test(name: string, fn: () => void): void {
@@ -558,7 +580,10 @@ test('prototip kendi state\'ini kullanır, ana GameState\'e dokunmaz', () => {
   a.player.coins = 999;
   eq(b.player.coins, 0, 'örnekler ayrı olmalı:');
   ok(a.inventory !== b.inventory);
-  eq(a.player.level, PROTO.startLevel, 'prototip başlangıç seviyesi:');
+  /* P2.8 — canlı oyun artık Sv1'den başlıyor; test dünyası seviyeyi AÇIKÇA
+     70 yapar (bkz. `TEST_LEVEL`). Burada test kurulumunun tuttuğu doğrulanır. */
+  eq(a.player.level, TEST_LEVEL, 'test dünyası seviyesi:');
+  eq(new PrototypeState(99).player.level, PROTO.startLevel, 'canlı başlangıç seviyesi:');
   ok(a.equipment.equippedInstance('weapon') !== undefined, 'başlangıç yayı kuşanılı');
 });
 test('prototip PlayerState/SkillSystem ana sınıflarını yeniden kullanır', () => {
@@ -974,10 +999,11 @@ test('prototip davranışları ana SkillRegistry\'ye ADDITIVE eklenir', () => {
   eq(as_!.requiredLevel, 55, 'arrow shower KAYNAK seviye:');
   eq(as_!.manaCost, 150, 'arrow shower KAYNAK mana:');
 });
-test('prototip başlangıcı: Sv70 + iksirler (15 skillin hepsi açık olsun diye)', () => {
+test('test kurulumu: Sv70 + iksirler (15 skillin hepsi açık olsun diye)', () => {
   const S = protoState(4);
-  eq(S.player.level, 70, 'prototip seviyesi:');
-  eq(S.player.level, PROTO.startLevel, 'config ile tutarlı:');
+  eq(S.player.level, 70, 'test seviyesi:');
+  /* Canlı oyun Sv1'den başlar — bu AYRI bir karardır, testin varsayımı değil. */
+  eq(PROTO.startLevel, 1, 'canlı başlangıç seviyesi:');
   const potions = S.inventory.bagList().filter((e) => S.consumables.isConsumable(e.entry.itemRef));
   ok(potions.length >= 4, `en az 4 çeşit iksir bekleniyordu, ${potions.length}`);
   ok(S.stats.finalStats().maxMp >= 150, 'arrow shower için yeterli mana havuzu');
@@ -9497,6 +9523,191 @@ test('§56 yerleşim katmanı SAF — three yok, gameplay yok', () => {
   ok(!/from\s+'three/.test(src), 'yerleşim three import ETMEMELİ');
   ok(!/Math\.random/.test(src), 'yerleşim Math.random KULLANMAMALI');
   ok(!/world\//.test(src), 'yerleşim gameplay sistemi import ETMEMELİ');
+});
+
+/* ================= P2.7 — KARAKTER + YETENEK EKRANLARI ================= */
+console.log('P2.7 — karakter ve yetenek panelleri:');
+
+test('§57 karakter ekranı: satırlar KAYNAKTAN, ekipman katkısı FARKTIR', () => {
+  const S = protoState(2700);
+  const final = S.stats.finalStats();
+  const base = StatCalculator.baseStats(S.player.level);
+  const rows = statRows(final, base, 0.8);
+  /* Değerler uydurulmaz: saldırı satırı authority'nin döndürdüğü sayıdır. */
+  const atk = rows.find((r) => r.label === 'Saldırı')!;
+  eq(atk.value, String(Math.round(final.attack)), 'saldırı değeri:');
+  /* Ekipman katkısı = kuşanılı − taban. Fark yoksa satır katkı GÖSTERMEZ. */
+  for (const r of rows) {
+    if (r.fromGear === null) continue;
+    ok(/^[+-]\d+$/.test(r.fromGear), `katkı biçimi bozuk: ${r.label} → ${r.fromGear}`);
+  }
+  const hp = rows.find((r) => r.label === 'Max HP')!;
+  const diff = Math.round(final.maxHp - base.maxHp);
+  eq(hp.fromGear, diff === 0 ? null : `${diff > 0 ? '+' : ''}${diff}`, 'HP katkısı:');
+  /* Ekipman özeti 12 yuvanın TAMAMINI listeler (boşlar dahil). */
+  eq(gearSlotOrder().length, 12, 'ekipman yuvası:');
+});
+
+test('§57 karakter ekranı blokları panel İÇİNDE ve çakışmıyor', () => {
+  const within = (r: { x: number; y: number; w: number; h: number }): boolean =>
+    r.x >= PANEL_FRAME.x && r.y >= PANEL_FRAME.y
+    && r.x + r.w <= PANEL_FRAME.x + PANEL_FRAME.w
+    && r.y + r.h <= PANEL_FRAME.y + PANEL_FRAME.h;
+  ok(within(CHAR_STATS_BOX), 'stat bloğu panel dışında');
+  ok(within(CHAR_GEAR_BOX), 'ekipman bloğu panel dışında');
+  ok(CHAR_GEAR_BOX.y >= CHAR_STATS_BOX.y + CHAR_STATS_BOX.h, 'iki blok çakışıyor');
+  /* Panel dışına dokunma hiçbir şeyi tetiklemez. */
+  eq(charHitTest(2, 2), null, 'panel dışı:');
+});
+
+test('§58 yetenek ekranı: yuva ve havuz dokunuşları DOĞRU çözülür', () => {
+  const mid = (r: { x: number; y: number; w: number; h: number }): [number, number] =>
+    [r.x + r.w / 2, r.y + r.h / 2];
+  const bars = skillBarRects(ACTIVE_BAR_SLOTS);
+  eq(bars.length, ACTIVE_BAR_SLOTS, 'bar yuvası:');
+  for (let i = 0; i < bars.length; i++) {
+    const h = skillHitTest(...mid(bars[i]!), ACTIVE_BAR_SLOTS, SKILL_PAGE_SIZE);
+    ok(h !== null && h.kind === 'bar' && h.index === i, `bar ${i} çözülemedi`);
+  }
+  const pool = skillPoolRects(SKILL_PAGE_SIZE);
+  for (const i of [0, SKILL_PAGE_SIZE - 1]) {
+    const h = skillHitTest(...mid(pool[i]!), ACTIVE_BAR_SLOTS, SKILL_PAGE_SIZE);
+    ok(h !== null && h.kind === 'pool' && h.index === i, `havuz ${i} çözülemedi`);
+  }
+  for (const b of skillPageButtons()) {
+    const h = skillHitTest(...mid(b), ACTIVE_BAR_SLOTS, SKILL_PAGE_SIZE);
+    ok(h !== null && h.kind === 'button' && h.id === b.id, `${b.id} çözülemedi`);
+  }
+  /* Yerleşim çakışmamalı: bar, havuz ve sayfa düğmeleri ayrık. */
+  const all = [...bars, ...pool, ...skillPageButtons()];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const a = all[i]!, b = all[j]!;
+      const over = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      ok(!over, `yetenek yerleşimi çakışıyor: ${i}/${j}`);
+    }
+  }
+});
+
+test('§58 yuva ataması AUTHORITY’dedir — panel yalnız iletir', () => {
+  const S = protoState(2701);
+  const before = S.combat.skills.slots().map((s) => s.def?.sourceRef ?? null);
+  /* Panel katmanı mutasyon YAPMAZ: yalnız dikdörtgen ve satır üretir. */
+  const src = readFileSync(join(PROTO_ROOT, 'ui', 'character-panel.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/import\s+type[\s\S]*?;/g, '');
+  ok(!/setSlot|equip\(|\.remove\(/.test(src), 'panel mutasyon çağırmamalı');
+  ok(!/from\s+'three/.test(src), 'panel three import etmemeli');
+  ok(!/Math\.random/.test(src), 'panel Math.random kullanmamalı');
+  /* Gerçek atama SkillLoadout üzerinden olur ve etkisini slots()'ta gösterir. */
+  const ref = GENIE_SKILL_POOL.find((r) => SkillRegistry.get(r) !== undefined);
+  if (ref !== undefined) {
+    S.combat.skills.loadout.setSlot(0, ref);
+    eq(S.combat.skills.slots()[0]!.def?.sourceRef, ref, 'yuva 0 ataması:');
+    S.combat.skills.loadout.setSlot(0, before[0]);
+  }
+});
+
+/* ================= P2.8 — ÖRS ================= */
+console.log('P2.8 — Örs (yükseltme):');
+
+test('§59 eğri KAYNAKTAN gelir: ilk 3 garantili, sonra risk', () => {
+  eq(successChance(0), 1, '+1 şansı:');
+  eq(successChance(1), 1, '+2 şansı:');
+  eq(successChance(2), 1, '+3 şansı:');
+  ok(successChance(3) > 0 && successChance(3) < 1, '+4 riskli olmalı');
+  /* Eğri MONOTON düşer — riskli kademe kolaylaşamaz. */
+  for (let i = 3; i < FORGE_EFFECTIVE_MAX; i++) {
+    ok(successChance(i) >= successChance(i + 1), `${i}→${i + 1} eğrisi yükseliyor`);
+  }
+  /* Kaynakta %0 olan kademe DENENMEZ: oyuncu boşuna malzeme yakmaz. */
+  ok(!canAttempt(FORGE_EFFECTIVE_MAX), 'tavanda deneme kabul edilmemeli');
+  ok(canAttempt(FORGE_EFFECTIVE_MAX - 1), 'tavan altı denenebilmeli');
+});
+
+test('§59 maliyet artan, garantili kademe daha az parşömen ister', () => {
+  for (let i = 0; i < FORGE_EFFECTIVE_MAX; i++) {
+    ok(goldCost(i + 1) > goldCost(i), `altın maliyeti artmıyor: ${i}`);
+  }
+  eq(scrollCost(0), 1, 'garantili parşömen:');
+  eq(scrollCost(3), 2, 'riskli parşömen:');
+  const pv = forgePreview(0);
+  ok(pv.guaranteed && !pv.atMax, 'ilk kademe garantili ve tavan değil');
+});
+
+test('§60 REDDEDİLEN deneme HİÇBİR ŞEY harcamaz', () => {
+  const S = protoState(2800);
+  /* Kaynak item'ın `baseUpgradeLevel`i sıfırdan farklı olabilir; test
+     kademeleri saymak için AÇIKÇA +0'dan başlar. */
+  const add = S.inventory.add(allDefinitions()[0]!.definitionRef, { upgradeLevel: 0 });
+  ok(add.ok, 'eşya eklenebilmeli');
+  const id = add.ok ? add.instance.instanceId : 0;
+  S.player.coins = 0;                                   // altın YOK
+  const goldBefore = S.player.coins;
+  const scrollsBefore = S.forge.scrollCount();
+  const res = S.forge.upgrade(id);
+  ok(!res.ok && res.reason === 'noGold', 'altınsız deneme reddedilmeli');
+  eq(S.player.coins, goldBefore, 'altın harcanmamalı:');
+  eq(S.forge.scrollCount(), scrollsBefore, 'parşömen harcanmamalı:');
+  eq(S.inventory.get(id)?.upgradeLevel, 0, 'seviye değişmemeli:');
+});
+
+test('§60 GARANTİLİ kademe her zaman başarılı, malzeme düşer', () => {
+  const S = protoState(2801);
+  const add = S.inventory.add(allDefinitions()[0]!.definitionRef, { upgradeLevel: 0 });
+  const id = add.ok ? add.instance.instanceId : 0;
+  S.player.coins = 999999;
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 20 });
+  for (let lvl = 0; lvl < 3; lvl++) {
+    const gold = S.player.coins, scrolls = S.forge.scrollCount();
+    const res = S.forge.upgrade(id);
+    ok(res.ok && res.success, `+${lvl + 1} garantili başarısız oldu`);
+    eq(S.inventory.get(id)?.upgradeLevel, lvl + 1, 'yeni seviye:');
+    eq(S.player.coins, gold - goldCost(lvl), 'altın düşüşü:');
+    eq(S.forge.scrollCount(), scrolls - scrollCost(lvl), 'parşömen düşüşü:');
+  }
+});
+
+test('§60 BAŞARISIZ deneme eşyayı YAKAR ve yuvayı boşaltır', () => {
+  /* Riskli kademeye kadar garantili yükselt, sonra başarısızlığa denk gelene
+     kadar dene. Zar tohumlu olduğu için bu döngü DETERMİNİSTİKTİR. */
+  const S = protoState(2802);
+  S.player.coins = 9999999;
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 400 });
+  let burned = false;
+  for (let attempt = 0; attempt < 60 && !burned; attempt++) {
+    const add = S.inventory.add(allDefinitions()[0]!.definitionRef, { upgradeLevel: 0 });
+    if (!add.ok) break;
+    const id = add.instance.instanceId;
+    for (let lvl = 0; lvl < 3; lvl++) S.forge.upgrade(id);      // +3'e garantili
+    S.equipService.equip(id);                                   // kuşan
+    const res = S.forge.upgrade(id);                            // riskli deneme
+    if (res.ok && !res.success) {
+      burned = true;
+      eq(S.inventory.get(id), undefined, 'yanan eşya envanterde kalmamalı:');
+      ok(S.stats.slots().every((sl) => sl.instanceId !== id), 'yanan eşya yuvada kalmamalı');
+    }
+  }
+  ok(burned, '60 denemede hiç başarısızlık olmadı — zar bozuk olabilir');
+});
+
+test('§61 Örs paneli yerleşimi panel İÇİNDE ve çakışmıyor', () => {
+  const within = (r: { x: number; y: number; w: number; h: number }): boolean =>
+    r.x >= PANEL_FRAME.x && r.y >= PANEL_FRAME.y
+    && r.x + r.w <= PANEL_FRAME.x + PANEL_FRAME.w
+    && r.y + r.h <= PANEL_FRAME.y + PANEL_FRAME.h;
+  ok(within(FORGE_LIST_BOX), 'liste bloğu panel dışında');
+  ok(within(FORGE_PREVIEW_BOX), 'önizleme bloğu panel dışında');
+  ok(FORGE_PREVIEW_BOX.y >= FORGE_LIST_BOX.y + FORGE_LIST_BOX.h, 'bloklar çakışıyor');
+  for (const b of forgeButtons()) ok(within(b), `${b.id} panel dışında`);
+  const rows = forgeRowRects(FORGE_PAGE_SIZE);
+  for (const r of rows) ok(within(r), 'satır panel dışında');
+  const mid = (r: { x: number; y: number; w: number; h: number }): [number, number] =>
+    [r.x + r.w / 2, r.y + r.h / 2];
+  for (let i = 0; i < rows.length; i++) {
+    const h = forgeHitTest(...mid(rows[i]!), FORGE_PAGE_SIZE);
+    ok(h !== null && h.kind === 'row' && h.index === i, `satır ${i} çözülemedi`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

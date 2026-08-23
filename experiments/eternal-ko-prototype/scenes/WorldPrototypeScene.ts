@@ -9,6 +9,8 @@ import type { DrawApi, GameHost, PointerEventInfo, Scene } from '../../../src/en
 import { DisposerBag } from '../../../src/engine/dispose.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
 import { SkillRegistry } from '../../../src/game/systems/SkillRegistry.js';
+import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
+import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import { PLAYER_SPEED_OPTIONS, PROTO, TUNING_DEFAULTS, type TuningValues } from '../config.js';
 import { PrototypeState } from '../state.js';
 import {
@@ -21,6 +23,14 @@ import {
   HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN, HUD_TARGET_CARD, HUD_BARS,
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
+import {
+  CHAR_GEAR_BOX, CHAR_STATS_BOX, FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX,
+  PANEL_FRAME, SKILL_PAGE_SIZE, charHitTest, forgeButtons, forgeHitTest, forgeRowRects,
+  gearSlotOrder, panelCloseButton, skillBarRects, skillHitTest, skillPageButtons,
+  skillPoolRects, statRows,
+} from '../ui/character-panel.js';
+import { canAttempt, forgePreview } from '../data/forge-model.js';
+import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
   hitTest as invHitTest, invButtons, invCloseButton, itemHeadline, targetSlotFor,
@@ -88,6 +98,16 @@ interface Btn { id: string; x: number; y: number; w: number; h: number; label: s
 
 /** `EquipService` reddetme sebebi → kullanıcı mesajı. Kural BURADA DEĞİL,
  *  serviste; bu tablo yalnız çeviridir. */
+/** Örs reddetme sebebi → kullanıcı mesajı. Kural serviste, bu tablo çeviri. */
+const FORGE_FAIL: Record<string, string> = {
+  notFound: 'Eşya bulunamadı',
+  noDefinition: 'Katalogda yok',
+  maxLevel: 'Tavanda — denenemez',
+  noGold: 'Altın yetmiyor',
+  noScroll: 'Parşömen yetmiyor',
+  locked: 'Eşya kilitli',
+};
+
 const INV_FAIL: Record<EquipFail, string> = {
   notFound: 'Eşya bulunamadı',
   noDefinition: 'Katalogda yok — kuşanılamaz',
@@ -216,6 +236,19 @@ export class WorldPrototypeScene implements Scene {
   /** P2.5 — envanter/ekipman paneli MODAL'dır (Genie ayarları gibi). */
   private invOpen = false;
   private invSel: InvSelection = null;
+  /** P2.7 — karakter ve yetenek ekranları (envanterle AYNI modal deseni). */
+  private charOpen = false;
+  private skillOpen = false;
+  /** Yetenek havuzunun sayfası (dikey kaydırma YOK — sayfalanır). */
+  private skillPage = 0;
+  /** Havuzdan seçilen skill hangi bar yuvasına gidecek. */
+  private skillBarSel = 0;
+  /** P2.8 — Örs. */
+  private forgeOpen = false;
+  private forgePage = 0;
+  private forgeSel: number | null = null;
+  /** Son deneme sonucunun kısa özeti (panelde gösterilir). */
+  private forgeMsg = '';
   private genieTab: 'general' | 'sets' | 'bar' = 'general';
   private editingSet: SetId = 0;
   /** Aktif bar sekmesinde düzenlenen slot. */
@@ -516,10 +549,18 @@ export class WorldPrototypeScene implements Scene {
     /* Genie ayar ekranı MODAL'dır: açıkken alttaki hiçbir kontrol tetiklenmez. */
     if (this.genieOpen) { this.handleGenieSettings(p); return; }
     if (this.invOpen) { this.handleInventory(p); return; }
+    if (this.charOpen) { this.handleCharacter(p); return; }
+    if (this.skillOpen) { this.handleSkills(p); return; }
+    if (this.forgeOpen) { this.handleForge(p); return; }
     for (const n of this.navButtons()) {
       if (!this.hit(p, n)) continue;
       this.host.audio.play('ui');
       if (n.id === 'nav_bag') { this.invOpen = true; this.invSel = null; }
+      else if (n.id === 'nav_char') { this.charOpen = true; }
+      else if (n.id === 'nav_skill') { this.skillOpen = true; this.skillPage = 0; }
+      else if (n.id === 'nav_forge') {
+        this.forgeOpen = true; this.forgePage = 0; this.forgeSel = null; this.forgeMsg = '';
+      }
       else this.say('Bu ekran sonraki görevde');
       return;
     }
@@ -1087,7 +1128,7 @@ export class WorldPrototypeScene implements Scene {
     }
 
     /* GENIE — ayar ekranı açıkken duraklar (kullanıcı ayar yaparken cast etmesin) */
-    if (!this.genieOpen && !this.invOpen) {
+    if (!this.genieOpen && !this.invOpen && !this.charOpen && !this.skillOpen && !this.forgeOpen) {
       this.applyGenieActions(this.S.genie.update(dt, this.ents(), this.S.world));
     }
 
@@ -1137,6 +1178,9 @@ export class WorldPrototypeScene implements Scene {
     if (this.devOpen && this.balanceOpen) this.renderBalance(g);
     if (this.genieOpen) this.renderGenieSettings(g);
     if (this.invOpen) this.renderInventory(g);
+    if (this.charOpen) this.renderCharacter(g);
+    if (this.skillOpen) this.renderSkills(g);
+    if (this.forgeOpen) this.renderForge(g);
   }
 
   private onScreen(sx: number, sy: number, pad = 160): boolean {
@@ -2075,6 +2119,294 @@ export class WorldPrototypeScene implements Scene {
   /** Yuva kutusuna sığmayan uzun adları kısaltır (yalnız GÖRSEL). */
   private shortName(name: string): string {
     return name.length <= 12 ? name : `${name.slice(0, 11)}…`;
+  }
+
+
+  /* ═══════════════ P2.7 — KARAKTER EKRANI ═══════════════
+     Statlar BURADA HESAPLANMAZ: `ArcherBuildResolver` authority'sinden okunur.
+     Ekipman katkısı, kuşanılı hâl ile TABAN (seviye) statının farkıdır. */
+
+  private handleCharacter(p: PointerEventInfo): void {
+    const hit = charHitTest(p.x, p.y);
+    if (hit === null) return;
+    this.host.audio.play('ui');
+    if (hit.id === 'inv_close') this.charOpen = false;
+  }
+
+  private panelShell(g: DrawApi, title: string, right: string): void {
+    const F = PANEL_FRAME;
+    g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.72);
+    g.rect(F.x, F.y, F.w, F.h, '#100d08', 0.97);
+    g.rect(F.x, F.y, F.w, 3, '#e08a3c');
+    g.text(title, F.x + 16, F.y + 18, { size: 15, bold: true, color: '#e8d9a0' });
+    if (right) g.text(right, F.x + F.w - 74, F.y + 20, { align: 'right', size: 12, color: '#8d8272' });
+    const c = panelCloseButton();
+    g.rect(c.x, c.y, c.w, c.h, '#241c14');
+    g.text(c.label, c.x + c.w / 2, c.y + 9, { align: 'center', size: 15, color: '#cfc7b6' });
+  }
+
+  private renderCharacter(g: DrawApi): void {
+    const p = this.S.player;
+    const final = this.S.stats.finalStats();
+    const base = StatCalculator.baseStats(p.level);
+    this.panelShell(g, 'KARAKTER', `Sv ${p.level}`);
+
+    /* ---- stat blokları ---- */
+    const S1 = CHAR_STATS_BOX;
+    g.rect(S1.x, S1.y, S1.w, S1.h, '#0b0908', 0.95);
+    g.text('STATLAR', S1.x + 12, S1.y + 10, { size: 11, bold: true, color: '#8d8272' });
+    statRows(final, base, this.S.timing.actionTime(0)).forEach((row, i) => {
+      const y = S1.y + 34 + i * 29;
+      g.text(row.label, S1.x + 16, y, { size: 12, color: '#cfc7b6' });
+      g.text(row.value, S1.x + S1.w * 0.62, y, { align: 'right', size: 12, bold: true, color: '#e8e0d0' });
+      if (row.fromGear !== null) {
+        g.text(`(${row.fromGear})`, S1.x + S1.w - 16, y,
+          { align: 'right', size: 11, color: row.fromGear.startsWith('-') ? '#c96a5a' : '#7fa85c' });
+      }
+    });
+
+    /* ---- kuşanılı ekipman özeti ---- */
+    const S2 = CHAR_GEAR_BOX;
+    g.rect(S2.x, S2.y, S2.w, S2.h, '#0b0908', 0.95);
+    g.text('EKİPMAN', S2.x + 12, S2.y + 10, { size: 11, bold: true, color: '#8d8272' });
+    const views = this.S.stats.slots();
+    gearSlotOrder().forEach((slot, i) => {
+      const y = S2.y + 34 + i * 25;
+      const v = views.find((x) => x.slotId === slot.id);
+      g.text(slot.label, S2.x + 16, y, { size: 11, color: '#6f655a' });
+      if (v?.definition) {
+        g.text(v.upgradeLevel > 0 ? `${v.definition.displayName} +${v.upgradeLevel}` : v.definition.displayName,
+          S2.x + S2.w - 16, y,
+          { align: 'right', size: 11, color: ITEM_CLASS_COLOR[v.definition.itemClass] });
+      } else {
+        g.text('—', S2.x + S2.w - 16, y, { align: 'right', size: 11, color: '#3a3128' });
+      }
+    });
+  }
+
+  /* ═══════════════ P2.7 — YETENEK EKRANI ═══════════════
+     Yuva ataması `SkillLoadout.setSlot()` authority'sindedir; panel yalnız
+     hangi skill'in nereye gideceğini iletir. */
+
+  private skillPool(): number[] {
+    return GENIE_SKILL_POOL.filter((ref) => SkillRegistry.get(ref) !== undefined);
+  }
+
+  private handleSkills(p: PointerEventInfo): void {
+    const pool = this.skillPool();
+    const pageCount = Math.max(1, Math.ceil(pool.length / SKILL_PAGE_SIZE));
+    const shown = pool.slice(this.skillPage * SKILL_PAGE_SIZE,
+      this.skillPage * SKILL_PAGE_SIZE + SKILL_PAGE_SIZE);
+    const hit = skillHitTest(p.x, p.y, ACTIVE_BAR_SLOTS, shown.length);
+    if (hit === null) return;
+    this.host.audio.play('ui');
+    if (hit.kind === 'button') {
+      if (hit.id === 'inv_close') { this.skillOpen = false; return; }
+      if (hit.id === 'skill_prev') this.skillPage = (this.skillPage + pageCount - 1) % pageCount;
+      if (hit.id === 'skill_next') this.skillPage = (this.skillPage + 1) % pageCount;
+      return;
+    }
+    if (hit.kind === 'bar') {
+      /* Aynı yuvaya ikinci dokunuş yuvayı BOŞALTIR. */
+      if (this.skillBarSel === hit.index) {
+        this.S.combat.skills.loadout.setSlot(hit.index, null);
+        this.say('Yuva boşaltıldı');
+      }
+      this.skillBarSel = hit.index;
+      return;
+    }
+    /* havuzdan seçim → seçili bar yuvasına ata */
+    const ref = shown[hit.index];
+    if (ref === undefined) return;
+    const def = SkillRegistry.get(ref);
+    if (!def) return;
+    if (def.requiredLevel > this.S.player.level) {
+      this.say(`Sv ${def.requiredLevel} gerekiyor`);
+      return;
+    }
+    const ok = this.S.combat.skills.loadout.setSlot(this.skillBarSel, ref);
+    this.say(ok ? `${def.displayName} → yuva ${this.skillBarSel + 1}` : 'Bu yuvaya atanamadı');
+  }
+
+  private renderSkills(g: DrawApi): void {
+    const pool = this.skillPool();
+    const pageCount = Math.max(1, Math.ceil(pool.length / SKILL_PAGE_SIZE));
+    const shown = pool.slice(this.skillPage * SKILL_PAGE_SIZE,
+      this.skillPage * SKILL_PAGE_SIZE + SKILL_PAGE_SIZE);
+    this.panelShell(g, 'YETENEKLER', `${this.skillPage + 1}/${pageCount}`);
+
+    /* ---- aktif bar ---- */
+    const slots = this.S.combat.skills.slots();
+    skillBarRects(ACTIVE_BAR_SLOTS).forEach((r, i) => {
+      const def = slots[i]?.def;
+      const on = this.skillBarSel === i;
+      g.rect(r.x, r.y, r.w, r.h, on ? '#2c2417' : '#1a1610');
+      g.rect(r.x, r.y, r.w, 2, on ? '#e08a3c' : '#3a3128');
+      g.text(`${i + 1}`, r.x + 6, r.y + 5, { size: 9, color: '#6f655a' });
+      if (def) {
+        g.text(def.displayName, r.x + r.w / 2, r.y + 26,
+          { align: 'center', size: 10, bold: true, color: '#e8e0d0' });
+        g.text(`${def.manaCost}MP`, r.x + r.w / 2, r.y + 50,
+          { align: 'center', size: 10, color: '#6f8fd0' });
+      } else {
+        g.text('boş', r.x + r.w / 2, r.y + r.h / 2 - 6,
+          { align: 'center', size: 11, color: '#3a3128' });
+      }
+    });
+    g.text('Yuva seç, sonra alttan yetenek seç · aynı yuvaya iki kez dokun = boşalt',
+      PANEL_FRAME.x + PANEL_FRAME.w / 2, PANEL_FRAME.y + 178,
+      { align: 'center', size: 10, color: '#6f655a' });
+
+    /* ---- havuz ---- */
+    const equipped = new Set(slots.map((s) => s.def?.sourceRef).filter((v) => v !== undefined));
+    skillPoolRects(shown.length).forEach((r, i) => {
+      const ref = shown[i]!;
+      const def = SkillRegistry.get(ref);
+      if (!def) return;
+      const locked = def.requiredLevel > this.S.player.level;
+      const inBar = equipped.has(ref);
+      g.rect(r.x, r.y, r.w, r.h, inBar ? '#1c1710' : '#141009', 0.95);
+      g.rect(r.x, r.y, 3, r.h, inBar ? '#e08a3c' : '#3a3128');
+      g.text(def.displayName, r.x + 14, r.y + 10,
+        { size: 12, bold: true, color: locked ? '#4a4239' : '#e8e0d0' });
+      g.text(`Sv ${def.requiredLevel} · ${def.manaCost}MP`
+        + (def.cooldownSec > 0 ? ` · ${def.cooldownSec.toFixed(1)}s` : ''),
+        r.x + 14, r.y + 30, { size: 10, color: locked ? '#4a4239' : '#8d8272' });
+      if (inBar) g.text('kuşanılı', r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#e08a3c' });
+      else if (locked) g.text('kilitli', r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#c96a5a' });
+    });
+
+    for (const b of skillPageButtons()) {
+      g.rect(b.x, b.y, b.w, b.h, '#1c1710', 0.95);
+      g.rect(b.x, b.y, b.w, 2, '#4a3f30');
+      g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 9,
+        { align: 'center', size: 18, bold: true, color: '#cfc7b6' });
+    }
+  }
+
+
+  /* ═══════════════ P2.8 — ÖRS ═══════════════
+     Karar ve mutasyon `ForgeSystem` authority'sindedir; bu metotlar yalnız
+     listeler, gösterir ve dokunmayı iletir. */
+
+  /** Yükseltilebilir eşyalar: katalogda tanımı olan, kilitli olmayanlar.
+   *  Kuşanılı olanlar DA listelenir — yükseltmek için çıkarmak gerekmez. */
+  private forgeItems(): ItemInstance[] {
+    return this.S.inventory.allEntries()
+      .filter((e) => !e.locked && definitionOf(e.itemRef) !== null)
+      .sort((a, b) => a.instanceId - b.instanceId);
+  }
+
+  private handleForge(p: PointerEventInfo): void {
+    const items = this.forgeItems();
+    const pageCount = Math.max(1, Math.ceil(items.length / FORGE_PAGE_SIZE));
+    const shown = items.slice(this.forgePage * FORGE_PAGE_SIZE,
+      this.forgePage * FORGE_PAGE_SIZE + FORGE_PAGE_SIZE);
+    const hit = forgeHitTest(p.x, p.y, shown.length);
+    if (hit === null) return;
+    this.host.audio.play('ui');
+    if (hit.kind === 'row') {
+      this.forgeSel = shown[hit.index]?.instanceId ?? null;
+      this.forgeMsg = '';
+      return;
+    }
+    if (hit.id === 'inv_close') { this.forgeOpen = false; return; }
+    if (hit.id === 'forge_prev') { this.forgePage = (this.forgePage + pageCount - 1) % pageCount; return; }
+    if (hit.id === 'forge_next') { this.forgePage = (this.forgePage + 1) % pageCount; return; }
+    if (hit.id !== 'forge_do') return;
+
+    if (this.forgeSel === null) { this.forgeMsg = 'Önce bir eşya seç'; return; }
+    const before = this.S.inventory.get(this.forgeSel);
+    const name = before ? definitionOf(before.itemRef)?.displayName ?? 'Eşya' : 'Eşya';
+    const res = this.S.forge.upgrade(this.forgeSel);
+    if (!res.ok) { this.forgeMsg = FORGE_FAIL[res.reason]; return; }
+    if (res.success) {
+      this.forgeMsg = `${name} +${res.newLevel} oldu`;
+      this.say(this.forgeMsg);
+    } else {
+      this.forgeMsg = `${name} YANDI (şans %${Math.round(res.chance * 100)})`;
+      this.say(this.forgeMsg);
+      this.forgeSel = null;
+    }
+  }
+
+  private renderForge(g: DrawApi): void {
+    const items = this.forgeItems();
+    const pageCount = Math.max(1, Math.ceil(items.length / FORGE_PAGE_SIZE));
+    const shown = items.slice(this.forgePage * FORGE_PAGE_SIZE,
+      this.forgePage * FORGE_PAGE_SIZE + FORGE_PAGE_SIZE);
+    const scrolls = this.S.forge.scrollCount();
+    this.panelShell(g, 'ÖRS', `${this.S.player.coins} altın · ${scrolls} parşömen`);
+
+    /* ---- eşya listesi ---- */
+    const L = FORGE_LIST_BOX;
+    g.rect(L.x, L.y, L.w, L.h, '#0b0908', 0.95);
+    g.text(`EŞYALAR  ${this.forgePage + 1}/${pageCount}`, L.x + 12, L.y + 10,
+      { size: 11, bold: true, color: '#8d8272' });
+    forgeRowRects(shown.length).forEach((r, i) => {
+      const e = shown[i]!;
+      const def = definitionOf(e.itemRef)!;
+      const on = this.forgeSel === e.instanceId;
+      g.rect(r.x, r.y, r.w, r.h, on ? '#2c2417' : '#141009', 0.95);
+      g.rect(r.x, r.y, 3, r.h, ITEM_CLASS_COLOR[def.itemClass]);
+      g.text(e.upgradeLevel > 0 ? `${def.displayName} +${e.upgradeLevel}` : def.displayName,
+        r.x + 14, r.y + 8, { size: 12, bold: true, color: ITEM_CLASS_COLOR[def.itemClass] });
+      const pv = forgePreview(e.upgradeLevel);
+      g.text(pv.atMax ? 'tavan' : `+${pv.to} · %${Math.round(pv.chance * 100)}`,
+        r.x + r.w - 14, r.y + 16,
+        { align: 'right', size: 11, color: pv.atMax ? '#4a4239' : pv.guaranteed ? '#7fa85c' : '#e08a3c' });
+      if (e.equippedSlot !== null) {
+        g.text('kuşanılı', r.x + 14, r.y + 28, { size: 9, color: '#6f655a' });
+      }
+    });
+    if (shown.length === 0) {
+      g.text('Yükseltilebilir eşya yok', L.x + L.w / 2, L.y + 60,
+        { align: 'center', size: 12, color: '#6f655a' });
+    }
+
+    /* ---- önizleme ---- */
+    const B = FORGE_PREVIEW_BOX;
+    g.rect(B.x, B.y, B.w, B.h, '#0b0908', 0.95);
+    const sel = this.forgeSel === null ? undefined : this.S.inventory.get(this.forgeSel);
+    if (!sel) {
+      g.text(this.forgeMsg || 'Bir eşya seç', B.x + 14, B.y + 16,
+        { size: 12, color: this.forgeMsg ? '#e8d9a0' : '#6f655a' });
+    } else {
+      const def = definitionOf(sel.itemRef)!;
+      const pv = forgePreview(sel.upgradeLevel);
+      g.text(`${def.displayName} +${sel.upgradeLevel} → +${pv.to}`, B.x + 14, B.y + 14,
+        { size: 13, bold: true, color: ITEM_CLASS_COLOR[def.itemClass] });
+      if (pv.atMax) {
+        g.text('Bu eşya kaynak eğrisinin tavanında — denenemez.', B.x + 14, B.y + 42,
+          { size: 11, color: '#8d8272' });
+      } else {
+        const rows: Array<[string, string, string]> = [
+          ['Başarı şansı', `%${Math.round(pv.chance * 100)}`, pv.guaranteed ? '#7fa85c' : '#e08a3c'],
+          ['Altın', `${pv.gold}`, this.S.player.coins >= pv.gold ? '#e8e0d0' : '#c96a5a'],
+          ['Parşömen', `${pv.scrolls}`, scrolls >= pv.scrolls ? '#e8e0d0' : '#c96a5a'],
+        ];
+        rows.forEach(([k, v, col], i) => {
+          const y = B.y + 44 + i * 24;
+          g.text(k, B.x + 16, y, { size: 11, color: '#8d8272' });
+          g.text(v, B.x + 220, y, { align: 'right', size: 12, bold: true, color: col });
+        });
+        g.text(pv.guaranteed ? 'Garantili — eşya yanmaz.' : 'BAŞARISIZ OLURSA EŞYA YANAR.',
+          B.x + 16, B.y + 122,
+          { size: 11, bold: !pv.guaranteed, color: pv.guaranteed ? '#7fa85c' : '#c96a5a' });
+      }
+      if (this.forgeMsg) {
+        g.text(this.forgeMsg, B.x + 16, B.y + 146, { size: 11, color: '#e8d9a0' });
+      }
+    }
+
+    for (const b of forgeButtons()) {
+      const active = b.id !== 'forge_do' || (sel !== undefined && canAttempt(sel.upgradeLevel));
+      g.rect(b.x, b.y, b.w, b.h, active ? '#1c1710' : '#141009', 0.95);
+      g.rect(b.x, b.y, b.w, 2, active ? '#e08a3c' : '#3a3128');
+      g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 8,
+        { align: 'center', size: b.id === 'forge_do' ? 13 : 18, bold: true,
+          color: active ? '#e8d9a0' : '#4a4239' });
+    }
   }
 
   private drawItemTooltip(g: DrawApi, itemRef: number | null, coin: number): void {

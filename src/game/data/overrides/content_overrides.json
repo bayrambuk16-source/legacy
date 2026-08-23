@@ -1,275 +1,279 @@
 {
-  "_note": "Özgün içerik katmanı. Kaynak (KO) isimleri production'da GÖSTERİLMEZ; oyuncuya giden her isim buradan gelir. Kapsanmayan kayıtlar köşeli parantezli placeholder ile işaretlenir.",
-  "monsters": {
-    "750": {
-      "displayName": "Toprak Solucanı",
-      "visualKey": "kurt_yavru"
-    },
-    "850": {
-      "displayName": "Çalı Sıçanı",
-      "visualKey": "kurt_yavru"
-    },
-    "752": {
-      "displayName": "Kan Solucanı",
-      "visualKey": "kurt_yavru"
-    },
-    "851": {
-      "displayName": "Yaban Sıçanı",
-      "visualKey": "kurt"
-    },
-    "150": {
-      "displayName": "Yamyam Goblin",
-      "visualKey": "kurt"
-    },
-    "754": {
-      "displayName": "Leş Böceği",
-      "visualKey": "kurt"
-    },
-    "852": {
-      "displayName": "Çöpçü Sıçan",
-      "visualKey": "kurt"
-    },
-    "755": {
-      "displayName": "Kapkaççı",
-      "visualKey": "kurt"
-    },
-    "255": {
-      "displayName": "Bataklık Yaratığı",
-      "visualKey": "kurt"
-    },
-    "250": {
-      "displayName": "Bataklık Devi",
-      "visualKey": "kurt_alfa"
-    },
-    "252": {
-      "displayName": "Bataklık Reisi",
-      "visualKey": "kurt_alfa"
-    }
+ "_note": "Özgün içerik katmanı. Kaynak (KO) isimleri production'da GÖSTERİLMEZ; oyuncuya giden her isim buradan gelir. Kapsanmayan kayıtlar köşeli parantezli placeholder ile işaretlenir.",
+ "monsters": {
+  "750": {
+   "displayName": "Toprak Solucanı",
+   "visualKey": "kurt_yavru"
   },
-  "zones": {
-    "hub": {
-      "displayName": "Avcı Kampı",
-      "sceneKey": "hub"
-    },
-    "combat_a": {
-      "displayName": "Kuzey Ormanı",
-      "sceneKey": "combat"
-    },
-    "combat_b": {
-      "displayName": "Gölgeli Vadi",
-      "sceneKey": "combat"
-    }
+  "850": {
+   "displayName": "Çalı Sıçanı",
+   "visualKey": "kurt_yavru"
   },
-  "items": {
-    "160100000": {
-      "displayName": "Kül Ağacı Avcı Yayı",
-      "iconKey": "es_okcu_silah"
-    },
-    "389010000": {
-      "displayName": "Kutsanmış Su",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389011000": {
-      "displayName": "Yaşam Suyu",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389012000": {
-      "displayName": "Sevgi Suyu",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389013000": {
-      "displayName": "Zarafet Suyu",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389014000": {
-      "displayName": "Lütuf Suyu",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389016000": {
-      "displayName": "Ruh İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389017000": {
-      "displayName": "Zihin İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389018000": {
-      "displayName": "Bilgelik İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389019000": {
-      "displayName": "İrfan İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389020000": {
-      "displayName": "Can İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "370004000": {
-      "displayName": "Kurt Kanı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "370005000": {
-      "displayName": "Kutsama İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "370006000": {
-      "displayName": "Şifa İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379001000": {
-      "displayName": "Yaşam Duası",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379002000": {
-      "displayName": "Sevgi Duası",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379003000": {
-      "displayName": "Zarafet Duası",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379004000": {
-      "displayName": "Lütuf Duası",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379006000": {
-      "displayName": "Yaşam Taşı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379013000": {
-      "displayName": "Mithril Kâse",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379059000": {
-      "displayName": "Savaşçı Taşı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379060000": {
-      "displayName": "Avcı Taşı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379061000": {
-      "displayName": "Büyücü Taşı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379062000": {
-      "displayName": "Şifacı Taşı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379067000": {
-      "displayName": "Gümüş Külçe",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379091000": {
-      "displayName": "Dönüşüm Mücevheri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379092000": {
-      "displayName": "Ateş Fişeği",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379107000": {
-      "displayName": "Altın Sikke",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379109000": {
-      "displayName": "Gümüş Sikke",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "379110000": {
-      "displayName": "Bronz Sikke",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389023000": {
-      "displayName": "Yaşam Tılsımı",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389026000": {
-      "displayName": "Tanrı Gücü Duası",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389033000": {
-      "displayName": "Karanlık Su",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389038000": {
-      "displayName": "Alev Direnci İksiri",
-      "iconKey": "es_okcu_tilsim"
-    },
-    "389039000": {
-      "displayName": "Buz Direnci İksiri",
-      "iconKey": "es_okcu_tilsim"
-    }
+  "752": {
+   "displayName": "Kan Solucanı",
+   "visualKey": "kurt_yavru"
   },
-  "skills": {
-    "102003": {
-      "displayName": "Standart Atış",
-      "description": "Mana harcamayan temel ok atışı."
-    },
-    "107505": {
-      "displayName": "Kor Oku",
-      "description": "Ateşle güçlendirilmiş atış; ek yanma hasarı verir."
-    },
-    "107010": {
-      "displayName": "Rüzgar Adımı",
-      "description": "Kısa süreli saldırı hızı artışı."
-    },
-    "107725": {
-      "displayName": "Hafif Ayak",
-      "description": "Hareket hızını artırır."
-    },
-    "107510": {
-      "displayName": "Zehirli Uç",
-      "description": "Hedefi zehirler; zamana yayılı hasar bırakır."
-    },
-    "107500": {
-      "displayName": "Delici Ok",
-      "description": "Tek hedefe %150 hasar veren delici atış."
-    },
-    "107515": {
-      "displayName": "Üçlü Salvo",
-      "description": "Tek çekişte 3 ok; her ok ayrı isabet çözülür."
-    },
-    "107555": {
-      "displayName": "Beşli Salvo",
-      "description": "Tek çekişte 5 ok; yakın mesafede tam isabet."
-    },
-    "107520": {
-      "displayName": "İzci Oku",
-      "description": "Takip eden ok; isabeti yüksektir."
-    },
-    "107525": {
-      "displayName": "Keskin Atış",
-      "description": "Tek hedefe ağır, keskin nişanlı atış."
-    },
-    "107530": {
-      "displayName": "Alev Atışı",
-      "description": "Kor Oku'nun güçlendirilmiş hâli."
-    },
-    "107535": {
-      "displayName": "Toksik Atış",
-      "description": "Zehirli Uç'un güçlendirilmiş hâli."
-    },
-    "107540": {
-      "displayName": "Yırtıcı Ok",
-      "description": "Yüksek hasarlı ağır atış."
-    },
-    "107545": {
-      "displayName": "Patlayıcı Ok",
-      "description": "En güçlü ateş oku; patlama hasarı bırakır."
-    },
-    "107550": {
-      "displayName": "Engerek Oku",
-      "description": "En güçlü zehir oku."
-    },
-    "107560": {
-      "displayName": "Gölge Avcısı",
-      "description": "Şaşmaz, çok yüksek hasarlı atış."
-    },
-    "108570": {
-      "displayName": "Kara Takip",
-      "description": "Okçu ustalığının zirvesi; şaşmaz ve yıkıcı."
-    }
+  "851": {
+   "displayName": "Yaban Sıçanı",
+   "visualKey": "kurt"
+  },
+  "150": {
+   "displayName": "Yamyam Goblin",
+   "visualKey": "kurt"
+  },
+  "754": {
+   "displayName": "Leş Böceği",
+   "visualKey": "kurt"
+  },
+  "852": {
+   "displayName": "Çöpçü Sıçan",
+   "visualKey": "kurt"
+  },
+  "755": {
+   "displayName": "Kapkaççı",
+   "visualKey": "kurt"
+  },
+  "255": {
+   "displayName": "Bataklık Yaratığı",
+   "visualKey": "kurt"
+  },
+  "250": {
+   "displayName": "Bataklık Devi",
+   "visualKey": "kurt_alfa"
+  },
+  "252": {
+   "displayName": "Bataklık Reisi",
+   "visualKey": "kurt_alfa"
   }
+ },
+ "zones": {
+  "hub": {
+   "displayName": "Avcı Kampı",
+   "sceneKey": "hub"
+  },
+  "combat_a": {
+   "displayName": "Kuzey Ormanı",
+   "sceneKey": "combat"
+  },
+  "combat_b": {
+   "displayName": "Gölgeli Vadi",
+   "sceneKey": "combat"
+  }
+ },
+ "items": {
+  "160100000": {
+   "displayName": "Kül Ağacı Avcı Yayı",
+   "iconKey": "es_okcu_silah"
+  },
+  "389010000": {
+   "displayName": "Kutsanmış Su",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389011000": {
+   "displayName": "Yaşam Suyu",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389012000": {
+   "displayName": "Sevgi Suyu",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389013000": {
+   "displayName": "Zarafet Suyu",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389014000": {
+   "displayName": "Lütuf Suyu",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389016000": {
+   "displayName": "Ruh İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389017000": {
+   "displayName": "Zihin İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389018000": {
+   "displayName": "Bilgelik İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389019000": {
+   "displayName": "İrfan İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389020000": {
+   "displayName": "Can İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "370004000": {
+   "displayName": "Kurt Kanı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "370005000": {
+   "displayName": "Kutsama İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "370006000": {
+   "displayName": "Şifa İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379001000": {
+   "displayName": "Yaşam Duası",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379002000": {
+   "displayName": "Sevgi Duası",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379003000": {
+   "displayName": "Zarafet Duası",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379004000": {
+   "displayName": "Lütuf Duası",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379006000": {
+   "displayName": "Yaşam Taşı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379013000": {
+   "displayName": "Mithril Kâse",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379059000": {
+   "displayName": "Savaşçı Taşı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379060000": {
+   "displayName": "Avcı Taşı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379061000": {
+   "displayName": "Büyücü Taşı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379062000": {
+   "displayName": "Şifacı Taşı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379067000": {
+   "displayName": "Gümüş Külçe",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379091000": {
+   "displayName": "Dönüşüm Mücevheri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379092000": {
+   "displayName": "Ateş Fişeği",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379107000": {
+   "displayName": "Altın Sikke",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379109000": {
+   "displayName": "Gümüş Sikke",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379110000": {
+   "displayName": "Bronz Sikke",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389023000": {
+   "displayName": "Yaşam Tılsımı",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389026000": {
+   "displayName": "Tanrı Gücü Duası",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389033000": {
+   "displayName": "Karanlık Su",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389038000": {
+   "displayName": "Alev Direnci İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "389039000": {
+   "displayName": "Buz Direnci İksiri",
+   "iconKey": "es_okcu_tilsim"
+  },
+  "379016000": {
+   "displayName": "Yükseltme Parşömeni",
+   "iconKey": "es_okcu_tilsim"
+  }
+ },
+ "skills": {
+  "102003": {
+   "displayName": "Standart Atış",
+   "description": "Mana harcamayan temel ok atışı."
+  },
+  "107505": {
+   "displayName": "Kor Oku",
+   "description": "Ateşle güçlendirilmiş atış; ek yanma hasarı verir."
+  },
+  "107010": {
+   "displayName": "Rüzgar Adımı",
+   "description": "Kısa süreli saldırı hızı artışı."
+  },
+  "107725": {
+   "displayName": "Hafif Ayak",
+   "description": "Hareket hızını artırır."
+  },
+  "107510": {
+   "displayName": "Zehirli Uç",
+   "description": "Hedefi zehirler; zamana yayılı hasar bırakır."
+  },
+  "107500": {
+   "displayName": "Delici Ok",
+   "description": "Tek hedefe %150 hasar veren delici atış."
+  },
+  "107515": {
+   "displayName": "Üçlü Salvo",
+   "description": "Tek çekişte 3 ok; her ok ayrı isabet çözülür."
+  },
+  "107555": {
+   "displayName": "Beşli Salvo",
+   "description": "Tek çekişte 5 ok; yakın mesafede tam isabet."
+  },
+  "107520": {
+   "displayName": "İzci Oku",
+   "description": "Takip eden ok; isabeti yüksektir."
+  },
+  "107525": {
+   "displayName": "Keskin Atış",
+   "description": "Tek hedefe ağır, keskin nişanlı atış."
+  },
+  "107530": {
+   "displayName": "Alev Atışı",
+   "description": "Kor Oku'nun güçlendirilmiş hâli."
+  },
+  "107535": {
+   "displayName": "Toksik Atış",
+   "description": "Zehirli Uç'un güçlendirilmiş hâli."
+  },
+  "107540": {
+   "displayName": "Yırtıcı Ok",
+   "description": "Yüksek hasarlı ağır atış."
+  },
+  "107545": {
+   "displayName": "Patlayıcı Ok",
+   "description": "En güçlü ateş oku; patlama hasarı bırakır."
+  },
+  "107550": {
+   "displayName": "Engerek Oku",
+   "description": "En güçlü zehir oku."
+  },
+  "107560": {
+   "displayName": "Gölge Avcısı",
+   "description": "Şaşmaz, çok yüksek hasarlı atış."
+  },
+  "108570": {
+   "displayName": "Kara Takip",
+   "description": "Okçu ustalığının zirvesi; şaşmaz ve yıkıcı."
+  }
+ }
 }
