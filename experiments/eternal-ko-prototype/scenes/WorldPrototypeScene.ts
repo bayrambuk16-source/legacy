@@ -2264,27 +2264,31 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private renderInventory(g: DrawApi): void {
-    /* P2.23 — YENİ PANEL GÖRSELİ. Çerçeve, yuvalar ve düğme zeminleri
-       tek görselden gelir; kod yalnız METİN ve ITEM ikonu çizer.
-       Görsel yüklenmediyse eski çizim devrede kalır (aşağıdaki
-       `panelShell` yolu). */
-    /* `AssetStore` arayüzü `images` haritasını AÇMAZ; varlık kontrolü
-       `has()` iledir. Görsel yüklenmediyse eski çizim devrede kalır. */
-    if (this.host.assets.has('ui_inv_panel')) {
-      g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
-      g.image('ui_inv_panel', INV_LAYOUT.panel.x, INV_LAYOUT.panel.y,
-        { w: INV_LAYOUT.panel.w, h: INV_LAYOUT.panel.h, alpha: 1 });
-    }
+    /* ═══ P2.24.2 — GÖRSEL VARSA ESKİ KABUK ÇİZİLMEZ ═══
+       P2.23'te panel görseli eklendi ama eski çizim SİLİNMEDİ: ikisi
+       peş peşe çalışıyor, %97 opak dikdörtgen yeni çerçevenin üstünü
+       tamamen örtüyordu. Oyuncu yeni paneli hiç görmedi.
+
+       Doğrusu bir DALLANMA: görsel yüklüyse çerçeveyi o taşır ve kod
+       yalnız METİN + ITEM ikonu çizer; yüklü değilse eski kabuk
+       yedek olarak devrede kalır. */
     const L = INV_LAYOUT;
-    g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.72);
-    g.rect(L.panel.x, L.panel.y, L.panel.w, L.panel.h, '#100d08', 0.97);
-    g.rect(L.panel.x, L.panel.y, L.panel.w, 3, '#e08a3c');
+    const art = this.host.assets.has('ui_inv_panel');
+    g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
+    if (art) {
+      g.image('ui_inv_panel', L.panel.x, L.panel.y,
+        { w: L.panel.w, h: L.panel.h, alpha: 1 });
+    } else {
+      g.rect(L.panel.x, L.panel.y, L.panel.w, L.panel.h, '#100d08', 0.97);
+      g.rect(L.panel.x, L.panel.y, L.panel.w, 3, '#e08a3c');
+    }
     g.text('ÇANTA & EKİPMAN', L.panel.x + 16, L.panel.y + 18,
       { size: 15, bold: true, color: '#e8d9a0' });
     const cap = `${this.S.inventory.usedSlots}/${this.S.inventory.capacity}`;
     g.text(cap, L.panel.x + L.panel.w - 74, L.panel.y + 20, { align: 'right', size: 12, color: '#8d8272' });
     const close = invCloseButton();
-    g.rect(close.x, close.y, close.w, close.h, '#241c14');
+    /* Kapatma düğmesinin zemini de görselde var — yalnız yoksa çizilir. */
+    if (!art) g.rect(close.x, close.y, close.w, close.h, '#241c14');
     g.text(close.label, close.x + close.w / 2, close.y + 9, { align: 'center', size: 15, color: '#cfc7b6' });
 
     /* ---- ekipman ızgarası ---- */
@@ -2293,8 +2297,11 @@ export class WorldPrototypeScene implements Scene {
     for (const r of equipSlotRects()) {
       const v = views.find((x) => x.slotId === r.slotId)!;
       const on = sel !== null && sel.kind === 'equip' && sel.slotId === r.slotId;
-      if (on) g.rect(r.x, r.y, r.w, r.h, '#2c2417', 0.7);
-      g.rect(r.x, r.y, r.w, 2, v.itemClass ? ITEM_CLASS_COLOR[v.itemClass] : '#3a3128');
+      /* Yuva zemini GÖRSELDEN gelir; kod yalnız seçim vurgusu ve
+         kalite şeridi çizer. */
+      if (!art) g.rect(r.x, r.y, r.w, r.h, '#1a1610');
+      if (on) g.rect(r.x, r.y, r.w, r.h, '#2c2417', 0.55);
+      if (v.itemClass) g.rect(r.x, r.y, r.w, 2, ITEM_CLASS_COLOR[v.itemClass]);
       /* P2.24 — etiket yuvanın ÜSTÜNDEKİ şeritte (maketin ayırdığı yer),
          ikon yuvanın ortasında. Eskiden ikisi de kutunun içindeydi ve
          item adı ikonla çakışıyordu. */
@@ -2318,7 +2325,8 @@ export class WorldPrototypeScene implements Scene {
       const c = cells[i]!;
       const e = entries[i];
       const on = e !== undefined && sel !== null && sel.kind === 'bag' && sel.instanceId === e.instanceId;
-      if (on) g.rect(c.x, c.y, c.w, c.h, '#2c2417', 0.7);
+      if (!art) g.rect(c.x, c.y, c.w, c.h, '#1a1610');
+      if (on) g.rect(c.x, c.y, c.w, c.h, '#2c2417', 0.55);
       if (!e) continue;
       const def = definitionOf(e.itemRef);
       const col = def ? ITEM_CLASS_COLOR[def.itemClass] : '#6f655a';
@@ -2335,7 +2343,7 @@ export class WorldPrototypeScene implements Scene {
 
     /* ---- detay + karşılaştırma ---- */
     const d = L.detail;
-    g.rect(d.x, d.y, d.w, d.h, '#0b0908', 0.95);
+    if (!art) g.rect(d.x, d.y, d.w, d.h, '#0b0908', 0.95);
     const picked = this.selectedItem();
     if (picked === null) {
       g.text('Bir eşya seç', d.x + 12, d.y + 16, { size: 13, color: '#8d8272' });
@@ -2389,8 +2397,11 @@ export class WorldPrototypeScene implements Scene {
     }
     for (const b of invButtons()) {
       const active = picked !== null;
-      g.rect(b.x, b.y, b.w, b.h, active ? '#1c1710' : '#141009', 0.95);
-      g.rect(b.x, b.y, b.w, 2, active ? '#e08a3c' : '#3a3128');
+      /* Düğme zeminleri GÖRSELDE var (yeşil/altın/kırmızı). Görsel
+         yüklüyse yalnız PASİF durum karartılır ve metin yazılır. */
+      if (!art) g.rect(b.x, b.y, b.w, b.h, active ? '#1c1710' : '#141009', 0.95);
+      else if (!active) g.rect(b.x, b.y, b.w, b.h, '#0b0908', 0.55);
+      if (!art) g.rect(b.x, b.y, b.w, 2, active ? '#e08a3c' : '#3a3128');
       g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 7,
         { align: 'center', size: 13, bold: true, color: active ? '#e8d9a0' : '#4a3f30' });
     }
