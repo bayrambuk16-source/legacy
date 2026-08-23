@@ -37,6 +37,7 @@ import {
   bulkButtons, classButtons, keepMaxButtons, pendingRows, sellHitTest, toggleRects,
 } from '../ui/sell-panel.js';
 import { formatPower, formatPowerDelta } from '../data/power-score.js';
+import { NON_GEAR_COLOR, nonGearInfo } from '../ui/non-gear-info.js';
 import {
   ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
 } from '../ui/camera-zoom.js';
@@ -2126,17 +2127,26 @@ export class WorldPrototypeScene implements Scene {
   }
 
   /** Seçili itemin tanımı + yükseltme seviyesi (yoksa null). */
-  private selectedItem(): { def: ReturnType<typeof definitionOf>; upgrade: number; instanceId: number | null } | null {
+  private selectedItem(): {
+    def: ReturnType<typeof definitionOf>; upgrade: number;
+    instanceId: number | null; itemRef: number;
+  } | null {
     const sel = this.invSel;
     if (sel === null) return null;
     if (sel.kind === 'bag') {
       const inst = this.S.inventory.get(sel.instanceId);
       if (!inst) return null;
-      return { def: definitionOf(inst.itemRef), upgrade: inst.upgradeLevel, instanceId: inst.instanceId };
+      return {
+        def: definitionOf(inst.itemRef), upgrade: inst.upgradeLevel,
+        instanceId: inst.instanceId, itemRef: inst.itemRef,
+      };
     }
     const view = this.S.stats.slots().find((v) => v.slotId === sel.slotId);
     if (!view || view.definitionRef === null) return null;
-    return { def: definitionOf(view.definitionRef), upgrade: view.upgradeLevel, instanceId: view.instanceId };
+    return {
+      def: definitionOf(view.definitionRef), upgrade: view.upgradeLevel,
+      instanceId: view.instanceId, itemRef: view.definitionRef,
+    };
   }
 
   private handleInventory(p: PointerEventInfo): void {
@@ -2251,9 +2261,26 @@ export class WorldPrototypeScene implements Scene {
     const d = L.detail;
     g.rect(d.x, d.y, d.w, d.h, '#0b0908', 0.95);
     const picked = this.selectedItem();
-    if (picked === null || picked.def === null) {
-      g.text(picked === null ? 'Bir eşya seç' : 'Bu eşya kuşanılamaz (katalogda yok)',
-        d.x + 12, d.y + 16, { size: 13, color: '#8d8272' });
+    if (picked === null) {
+      g.text('Bir eşya seç', d.x + 12, d.y + 16, { size: 13, color: '#8d8272' });
+    } else if (picked.def === null) {
+      /* P2.20 — EKİPMAN OLMAYAN EŞYA. Eskiden "katalogda yok" deniyordu
+         ve bozukmuş gibi görünüyordu; parşömen/iksir/ganimet tasarım
+         gereği kuşanılmaz. Artık ne olduğu ve ne yapılacağı yazıyor. */
+      const inst = picked.instanceId === null ? undefined : this.S.inventory.get(picked.instanceId);
+      const info = nonGearInfo(picked.itemRef);
+      const src = Content.item(picked.itemRef);
+      const col = NON_GEAR_COLOR[info.role];
+      g.rect(d.x, d.y, d.w, 2, col);
+      g.text(src?.displayName ?? `#${picked.itemRef}`, d.x + 12, d.y + 14,
+        { size: 14, bold: true, color: col });
+      g.text(info.purpose, d.x + 12, d.y + 38, { size: 11, color: '#cfc7b6' });
+      g.text(info.action, d.x + 12, d.y + 58, { size: 11, color: '#8d8272' });
+      if (inst) {
+        const price = this.S.autoGear.sellPrice(inst);
+        g.text(`Adet ${inst.quantity}  ·  satış ${price} altın`, d.x + 12, d.y + 82,
+          { size: 11, color: '#8d8272' });
+      }
     } else {
       const head = itemHeadline(picked.def, picked.upgrade);
       g.rect(d.x, d.y, d.w, 2, head.color);

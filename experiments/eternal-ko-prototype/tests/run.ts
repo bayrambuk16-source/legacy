@@ -56,6 +56,7 @@ import {
 } from '../data/power-score.js';
 import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
+import { NON_GEAR_COLOR, nonGearInfo, nonGearRole } from '../ui/non-gear-info.js';
 import {
   CAMERA_MODES, CAMERA_MODE_LABEL, CAMERA_THIRD, approachYaw, baseTuning, modeYaw, nextMode,
 } from '../ui/camera-mode.js';
@@ -10927,6 +10928,54 @@ test('§85 yön GÖRÜNÜMDÜR — hasar ve menzil ETKİLENMEZ', () => {
   mob.hp = 0;
   S.faceTarget(mob as never);
   eq(S.world.facingAngle, before, 'ölü hedefe dönmemeli:');
+});
+
+/* ================= P2.20 — EKİPMAN DIŞI EŞYALAR ================= */
+console.log('P2.20 — ekipman dışı eşya açıklaması:');
+
+test('§86 düşen HER eşya ya EKİPMAN ya da TANIMLI bir rol taşır', () => {
+  /* Envanterde "katalogda yok" diye biriken eşyalar aslında parşömen,
+     iksir ve satılık ganimetti. Hiçbiri bozuk değil; mesaj yanıltıcıydı. */
+  for (const [ref, role] of [
+    [SCROLL_ITEM_REF, 'scroll'], [TROPHY_ITEM_REF, 'trophy'],
+    [HP_POTION_REF, 'potion'], [MP_POTION_REF, 'potion'],
+  ] as const) {
+    eq(nonGearRole(ref), role, `${ref} rolü:`);
+    const info = nonGearInfo(ref);
+    ok(info.purpose.length > 0, `${ref} açıklaması boş`);
+    ok(info.action.length > 0, `${ref} eylem metni boş`);
+    ok(NON_GEAR_COLOR[info.role] !== undefined, `${ref} rengi yok`);
+    /* Bunlar EKİPMAN OLMAMALI — olsalardı kuşanılabilirlerdi. */
+    ok(!isEquipmentItem(ref), `${ref} ekipman görünüyor`);
+  }
+  /* Bilinmeyen referans HATA DEĞİL, kapsam bilgisi. */
+  eq(nonGearRole(999999999), 'unknown', 'bilinmeyen ref:');
+  ok(nonGearInfo(999999999).action.length > 0, 'bilinmeyen için de yönlendirme olmalı');
+});
+
+test('§86 CANLI: droplarda ekipman dışı eşyaların HEPSİ tanımlı', () => {
+  /* Gerçekten düşen her ekipman dışı eşya `unknown` olmamalı — olursa
+     oyuncu ne olduğunu anlamadığı bir şey biriktirir. */
+  const S = protoState(3200);
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  const seen = new Set<number>();
+  for (let i = 0; i < 300; i++) {
+    const ev = killAndReap(S, killableMob(S, S.world.worldX + 60, S.world.worldY, 252));
+    for (const r of ev.records) if (r.kind === 'item') seen.add(r.itemRef);
+  }
+  for (const ref of seen) {
+    if (isEquipmentItem(ref)) continue;
+    ok(nonGearRole(ref) !== 'unknown',
+      `tanımsız eşya düşüyor: ${ref} (${Content.item(ref)?.displayName ?? '?'})`);
+  }
+});
+
+test('§86 açıklama katmanı SAF', () => {
+  const src = readFileSync(join(PROTO_ROOT, 'ui', 'non-gear-info.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  ok(!/from\s+'three/.test(src), 'three import etmemeli');
+  ok(!/Math\.random/.test(src), 'Math.random kullanmamalı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
