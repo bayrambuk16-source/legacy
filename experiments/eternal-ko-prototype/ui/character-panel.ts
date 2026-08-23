@@ -174,15 +174,6 @@ export function skillPoolRects(count: number): UiRect[] {
   return skillPoolCells().slice(0, count);
 }
 
-function skillPoolRectsLegacy(count: number): UiRect[] {
-  const h = 52, gap = 6;
-  const x = PANEL_FRAME.x + 20;
-  const w = PANEL_FRAME.w - 40;
-  const y0 = PANEL_FRAME.y + 200;
-  const out: UiRect[] = [];
-  for (let i = 0; i < count; i++) out.push({ x, y: y0 + i * (h + gap), w, h });
-  return out;
-}
 
 /** Havuz listesinin bir ekrana sığan satır sayısı. Taşan skiller sayfalanır —
  *  panel KAYDIRILMAZ (mobil düzen kuralı: dikey kaydırma yok). */
@@ -213,7 +204,6 @@ export const SKILL_POOL_ICON_W = 62;
 export const SKILL_PAGE_ROW: UiRect = { x: 190, y: 864, w: 240, h: 43 };
 
 export function skillPageButtons(): Array<UiRect & { id: string; label: string }> {
-  const y = PANEL_FRAME.y + PANEL_FRAME.h - 62;
   return [
     /* Maketin ok düğmeleri sayfa şeridinin İKİ YANINDA. */
     { id: 'skill_prev', label: '‹', x: SKILL_PAGE_ROW.x - 66, y: SKILL_PAGE_ROW.y, w: 56, h: SKILL_PAGE_ROW.h },
