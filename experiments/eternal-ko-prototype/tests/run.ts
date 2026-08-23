@@ -8604,7 +8604,7 @@ test('kaynak sabitleri (zone 21 · moradon_0826.smd · 512×512)', () => {
   eq(MORADON_MAP_FILE, 'moradon_0826.smd', 'kanonik harita:');
   eq(MORADON_SOURCE_WIDTH, 512, 'kaynak genişlik:');
   eq(MORADON_SOURCE_HEIGHT, 512, 'kaynak yükseklik:');
-  eq(KO_TO_WORLD_SCALE, 5, 'ölçek:');
+  eq(KO_TO_WORLD_SCALE, 10, 'ölçek:');
   eq(MORADON_KO_SPAWN.x, 306, 'KO spawn X:');
   eq(MORADON_KO_SPAWN.z, 352, 'KO spawn Z:');
 });
@@ -8612,10 +8612,10 @@ test('kaynak sabitleri (zone 21 · moradon_0826.smd · 512×512)', () => {
 test('world boyutları ölçekten TÜREMELİ (elle yazılmamalı)', () => {
   eq(MORADON_WORLD_WIDTH, MORADON_SOURCE_WIDTH * KO_TO_WORLD_SCALE, 'world genişlik:');
   eq(MORADON_WORLD_HEIGHT, MORADON_SOURCE_HEIGHT * KO_TO_WORLD_SCALE, 'world yükseklik:');
-  eq(MORADON_WORLD_WIDTH, 2560, 'genişlik (sayı):');
-  eq(MORADON_WORLD_HEIGHT, 2560, 'yükseklik (sayı):');
-  eq(MORADON_WORLD_BOUNDS.width, 2560, 'bounds genişlik:');
-  eq(MORADON_WORLD_BOUNDS.height, 2560, 'bounds yükseklik:');
+  eq(MORADON_WORLD_WIDTH, 5120, 'genişlik (sayı):');
+  eq(MORADON_WORLD_HEIGHT, 5120, 'yükseklik (sayı):');
+  eq(MORADON_WORLD_BOUNDS.width, 5120, 'bounds genişlik:');
+  eq(MORADON_WORLD_BOUNDS.height, 5120, 'bounds yükseklik:');
 });
 
 test('koToWorld — X→X · Z→Y, ofset/rotasyon/eksen çevirme YOK', () => {
@@ -8624,25 +8624,25 @@ test('koToWorld — X→X · Z→Y, ofset/rotasyon/eksen çevirme YOK', () => {
   eq(origin.y, 0, 'KO (0,0) → world Y:');
 
   const far = koToWorld(512, 512);
-  eq(far.x, 2560, 'KO (512,512) → world X:');
-  eq(far.y, 2560, 'KO (512,512) → world Y:');
+  eq(far.x, 5120, 'KO (512,512) → world X:');
+  eq(far.y, 5120, 'KO (512,512) → world Y:');
 
   const spawn = koToWorld(306, 352);
-  eq(spawn.x, 1530, 'KO (306,352) → world X:');
-  eq(spawn.y, 1760, 'KO (306,352) → world Y:');
+  eq(spawn.x, 3060, 'KO (306,352) → world X:');
+  eq(spawn.y, 3520, 'KO (306,352) → world Y:');
 
   /* EKSEN AYRIMI: X ve Z birbirine karışmamalı. */
   const onlyX = koToWorld(100, 0);
-  eq(onlyX.x, 500, 'yalnız X → world X:');
+  eq(onlyX.x, 1000, 'yalnız X → world X:');
   eq(onlyX.y, 0, 'yalnız X → world Y (0 kalmalı):');
   const onlyZ = koToWorld(0, 100);
   eq(onlyZ.x, 0, 'yalnız Z → world X (0 kalmalı):');
-  eq(onlyZ.y, 500, 'yalnız Z → world Y:');
+  eq(onlyZ.y, 1000, 'yalnız Z → world Y:');
 });
 
 test('MORADON_WORLD_SPAWN dönüşümden TÜREMELİ', () => {
-  eq(MORADON_WORLD_SPAWN.x, 1530, 'world spawn X:');
-  eq(MORADON_WORLD_SPAWN.y, 1760, 'world spawn Y:');
+  eq(MORADON_WORLD_SPAWN.x, 3060, 'world spawn X:');
+  eq(MORADON_WORLD_SPAWN.y, 3520, 'world spawn Y:');
   const derived = koToWorld(MORADON_KO_SPAWN.x, MORADON_KO_SPAWN.z);
   eq(MORADON_WORLD_SPAWN.x, derived.x, 'X türetilmiş değerle aynı:');
   eq(MORADON_WORLD_SPAWN.y, derived.y, 'Y türetilmiş değerle aynı:');
@@ -9130,9 +9130,9 @@ test('§42 P2.4A koordinat temeli DEĞİŞMEDİ', () => {
      olurdu. Testin ASIL amacı korunuyor: koordinat temelinin kendisi (ölçek,
      Moradon sınırları, doğuş noktası) değişmemiştir. Arşiv dünyasının
      sabitleri de yerinde duruyor — anahtar geri çevrilirse aynen dönerler. */
-  eq(KO_TO_WORLD_SCALE, 5, 'ölçek:');
-  eq(MORADON_WORLD_BOUNDS.width, 2560, 'Moradon genişlik:');
-  eq(MORADON_WORLD_SPAWN.x, 1530, 'spawn X:'); eq(MORADON_WORLD_SPAWN.y, 1760, 'spawn Y:');
+  eq(KO_TO_WORLD_SCALE, 10, 'ölçek:');
+  eq(MORADON_WORLD_BOUNDS.width, 5120, 'Moradon genişlik:');
+  eq(MORADON_WORLD_SPAWN.x, 3060, 'spawn X:'); eq(MORADON_WORLD_SPAWN.y, 3520, 'spawn Y:');
   eq(TEST_WORLD_BOUNDS.width, 2480, 'arşiv test dünyası genişliği KORUNDU:');
   eq(TEST_SPAWN_POINT.y, 1650, 'arşiv test dünyası doğuşu KORUNDU:');
 });
@@ -9305,20 +9305,20 @@ test('§49 veri katmanı SAF — three yok, Math.random yok', () => {
 test('§49 maske ile collision TUTARLI (bilinen örnek noktalar)', () => {
   /* Şehir meydanı açık, sur gövdesi kapalı olmalı. Noktalar world birimidir. */
   ok(isWalkable(1530, 1760), 'şehir meydanı (spawn) açık olmalı');
-  eq(MORADON_MASK_CELLS * MORADON_CELL_SIZE, 2560, 'maske dünya genişliği:');
+  eq(MORADON_MASK_CELLS * MORADON_CELL_SIZE, 5120, 'maske dünya genişliği:');
   /* Oynanabilir dikdörtgen dışı KAPALI (kaynak heightmap kenar artefaktı). */
   ok(!isWalkable(1280, MORADON_PLAYABLE_RECT.minY - 1), 'oynanabilir alan dışı açık GÖRÜNMEMELİ');
 });
 
 test('§50 harita anahtarı MORADON — sınır, doğuş, engel authority’si', () => {
   eq(ACTIVE_MAP, 'moradon', 'aktif harita:');
-  eq(WORLD_BOUNDS.width, 2560, 'dünya genişliği:');
-  eq(WORLD_BOUNDS.height, 2560, 'dünya yüksekliği:');
+  eq(WORLD_BOUNDS.width, 5120, 'dünya genişliği:');
+  eq(WORLD_BOUNDS.height, 5120, 'dünya yüksekliği:');
   /* P2.10 — doğuş OYNANIŞ değeridir (güneybatı köşesi), kaynak değeri
      (`MORADON_WORLD_SPAWN`) yerinde durur ama artık kullanılmaz. */
   eq(SPAWN_POINT.x, MORADON_PLAY_SPAWN.x, 'doğuş X:');
   eq(SPAWN_POINT.y, MORADON_PLAY_SPAWN.y, 'doğuş Y:');
-  ok(MORADON_WORLD_SPAWN.x === 1530, 'kaynak değeri korunmalı');
+  ok(MORADON_WORLD_SPAWN.x === 3060, 'kaynak değeri korunmalı');
   /* İKİ engel sistemi AYNI ANDA çalışmaz: Moradon'da authority maskededir,
      dairesel engel listesi BOŞ olmalı. */
   eq(ACTIVE_OBSTACLES.length, 0, 'Moradon’da dairesel engel:');
@@ -10294,6 +10294,43 @@ test('§74 bitkiler GAMEPLAY’e GİRMEZ', () => {
   /* Bitkinin durduğu noktada yürüyüş SERBEST olmalı. */
   const it = buildFoliage()[0]!;
   ok(isWalkable(it.x, it.y), 'bitki noktası yürünebilir kalmalı');
+});
+
+test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () => {
+  /* P2.12 — iki sabit ayrı dosyada duruyor (`moradon-coords.ts` ve üretilmiş
+     `moradon-walkmask-data.ts`). Biri değişip diğeri kalırsa maske dünyayla
+     hizasını kaybeder ve mob/bitki duvara doğar. Test bunu bağlar. */
+  eq(MORADON_CELL_SIZE, KO_TO_WORLD_SCALE, 'hücre kenarı = dünya ölçeği:');
+  eq(MORADON_MASK_CELLS * MORADON_CELL_SIZE, MORADON_WORLD_WIDTH, 'maske genişliği:');
+  eq(WORLD_BOUNDS.width, MORADON_WORLD_WIDTH, 'sınır genişliği:');
+  /* Kale yarıçapı haritanın beşte biri kalmalı (kullanıcı kararı). */
+  eq(KEEP_RADIUS, Math.round(MORADON_WORLD_WIDTH / 5), 'kale yarıçapı:');
+});
+
+test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
+  /* Nesne SAYILARI değişmedi; alan dört katına çıktı. Yoğunluk düşmeli. */
+  eq(FARM_AREA_SLOTS.length, 23, 'slot sayısı SABİT:');
+  const items = buildFoliage();
+  ok(items.length > 700, `bitki sayısı düştü: ${items.length}`);
+  /* En yakın iki nesne arası mesafe ARTMALI — eskiden 29 birimdi. */
+  let worst = Infinity;
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const d = Math.hypot(items[i]!.x - items[j]!.x, items[i]!.y - items[j]!.y);
+      if (d < worst) worst = d;
+    }
+  }
+  ok(worst >= 50, `en yakın çift ${worst.toFixed(1)} — hâlâ sıkışık`);
+  /* Slot merkezleri de açılmalı. */
+  let closest = Infinity;
+  for (let i = 0; i < FARM_AREA_SLOTS.length; i++) {
+    for (let j = i + 1; j < FARM_AREA_SLOTS.length; j++) {
+      const a = FARM_AREA_SLOTS[i]!, b = FARM_AREA_SLOTS[j]!;
+      const d = Math.hypot(a.homeX - b.homeX, a.homeY - b.homeY);
+      if (d < closest) closest = d;
+    }
+  }
+  ok(closest >= 400, `en yakın slot çifti ${Math.round(closest)} birim`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

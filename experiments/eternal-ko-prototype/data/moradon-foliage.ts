@@ -21,16 +21,23 @@
  *  2. Doğuş meydanı boş: `SPAWN_CLEAR` yarıçapında hiçbir şey yok.
  *  3. Mob slotlarının içine ve 40 birim çevresine BÜYÜK bitki konmaz —
  *     savaş sırasında görüşü kapatmasın. Ot ve çiçek girebilir.
- *  4. Nesneler arası en az mesafe var; büyük bitkiler daha seyrek. */
+ *  4. Nesneler arası en az mesafe var; büyük bitkiler daha seyrek.
+ *
+ *  ══════════════ P2.12 — SAYILAR SABİT, ARALIK AÇILDI ══════════════
+ *  Oyun testinde bitkiler "ekranı kaplıyor" bulundu. Harita ölçeği iki
+ *  katına çıkınca (alan dört katı) aynı 860 nesne kendiliğinden dörtte
+ *  bir yoğunluğa indi. NESNE SAYILARI DEĞİŞMEDİ (kullanıcı kararı);
+ *  yalnız en az aralıklar ~1,8 katına çıkarıldı ki büyük alanda
+ *  kümelenme olmasın ve dağılım gerçekten yayılsın. */
 
 import { MORADON_FARM_SLOTS, MORADON_PLAY_SPAWN, SLOT_RECT } from './moradon-farm-slots.js';
 import { MORADON_PLAYABLE_RECT, isWalkable } from './moradon-walkmask.js';
 
 /** Doğuş çevresinde bitkisiz yarıçap (kale meydanı). */
-export const SPAWN_CLEAR = 180;
+export const SPAWN_CLEAR = 360;
 
 /** Slot dikdörtgeninin çevresinde büyük bitki yasağı payı. */
-export const SLOT_MARGIN = 40;
+export const SLOT_MARGIN = 80;
 
 export type FoliageKind = 'agac' | 'cam' | 'olu_agac' | 'cali' | 'ot' | 'cicek' | 'kaya';
 
@@ -60,13 +67,13 @@ interface KindSpec {
  *  Ters sırada kayalara yer kalmıyordu (plan denemesinde 120 yerine 19
  *  kaya yerleşmişti). */
 const SPECS: readonly KindSpec[] = [
-  { kind: 'agac', count: 110, spacing: 95, large: true, scaleMin: 0.85, scaleMax: 1.35 },
-  { kind: 'cam', count: 80, spacing: 95, large: true, scaleMin: 0.9, scaleMax: 1.4 },
-  { kind: 'olu_agac', count: 60, spacing: 95, large: true, scaleMin: 0.8, scaleMax: 1.2 },
-  { kind: 'kaya', count: 120, spacing: 70, large: true, scaleMin: 0.7, scaleMax: 1.6 },
-  { kind: 'cali', count: 140, spacing: 55, large: false, scaleMin: 0.8, scaleMax: 1.3 },
-  { kind: 'cicek', count: 90, spacing: 40, large: false, scaleMin: 0.9, scaleMax: 1.4 },
-  { kind: 'ot', count: 260, spacing: 38, large: false, scaleMin: 0.8, scaleMax: 1.5 },
+  { kind: 'agac', count: 110, spacing: 170, large: true, scaleMin: 0.85, scaleMax: 1.35 },
+  { kind: 'cam', count: 80, spacing: 170, large: true, scaleMin: 0.9, scaleMax: 1.4 },
+  { kind: 'olu_agac', count: 60, spacing: 170, large: true, scaleMin: 0.8, scaleMax: 1.2 },
+  { kind: 'kaya', count: 120, spacing: 125, large: true, scaleMin: 0.7, scaleMax: 1.6 },
+  { kind: 'cali', count: 140, spacing: 100, large: false, scaleMin: 0.8, scaleMax: 1.3 },
+  { kind: 'cicek', count: 90, spacing: 72, large: false, scaleMin: 0.9, scaleMax: 1.4 },
+  { kind: 'ot', count: 260, spacing: 68, large: false, scaleMin: 0.8, scaleMax: 1.5 },
 ];
 
 /** Tohumlu doğrusal üreteç — `Math.random()` KULLANILMAZ. */
@@ -114,7 +121,7 @@ export function buildFoliage(seed: number = FOLIAGE_SEED): FoliageItem[] {
       let clash = false;
       for (const o of out) {
         const ox = o.x - x, oy = o.y - y;
-        const min = Math.max(spec.spacing, 30);
+        const min = Math.max(spec.spacing, 55);
         if (ox * ox + oy * oy < min * min) { clash = true; break; }
       }
       if (clash) continue;

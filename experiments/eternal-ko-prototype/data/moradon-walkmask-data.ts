@@ -5,14 +5,17 @@
 
 /** Maske kenar uzunluğu (hücre). */
 export const MORADON_MASK_CELLS = 512;
-/** Hücre kenarı, world birimi. */
-export const MORADON_CELL_SIZE = 5;
+/** Hücre kenarı, world birimi.
+ *  P2.12 — 5'ten 10'a çıkarıldı (harita ölçeği). Maske HÜCRE SAYISI
+ *  DEĞİŞMEDİ (512×512); yalnız her hücrenin dünya karşılığı büyüdü.
+ *  `KO_TO_WORLD_SCALE` ile AYNI olmak ZORUNDA — testle bağlandı. */
+export const MORADON_CELL_SIZE = 10;
 /** Oynanabilir dikdörtgen (world birimi) — kaynak heightmap'in dejenere kenar
  *  sıraları VERİDEN tespit edilip çıkarıldı (üst 3 / alt 0 /
  *  sol 0 / sağ 0 düğüm sırası; iç taban -92.926). */
 export const MORADON_PLAYABLE_RECT = {
-  minX: 0, maxX: 2560,
-  minY: 60, maxY: 2560,
+  minX: 0, maxX: 5120,
+  minY: 120, maxY: 5120,
 } as const;
 /** Kapalı hücre bitleri (1 = KAPALI), satır-major, LSB-first, base64.
  *  Kaynaklar: collision üçgenleri (conservative) + oynanabilir dikdörtgen dışı. */

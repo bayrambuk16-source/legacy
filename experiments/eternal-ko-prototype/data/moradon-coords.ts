@@ -72,7 +72,21 @@ export const MORADON_KO_SPAWN = { x: 306, z: 352 } as const;
  *  mesh'i terrain üstüne bindirildiğinde sur/kule/bina ayak izleri araziyle
  *  hizalı çıkıyor ve `start_positions` (306/352) sur halkasının İÇİNE,
  *  şehir tile bölgesiyle örtüşerek düşüyor. FLIP YOKTUR. */
-export const KO_TO_WORLD_SCALE = 5;
+/*  ══════════════ P2.12 — ÖLÇEK 5 → 10 ══════════════
+ *  Oyun testinde harita KÜÇÜK ve her şey İÇ İÇE bulundu: 23 slot, 149 mob
+ *  ve 860 bitki 2560×2560'a sığmıyordu. Ölçek iki katına çıkarıldı →
+ *  dünya 5120×5120, ALAN DÖRT KATI.
+ *
+ *  NESNE SAYILARI SABİT KALDI (kullanıcı kararı): aynı 23 slot, aynı 860
+ *  bitki dört kat alana yayıldı → yoğunluk dörtte bire indi.
+ *
+ *  GAMEPLAY MENZİLLERİ ÖLÇEKLENMEDİ (attack 350, aggro 150, roam 50...).
+ *  Dünyanın büyük hissettirmesinin sebebi budur: menzil sabit kalınca
+ *  her şey göreli olarak küçülür.
+ *
+ *  MALİYET: yükseklik ızgarası 129×129 olarak KALDI, iki katına yayıldı →
+ *  arazi detayı yarıya indi. Moradon zaten düz olduğu için kabul edildi. */
+export const KO_TO_WORLD_SCALE = 10;
 
 export const MORADON_WORLD_WIDTH = MORADON_SOURCE_WIDTH * KO_TO_WORLD_SCALE;
 export const MORADON_WORLD_HEIGHT = MORADON_SOURCE_HEIGHT * KO_TO_WORLD_SCALE;

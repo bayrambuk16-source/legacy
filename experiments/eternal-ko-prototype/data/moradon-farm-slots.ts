@@ -1,8 +1,8 @@
 /** MORADON YERLEŞİMİ — KÖŞE DOĞUŞ + HARİTAYA YAYILMIŞ SLOTLAR (P2.10)
  *
  *  ══════════════ DOĞUŞ NOKTASI BİLİNÇLİ OLARAK TAŞINDI ══════════════
- *  P2.4C'de doğuş `start_positions` kaynağından türetilmişti (KO 306/352 →
- *  world 1530/1760) ve "kapanmış karar" diye işaretlenmişti. P2.10'da bu
+ *  P2.4C'de doğuş `start_positions` kaynağından türetilmişti ve "kapanmış
+ *  karar" diye işaretlenmişti. P2.10'da bu
  *  karar OYNANIŞ GEREKÇESİYLE değiştirildi: doğuş haritanın GÜNEYBATI
  *  köşesine alındı. Sebep — oyuncu bir köşeden başlayıp haritanın içine
  *  doğru ilerlemeli; merkezden başlayınca her yön aynı oluyor ve seviye
@@ -14,12 +14,20 @@
  *
  *  ══════════════ KALE ALANI — MOB YOK ══════════════
  *  Doğuş çevresinde `KEEP_RADIUS` kadar mob YOKTUR. Yarıçap haritanın beşte
- *  biridir (2560 / 5 ≈ 512) — kullanıcı kararı. Yeni oyuncu üstüne mob
+ *  biridir (5120 / 5 ≈ 1024) — kullanıcı kararı. Yeni oyuncu üstüne mob
  *  gelmeden nefes alır; ileride kale yapıları bu alana kurulur.
  *
  *  ══════════════ SEVİYE GRADYANI MESAFEDEN TÜRER ══════════════
  *  Slotlar doğuşa uzaklığa göre sıralanır ve 11 mob türü seviye sırasına
  *  göre bu sıraya dağıtılır: en yakın slotta Sv1, en uzakta Sv15.
+ *
+ *  ══════════════ P2.12 — KOORDİNATLAR ×2 ══════════════
+ *  Harita ölçeği 5'ten 10'a çıkınca (dünya 5120×5120) bütün slot
+ *  koordinatları iki katına alındı. SLOT SAYISI ve MOB SAYISI DEĞİŞMEDİ
+ *  (kullanıcı kararı) — aynı 23 slot dört kat alana yayıldı.
+ *
+ *  `SLOT_RECT` 200'de KALDI: slot içi mob yoğunluğu aynı kalsın, yalnız
+ *  slotlar arası mesafe açılsın diye.
  *
  *  ══════════════ YERLEŞİM "NİZAMİ" DEĞİLDİR ══════════════
  *  Dikdörtgenler ızgaraya dizilmedi. Aday havuzu TOHUMLU bir karıştırmayla
@@ -35,10 +43,10 @@
 import { defineMobSlot, type MobSpawnSlot } from './mob-slot-schema.js';
 
 /** OYNANIŞ doğuş noktası — güneybatı köşesi. Kaynak değeri EZMEZ. */
-export const MORADON_PLAY_SPAWN = { x: 340, y: 2220 } as const;
+export const MORADON_PLAY_SPAWN = { x: 680, y: 4440 } as const;
 
 /** Kale alanı yarıçapı — bu mesafede mob YOK. */
-export const KEEP_RADIUS = 512;
+export const KEEP_RADIUS = 1024;
 
 /** Slot dikdörtgeninin kenarı. 200 birim: 5-8 mob içeride birbirine
  *  yapışmadan dağılır (hücre ızgarası 3×3 → hücre başına ~66 birim). */
@@ -61,37 +69,37 @@ interface Placement {
  *  köşesidir; kenar `SLOT_RECT`. Yorumdaki mesafe doğuş noktasınadır. */
 const PLACEMENT: readonly Placement[] = [
   /* ---- BANT 1 · Sv1-2 · 600-900 ---- */
-  { x: 840, y: 2020, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 600, y: 1500, ref: 750, count: 5, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 40, y: 1300, ref: 850, count: 6, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 1680, y: 4040, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 1200, y: 3000, ref: 750, count: 5, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 80, y: 2600, ref: 850, count: 6, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
 
   /* ---- BANT 2 · Sv4-5 · 1000-1350 ---- */
-  { x: 600, y: 1180, ref: 752, count: 6, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 920, y: 1100, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 440, y: 900, ref: 851, count: 5, name: 'Yaban Sıçanı', ai: 'AGGRESSIVE', art: SMALL },
-  { x: 120, y: 780, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 1200, y: 2360, ref: 752, count: 6, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 1840, y: 2200, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 880, y: 1800, ref: 851, count: 5, name: 'Yaban Sıçanı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 240, y: 1560, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
 
   /* ---- BANT 3 · Sv6-7 · 1400-1950 ---- */
-  { x: 720, y: 780, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1760, y: 1900, ref: 150, count: 6, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
-  { x: 1120, y: 820, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
-  { x: 520, y: 540, ref: 754, count: 7, name: 'Leş Böceği', ai: 'NORMAL', art: SWAMP },
-  { x: 80, y: 460, ref: 754, count: 5, name: 'Leş Böceği', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1960, y: 1460, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
-  { x: 800, y: 340, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
-  { x: 240, y: 180, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1440, y: 1560, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3520, y: 3800, ref: 150, count: 6, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
+  { x: 2240, y: 1640, ref: 150, count: 7, name: 'Yamyam Goblin', ai: 'NORMAL', art: SWAMP },
+  { x: 1040, y: 1080, ref: 754, count: 7, name: 'Leş Böceği', ai: 'NORMAL', art: SWAMP },
+  { x: 160, y: 920, ref: 754, count: 5, name: 'Leş Böceği', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3920, y: 2920, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
+  { x: 1600, y: 680, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SWAMP },
+  { x: 480, y: 360, ref: 852, count: 6, name: 'Çöpçü Sıçan', ai: 'AGGRESSIVE', art: SWAMP },
 
   /* ---- BANT 4 · Sv8-9 · 1950-2350 ---- */
-  { x: 1560, y: 660, ref: 755, count: 8, name: 'Kapkaççı', ai: 'NORMAL', art: SWAMP },
-  { x: 1320, y: 460, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1120, y: 140, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
-  { x: 1440, y: 140, ref: 255, count: 5, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3120, y: 1320, ref: 755, count: 8, name: 'Kapkaççı', ai: 'NORMAL', art: SWAMP },
+  { x: 2640, y: 920, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 2240, y: 280, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'NORMAL', art: SWAMP },
+  { x: 2880, y: 280, ref: 255, count: 5, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
 
   /* ---- BANT 5 · Sv11-15 · en uzak köşe ---- */
-  { x: 1720, y: 300, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 2000, y: 420, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'NORMAL', art: BOSS },
-  { x: 2280, y: 580, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
-  { x: 2120, y: 140, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+  { x: 3440, y: 600, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 4000, y: 840, ref: 250, count: 5, name: 'Bataklık Devi', ai: 'NORMAL', art: BOSS },
+  { x: 4560, y: 1160, ref: 252, count: 5, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
+  { x: 4240, y: 280, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'ELITE', art: BOSS },
 ];
 
 /** Kanonik slot tablosu — haritanın tamamına yayılmış. */
