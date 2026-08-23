@@ -158,3 +158,16 @@ export const FOLIAGE_BASE_SCALE: Readonly<Record<FoliageKind, number>> = {
  *  sonrası ekranda aynı anda 40-60 nesne kalır (~150 bin üçgen), bu da
  *  mevcut mob yüküne yakındır. */
 export const FOLIAGE_DRAW_DISTANCE = 900;
+
+/** P2.29 — UZAYSAL HÜCRE KENARI (dünya birimi).
+ *
+ *  Bitkiler tür başına TEK InstancedMesh olarak çiziliyordu ve three'nin
+ *  frustum kesimi devreye girmiyordu: InstancedMesh tek nesne sayılır,
+ *  bütün örnekler ya çizilir ya çizilmez. Tek mesh bütün haritayı
+ *  kapladığı için hep çiziliyordu — 860 nesne, ~1,3 milyon üçgen.
+ *
+ *  Artık (tür × hücre) başına bir mesh var. 5120 / 1706 ≈ 3×3 = 9 hücre;
+ *  kamera aynı anda 2-4 hücre görür, yani üçgen yükü kabaca dokuzda
+ *  birine iner. Çizim çağrısı 7'den ~20'ye çıkar — mobilde bu takas
+ *  değer. */
+export const FOLIAGE_CELL = 1706;

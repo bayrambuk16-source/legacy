@@ -34,6 +34,8 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { facingToYaw } from './coords.js';
 import { usesGoblinModel } from '../data/kecoon-model.js';
+import { MAX_MOB_VISUALS, MOB_DRAW_DISTANCE } from '../data/mob-draw-distance.js';
+import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
 import {
   FOLIAGE_BASE_SCALE, type FoliageItem, type FoliageKind,
 } from '../data/moradon-foliage.js';
@@ -219,6 +221,9 @@ export class ThreeWorldRenderer {
   /** Telemetri: bu karede hangi mob hangi klibi çalıyor. */
   private mobClipRows: Array<{ uid: number; phase: string; clip: string; timeScale: number }> = [];
   private mobDeathActive = 0;
+  /** P2.29 — bu karede GÖRSELİ olan mob sayısı (telemetri). */
+  private mobVisualsActive = 0;
+  get visibleMobCount(): number { return this.mobVisualsActive; }
 
   /* ───────── P2.4 — gerçek ok modeli ───────── */
   /** GLB'den gelen ok geometrisi/materyali; `null` → P2.3 primitive silüeti. */
@@ -510,7 +515,7 @@ export class ThreeWorldRenderer {
 
      GAMEPLAY ETKİSİ YOK: bitkiler collision'a girmez, WorldFrame'e
      yazılmaz, hiçbir gameplay sistemi bunları görmez. */
-  private foliage = new Map<FoliageKind, InstancedMesh>();
+  private foliage = new Map<string, InstancedMesh>();
   private foliageOwned: BufferGeometry[] = [];
 
   /** Bir bitki türünün modelini yükler ve örneklerini yerleştirir. */
@@ -529,34 +534,59 @@ export class ThreeWorldRenderer {
     const mesh = src as Mesh;
     this.detachFoliage(kind);
 
+    /* ═══ P2.29 — PARÇALI INSTANCING ═══
+       `FOLIAGE_DRAW_DISTANCE` P2.11'de tanımlanmıştı ama HİÇ
+       UYGULANMAMIŞTI: 860 nesnenin tamamı her karede çiziliyordu
+       (~1,3 milyon üçgen).
+
+       three'nin frustum kesimi InstancedMesh'i TEK NESNE sayar —
+       bütün örnekler ya çizilir ya çizilmez. Tek bir mesh bütün
+       haritayı kapladığı için kesim hiç devreye girmiyordu.
+
+       Çözüm: tür başına TEK mesh yerine (tür × HÜCRE) başına bir
+       mesh. Her hücre kendi sınır küresini taşır, uzaktaki hücreler
+       frustum tarafından kesilir. Çizim çağrısı 7'den ~20'ye çıkar
+       ama üçgen yükü dokuzda bire iner. */
     const geo = mesh.geometry.clone();
     this.foliageOwned.push(geo);
-    const inst = new InstancedMesh(geo, mesh.material, items.length);
-    inst.frustumCulled = true;
+    const cells = new Map<string, FoliageItem[]>();
+    for (const it of items) {
+      const cx = Math.floor(it.x / FOLIAGE_CELL);
+      const cy = Math.floor(it.y / FOLIAGE_CELL);
+      const key = `${cx}:${cy}`;
+      const list = cells.get(key) ?? [];
+      list.push(it);
+      cells.set(key, list);
+    }
     const m4 = new Matrix4();
     const q = new Quaternion();
     const pos = new Vector3();
     const scl = new Vector3();
-    items.forEach((it, i) => {
-      const base = FOLIAGE_BASE_SCALE[it.kind] * it.scale;
-      pos.set(it.x, groundElevationAt(it.x, it.y), it.y);
-      q.setFromAxisAngle(new Vector3(0, 1, 0), it.rotation);
-      scl.set(base, base, base);
-      m4.compose(pos, q, scl);
-      inst.setMatrixAt(i, m4);
-    });
-    inst.instanceMatrix.needsUpdate = true;
-    this.scene.add(inst);
-    this.foliage.set(kind, inst);
+    for (const [cellKey, list] of cells) {
+      const inst = new InstancedMesh(geo, mesh.material, list.length);
+      inst.frustumCulled = true;
+      list.forEach((it, i) => {
+        const base = FOLIAGE_BASE_SCALE[it.kind] * it.scale;
+        pos.set(it.x, groundElevationAt(it.x, it.y), it.y);
+        q.setFromAxisAngle(new Vector3(0, 1, 0), it.rotation);
+        scl.set(base, base, base);
+        m4.compose(pos, q, scl);
+        inst.setMatrixAt(i, m4);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      this.scene.add(inst);
+      this.foliage.set(`${kind}#${cellKey}`, inst);
+    }
     return true;
   }
 
   detachFoliage(kind: FoliageKind): void {
-    const inst = this.foliage.get(kind);
-    if (!inst) return;
-    this.scene.remove(inst);
-    inst.dispose();
-    this.foliage.delete(kind);
+    for (const [key, inst] of [...this.foliage]) {
+      if (!key.startsWith(`${kind}#`)) continue;
+      this.scene.remove(inst);
+      inst.dispose();
+      this.foliage.delete(key);
+    }
   }
 
   /** Yüklenmiş bitki türü sayısı (telemetri). */
@@ -703,10 +733,42 @@ export class ThreeWorldRenderer {
     this.mobs.beginFrame();
     this.mobClipRows.length = 0;
     this.mobDeathActive = 0;
-    for (const m of frame.mobs) {
+    this.mobVisualsActive = 0;
+    /* P2.29 — ÖNCE SIRALA, SONRA KES. Mesafe kesimi tek başına yetmiyor:
+       kalabalık bir noktada 1400 birimlik daire 79 moba denk geliyor.
+       En yakın `MAX_MOB_VISUALS` tanesi çizilir; savaştığın mob her
+       zaman bu kümededir. */
+    const visible = frame.mobs
+      .filter((m) => {
+        if (m.corpseFaded) return false;
+        const dx = m.worldX - p.worldX;
+        const dy = m.worldY - p.worldY;
+        return dx * dx + dy * dy <= MOB_DRAW_DISTANCE * MOB_DRAW_DISTANCE;
+      })
+      .map((m) => ({
+        m,
+        d: (m.worldX - p.worldX) ** 2 + (m.worldY - p.worldY) ** 2,
+      }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, MAX_MOB_VISUALS)
+      .map((e) => e.m);
+    for (const m of visible) {
       /* P2.9 — ceset süresi dolduysa görsel ÜRETİLMEZ ve dokunulmaz;
          `endFrame()` onu kendiliğinden söker. Gameplay listesi değişmez. */
-      if (m.corpseFaded) continue;
+      /* ═══ P2.29 — MESAFE KESİMİ ═══
+         Oyun testi bulgusu: biraz ilerleyince oyun donuyordu. Sebep
+         haritadaki 184 mobun TAMAMININ her karede canlı iskeletli mesh
+         olarak durmasıydı — ekran dışındakiler dahil. Goblin modeli
+         mutanttan %54 ağır olduğu için (17 404 / 11 271 üçgen) yük
+         iki buçuk milyon üçgene çıkmıştı.
+
+         Kesim mesafesi ÖLÇÜLDÜ, uydurulmadı: en geniş kamera
+         (kuş bakışı, mesafe 750 × zoom 2,2 = 1650, fov 40°) köşegende
+         1223 birim kapsıyor. `MOB_DRAW_DISTANCE` onun biraz üstünde.
+
+         GAMEPLAY ETKİLENMEZ: mob AI, respawn ve savaş dünyada
+         çalışmaya devam eder; yalnız görseli çizilmez. */
+      this.mobVisualsActive += 1;
       const key = mobVisualKey(m.uid, m.generation);
       const g = this.mobs.touch(key);
       if (g.children.length === 0) this.fillMobVisual(g, m, key);

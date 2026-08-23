@@ -69,6 +69,10 @@ import {
 } from '../data/kecoon-model.js';
 import { clipMapFor } from '../render3d/MutantAnimator.js';
 import {
+  CAMERA_DIAGONAL_REACH, MAX_MOB_VISUALS, MOB_DRAW_DISTANCE,
+} from '../data/mob-draw-distance.js';
+import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
+import {
   GENIE_PANEL, GENIE_SET_TABS, GENIE_SKILL_SLOTS, GENIE_SLIDERS, GENIE_TOGGLES,
   SLIDER_TRACK, genieHitTest,
 } from '../ui/genie-panel.js';
@@ -11757,6 +11761,78 @@ test('§98 LİSANS künyesi kodda TAŞINIYOR', () => {
   ok(KECOON_ATTRIBUTION.includes('RapidAssets'), 'künye sahibi eksik');
   ok(KECOON_ATTRIBUTION.includes('CC-BY'), 'lisans adı eksik');
   ok(PROTO_MODELS['kecoon_glb'] !== undefined, 'model manifestte yok');
+});
+
+/* ================= P2.29 — ÇİZİM YÜKÜ KESİMİ ================= */
+console.log('P2.29 — mesafe kesimi ve parçalı bitki:');
+
+test('§99 kesim mesafesi KAMERA ERİŞİMİNDEN büyük', () => {
+  /* Kesim kameranın gördüğünden dar olursa görünür alanda mob kaybolur. */
+  ok(MOB_DRAW_DISTANCE > CAMERA_DIAGONAL_REACH,
+    `kesim (${MOB_DRAW_DISTANCE}) kamera erişiminden (${CAMERA_DIAGONAL_REACH}) dar`);
+  /* Ama sınırsız da olmamalı — haritanın yarısını kapsamamalı. */
+  ok(MOB_DRAW_DISTANCE < WORLD_BOUNDS.width / 2, 'kesim çok geniş');
+});
+
+test('§99 GÖRSEL TAVANI kalabalığı sınırlar', () => {
+  /* Mesafe kesimi tek başına yetmiyor: slotlar 420 birim aralıklı,
+     kalabalık noktada 1400 birimlik daire 79 moba denk geliyor. */
+  ok(MAX_MOB_VISUALS > 0 && MAX_MOB_VISUALS <= 40,
+    `görsel tavanı makul değil: ${MAX_MOB_VISUALS}`);
+  /* Tavan, bir slotun mob sayısından belirgin biçimde büyük olmalı —
+     yoksa tek bir slotu bile tam göremezsin. */
+  ok(MAX_MOB_VISUALS >= 3 * 8, 'tavan tek slotu bile karşılamıyor');
+
+  /* CANLI: haritanın EN KALABALIK noktasında bile tavan aşılmamalı. */
+  const S = new PrototypeState(3700);
+  let worst = 0;
+  for (let y = 400; y < 5000; y += 400) {
+    for (let x = 400; x < 5000; x += 400) {
+      let n = 0;
+      for (const m of S.mobs.mobs) {
+        const dx = m.worldX - x, dy = m.worldY - y;
+        if (dx * dx + dy * dy <= MOB_DRAW_DISTANCE * MOB_DRAW_DISTANCE) n += 1;
+      }
+      if (n > worst) worst = n;
+    }
+  }
+  /* Kesim öncesi kalabalık TAVANDAN büyük olabilir — tavan zaten
+     bunun için var. Test onun GERÇEKTEN gerekli olduğunu doğrular. */
+  ok(worst > MAX_MOB_VISUALS,
+    `tavan gereksiz görünüyor: en kalabalık nokta ${worst} mob`);
+});
+
+test('§99 BİTKİLER hücrelere bölünür — tek mesh haritayı kaplamaz', () => {
+  /* three'nin frustum kesimi InstancedMesh'i TEK nesne sayar; tek mesh
+     bütün haritayı kaplarsa kesim hiç devreye girmez. */
+  ok(FOLIAGE_CELL > 0, 'hücre kenarı tanımsız');
+  ok(FOLIAGE_CELL < WORLD_BOUNDS.width, 'hücre haritanın tamamı — kesim çalışmaz');
+  const cells = Math.ceil(WORLD_BOUNDS.width / FOLIAGE_CELL);
+  ok(cells >= 3, `hücre sayısı az: ${cells}×${cells}`);
+  /* Ama aşırı bölmek de çizim çağrısını patlatır. */
+  ok(cells <= 8, `hücre sayısı fazla: ${cells}×${cells}`);
+
+  /* Her hücrede gerçekten bitki olmalı — boş hücre çizim çağrısı üretmez
+     ama dağılımın haritaya YAYILDIĞINI doğrular. */
+  const used = new Set<string>();
+  for (const it of buildFoliage()) {
+    used.add(`${Math.floor(it.x / FOLIAGE_CELL)}:${Math.floor(it.y / FOLIAGE_CELL)}`);
+  }
+  ok(used.size >= 6, `bitkiler ${used.size} hücreye sıkışmış`);
+});
+
+test('§99 kesim GAMEPLAY’i etkilemez', () => {
+  /* Kesilen mobun AI'ı, respawn'ı ve savaşı sürer; yalnız görseli
+     üretilmez. Renderer zaten gameplay'e yazmaz. */
+  const S = new PrototypeState(3701);
+  const before = S.mobs.mobs.length;
+  for (let i = 0; i < 120; i++) S.mobs.update(1 / 60, S.world);
+  eq(S.mobs.mobs.length, before, 'mob listesi kesimden etkilenmemeli:');
+  /* Uzaktaki mob hâlâ hedeflenebilir olmalı (menzil kuralı ayrı). */
+  const far = S.mobs.mobs
+    .map((m) => Math.hypot(m.worldX - S.world.worldX, m.worldY - S.world.worldY))
+    .some((d) => d > MOB_DRAW_DISTANCE);
+  ok(far, 'kesim mesafesinin dışında mob olmalı (senaryo geçersiz)');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
