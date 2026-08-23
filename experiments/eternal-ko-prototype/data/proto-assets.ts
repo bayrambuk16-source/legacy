@@ -35,6 +35,11 @@ export const UI_ASSETS: Record<string, string> = {
      Parçalara ayırmadım çünkü maket zaten hizalı üretildi; kesip yeniden
      hizalamak hata kaynağı olurdu. Metin ve item ikonları ÜSTÜNE çizilir. */
   ui_inv_panel: 'assets/ui/inv_panel.webp',
+  /* P2.25 — üç panel daha. Hepsi 941×1672 maket ölçüsünde ve YAZISIZ;
+     metin, ikon ve durum vurgusu kod tarafından çizilir. */
+  ui_char_panel: 'assets/ui/char_panel.webp',
+  ui_skill_panel: 'assets/ui/skill_panel.webp',
+  ui_genie_panel: 'assets/ui/genie_panel.webp',
   ui_player_card: 'assets/ui/ui_player_card.webp',
   ui_target_card: 'assets/ui/ui_target_card.webp',
   ui_genie_toggle: 'assets/ui/ui_genie_toggle.webp',

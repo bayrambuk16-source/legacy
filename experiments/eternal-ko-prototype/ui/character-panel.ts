@@ -72,23 +72,49 @@ export type AllocStatId = typeof ALLOC_ROWS[number];
 
 /** Artı düğmelerinin dikdörtgenleri. `+1` ve `+5` iki ayrı düğmedir:
  *  67 puanı tek tek harcamak mobilde işkence olur. */
+/** Dağıtım stat satırları — [y, yükseklik]. */
+export const ALLOC_STAT_ROWS: ReadonlyArray<readonly [number, number]> = [
+  [329, 36], [375, 36],
+];
+
+/** Amber kare düğmeler: maketin 2×2 bloğu (x 440 ve 508, sahne). */
 export function allocButtons(): Array<UiRect & { id: string; stat: AllocStatId; amount: number }> {
   const out: Array<UiRect & { id: string; stat: AllocStatId; amount: number }> = [];
   ALLOC_ROWS.forEach((stat, i) => {
-    const y = PANEL_FRAME.y + 62 + i * 40;
-    out.push({ id: `alloc_${stat}_1`, stat, amount: 1, x: PANEL_FRAME.x + 214, y, w: 44, h: 34 });
-    out.push({ id: `alloc_${stat}_5`, stat, amount: 5, x: PANEL_FRAME.x + 264, y, w: 44, h: 34 });
+    const [y, h] = ALLOC_STAT_ROWS[i]!;
+    out.push({ id: `alloc_${stat}_1`, stat, amount: 1, x: 440, y, w: 60, h });
+    out.push({ id: `alloc_${stat}_5`, stat, amount: 5, x: 508, y, w: 60, h });
   });
   return out;
 }
 
 /** Dağıtım bloğunun tamamı (başlık + iki satır). */
-export const ALLOC_BOX: UiRect = {
-  x: PANEL_FRAME.x + 20, y: PANEL_FRAME.y + 44,
-  w: PANEL_FRAME.w - 40, h: 84,
-};
+/* ═══ P2.25 — KARAKTER MAKETİNE OTURTULDU ═══
+   Konumlar maketin koyu bloklarından ÖLÇÜLDÜ (941×1672 → sahne 620×1100,
+   çarpan 0.659), formülle türetilmedi. */
+
+/** Kimlik bloğu: portre çemberi + üç bilgi satırı. */
+export const CHAR_PORTRAIT: UiRect = { x: 72, y: 112, w: 155, h: 155 };
+export const CHAR_IDENTITY_ROWS: ReadonlyArray<readonly [number, number]> = [
+  [123, 36], [169, 34], [214, 34],
+];
+export const CHAR_IDENTITY_X = 243;
+export const CHAR_IDENTITY_W = 320;
+
+/** Dağıtım bloğu: üstte puan satırı, altında iki stat satırı. */
+export const ALLOC_BOX: UiRect = { x: 66, y: 280, w: 500, h: 140 };
+export const ALLOC_POINT_ROW: UiRect = { x: 70, y: 287, w: 490, h: 32 };
 
 /** Stat satırlarının çizileceği blok. */
+/** Stat listesi. 11 satır, 28,3 px aralıklı — maketin zebra bantlarından.
+ *  Dikey ayırıcı x 410'da: sol etiket, sağ değer. */
+export const CHAR_STAT_ROW_H = 28.3;
+export const CHAR_STAT_FIRST_Y = 445;
+export const CHAR_STAT_DIVIDER_X = 410;
+export const CHAR_RESIST_ROWS: ReadonlyArray<readonly [number, number]> = [
+  [783, 47], [836, 45], [888, 45],
+];
+
 export const CHAR_STATS_BOX: UiRect = {
   x: PANEL_FRAME.x + 20, y: PANEL_FRAME.y + 136,
   w: PANEL_FRAME.w - 40, h: 330,
@@ -135,6 +161,15 @@ export function skillBarRects(count: number): UiRect[] {
 }
 
 /** Havuzdaki skill satırlarının dikdörtgenleri (alttaki liste). */
+/** Havuz hücreleri — maket tablosundan, satır-major (soldan sağa). */
+export function skillPoolCells(): UiRect[] {
+  const out: UiRect[] = [];
+  for (const [y, h] of SKILL_POOL_ROWS) {
+    for (const [x, w] of SKILL_POOL_COLS) out.push({ x, y, w, h });
+  }
+  return out;
+}
+
 export function skillPoolRects(count: number): UiRect[] {
   const h = 52, gap = 6;
   const x = PANEL_FRAME.x + 20;
@@ -147,7 +182,31 @@ export function skillPoolRects(count: number): UiRect[] {
 
 /** Havuz listesinin bir ekrana sığan satır sayısı. Taşan skiller sayfalanır —
  *  panel KAYDIRILMAZ (mobil düzen kuralı: dikey kaydırma yok). */
-export const SKILL_PAGE_SIZE = 10;
+export const SKILL_PAGE_SIZE = 12;
+
+/* ═══ P2.25 — YETENEK MAKETİ ═══ ölçülen konumlar (sahne pikseli). */
+/** Üstteki puan şeridi: solda bilgi, sağda vurgulu kutu. */
+export const SKILL_POINT_ROW: UiRect = { x: 40, y: 110, w: 530, h: 51 };
+export const SKILL_POINT_BOX: UiRect = { x: 425, y: 114, w: 145, h: 43 };
+/** 5 aktif yuva — sütun konumları maketten. */
+export const SKILL_BAR_SLOTS: ReadonlyArray<readonly [number, number]> = [
+  [59, 78], [165, 78], [273, 72], [375, 75], [480, 78],
+];
+export const SKILL_BAR_Y = 190;
+export const SKILL_BAR_H = 80;
+/** Yuva altındaki isim şeridi. */
+export const SKILL_BAR_LABEL_Y = 283;
+/** Havuz: 2 sütun × 6 satır. */
+export const SKILL_POOL_COLS: ReadonlyArray<readonly [number, number]> = [
+  [48, 210], [321, 212],
+];
+export const SKILL_POOL_ROWS: ReadonlyArray<readonly [number, number]> = [
+  [329, 76], [416, 76], [503, 76], [590, 80], [677, 76], [763, 80],
+];
+/** Havuz hücresindeki ikon karesi (sol taraf). */
+export const SKILL_POOL_ICON_W = 62;
+/** Sayfa şeridi ve okları. */
+export const SKILL_PAGE_ROW: UiRect = { x: 190, y: 864, w: 240, h: 43 };
 
 export function skillPageButtons(): Array<UiRect & { id: string; label: string }> {
   const y = PANEL_FRAME.y + PANEL_FRAME.h - 62;

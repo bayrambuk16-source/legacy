@@ -51,7 +51,9 @@ import {
 import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import { GENIE_SKILL_POOL } from '../data/archer-skills.js';
 import { ARCHER_SOURCE_ITEMS, archerSourceItem } from '../data/archer-source-items.js';
-import { ALLOC_BOX, ALLOC_ROWS, allocButtons, parseAllocId } from '../ui/character-panel.js';
+import {
+  ALLOC_BOX, ALLOC_ROWS, CHAR_STAT_FIRST_Y, allocButtons, parseAllocId,
+} from '../ui/character-panel.js';
 import {
   POWER_EXPONENT, POWER_SCORE_MIN, formatPower, formatPowerDelta, powerScore,
 } from '../data/power-score.js';
@@ -59,6 +61,14 @@ import { AUTO_GEAR_DEFAULTS } from '../world/AutoGearSystem.js';
 import { EXTRA_MONSTERS } from '../data/extra-monsters.js';
 import { NON_GEAR_COLOR, nonGearInfo, nonGearRole } from '../ui/non-gear-info.js';
 import { QUESTS, promotionQuests, questById } from '../data/quests.js';
+import {
+  GENIE_PANEL, GENIE_SET_TABS, GENIE_SKILL_SLOTS, GENIE_SLIDERS, GENIE_TOGGLES,
+  SLIDER_TRACK, genieHitTest,
+} from '../ui/genie-panel.js';
+import {
+  CHAR_IDENTITY_ROWS, CHAR_RESIST_ROWS, SKILL_BAR_SLOTS, SKILL_POOL_COLS,
+  SKILL_POOL_ROWS, skillPoolCells,
+} from '../ui/character-panel.js';
 import {
   CAMERA_MODES, CAMERA_MODE_LABEL, CAMERA_THIRD, approachYaw, baseTuning, modeYaw, nextMode,
 } from '../ui/camera-mode.js';
@@ -10246,8 +10256,10 @@ test('§72 dağıtım düğmeleri panel İÇİNDE ve doğru çözülür', () => 
     ok(parsed !== null && parsed.stat === b.stat && parsed.amount === b.amount,
       `${b.id} ayrıştırılamadı`);
   }
-  /* Dağıtım bloğu stat bloğuyla ÇAKIŞMAMALI. */
-  ok(ALLOC_BOX.y + ALLOC_BOX.h <= CHAR_STATS_BOX.y, 'dağıtım ve stat blokları çakışıyor');
+  /* P2.25 — stat listesi artık maketten geliyor (`CHAR_STAT_FIRST_Y`),
+     eski `CHAR_STATS_BOX` yalnız yedek çizim için duruyor. Çakışma
+     kontrolü gerçek konumla yapılır. */
+  ok(ALLOC_BOX.y + ALLOC_BOX.h <= CHAR_STAT_FIRST_Y, 'dağıtım ve stat listesi çakışıyor');
 });
 
 test('§73 EĞRİ: Sv20 dağıtılmış karakter Sv15 mobu MAKUL sürede indirir', () => {
@@ -11335,6 +11347,99 @@ test('§92 aynı YUVADAKİ eşyalar FARKLI ikon taşır', () => {
   for (const [slot, set] of bySlot) {
     const count = allDefinitions().filter((d) => d.equipSlot === slot).length;
     eq(set.size, count, `${slot} yuvasında ikon tekrarı:`);
+  }
+});
+
+/* ================= P2.25 — ÜÇ PANEL MAKETİ ================= */
+console.log('P2.25 — karakter, yetenek, genie panelleri:');
+
+test('§93 panel görselleri MANİFESTTE', () => {
+  for (const k of ['ui_inv_panel', 'ui_char_panel', 'ui_skill_panel', 'ui_genie_panel']) {
+    ok(UI_ASSETS[k] !== undefined, `manifestte yok: ${k}`);
+    ok(UI_ASSETS[k]!.startsWith('assets/ui/'), `yanlış klasör: ${k}`);
+  }
+});
+
+test('§93 GENIE yerleşimi panel İÇİNDE ve ÇAKIŞMIYOR', () => {
+  const P = GENIE_PANEL;
+  const within = (r: { x: number; y: number; w: number; h: number }, n: string): void => {
+    ok(r.x >= 0 && r.x + r.w <= P.w, `${n} yatay taşıyor`);
+    ok(r.y >= 0 && r.y + r.h <= P.h, `${n} dikey taşıyor`);
+  };
+  for (const [x, w] of GENIE_SET_TABS) within({ x, y: 196, w, h: 50 }, 'set sekmesi');
+  for (const [x, w] of GENIE_SKILL_SLOTS) within({ x, y: 324, w, h: 74 }, 'skill yuvası');
+  /* Kaydırıcılar SIRALI ve çakışmasız olmalı. */
+  let prev = 0;
+  for (const s of GENIE_SLIDERS) {
+    ok(s.labelY > prev, `${s.id} etiketi geriye gidiyor`);
+    ok(s.trackY > s.labelY, `${s.id} çubuğu etiketin üstünde`);
+    prev = s.trackY;
+    within({ x: SLIDER_TRACK.x, y: s.trackY, w: SLIDER_TRACK.w, h: 36 }, s.id);
+  }
+  /* Aç/kapa satırları sıralı. */
+  let py = 0;
+  for (const t of GENIE_TOGGLES) {
+    ok(t.y > py, `${t.id} sırasız`);
+    py = t.y;
+  }
+  eq(GENIE_SLIDERS.length, 4, 'kaydırıcı sayısı:');
+  eq(GENIE_TOGGLES.length, 4, 'aç/kapa sayısı:');
+});
+
+test('§93 GENIE dokunma çözümlemesi doğru hedefi bulur', () => {
+  const mid = (r: { x: number; y: number; w: number; h: number }): [number, number] =>
+    [r.x + r.w / 2, r.y + r.h / 2];
+  for (let i = 0; i < GENIE_SET_TABS.length; i++) {
+    const [x, w] = GENIE_SET_TABS[i]!;
+    const h = genieHitTest(...mid({ x, y: 196, w, h: 50 }));
+    ok(h !== null && h.kind === 'set' && h.index === i, `set ${i} çözülemedi`);
+  }
+  for (const s of GENIE_SLIDERS) {
+    /* Çubuğun ORTASINA dokunmak %50 oranı vermeli. */
+    const h = genieHitTest(SLIDER_TRACK.x + SLIDER_TRACK.w / 2, s.trackY + 18);
+    ok(h !== null && h.kind === 'sliderDrag' && h.id === s.id, `${s.id} çubuğu çözülemedi`);
+    if (h !== null && h.kind === 'sliderDrag') {
+      ok(Math.abs(h.ratio - 0.5) < 0.05, `orta nokta oranı: ${h.ratio}`);
+    }
+    /* Ok düğmeleri adım vermeli. */
+    const l = genieHitTest(78, s.trackY + 18);
+    ok(l !== null && l.kind === 'sliderStep' && l.dir === -1, `${s.id} sol ok`);
+  }
+  for (const t of GENIE_TOGGLES) {
+    const h = genieHitTest(300, t.y + 14);
+    ok(h !== null && h.kind === 'toggle' && h.id === t.id, `${t.id} çözülemedi`);
+  }
+});
+
+test('§93 YETENEK havuzu 2×6 = 12, sıralı ve çakışmasız', () => {
+  eq(SKILL_POOL_COLS.length, 2, 'havuz sütunu:');
+  eq(SKILL_POOL_ROWS.length, 6, 'havuz satırı:');
+  const cells = skillPoolCells();
+  eq(cells.length, 12, 'havuz hücresi:');
+  eq(SKILL_BAR_SLOTS.length, 5, 'aktif yuva:');
+  /* Satırlar sıralı ve üst üste binmiyor. */
+  for (let i = 1; i < SKILL_POOL_ROWS.length; i++) {
+    const [py, ph] = SKILL_POOL_ROWS[i - 1]!;
+    const [y] = SKILL_POOL_ROWS[i]!;
+    ok(y >= py + ph, `havuz satırı ${i} çakışıyor`);
+  }
+  /* Aktif yuvalar soldan sağa sıralı. */
+  for (let i = 1; i < SKILL_BAR_SLOTS.length; i++) {
+    ok(SKILL_BAR_SLOTS[i]![0] > SKILL_BAR_SLOTS[i - 1]![0], `yuva ${i} sırasız`);
+  }
+});
+
+test('§93 KARAKTER blokları sıralı — kimlik → dağıtım → stat → direnç', () => {
+  const lastId = CHAR_IDENTITY_ROWS[CHAR_IDENTITY_ROWS.length - 1]!;
+  ok(ALLOC_BOX.y >= lastId[0] + lastId[1], 'dağıtım kimlikle çakışıyor');
+  ok(CHAR_STAT_FIRST_Y >= ALLOC_BOX.y + ALLOC_BOX.h, 'stat dağıtımla çakışıyor');
+  const firstResist = CHAR_RESIST_ROWS[0]!;
+  ok(firstResist[0] > CHAR_STAT_FIRST_Y, 'direnç statla çakışıyor');
+  eq(CHAR_RESIST_ROWS.length, 3, 'direnç satırı:');
+  /* Dağıtım düğmeleri dağıtım bloğunun İÇİNDE. */
+  for (const b of allocButtons()) {
+    ok(b.y >= ALLOC_BOX.y && b.y + b.h <= ALLOC_BOX.y + ALLOC_BOX.h,
+      `${b.id} dağıtım bloğunun dışında`);
   }
 });
 

@@ -2440,6 +2440,19 @@ export class WorldPrototypeScene implements Scene {
     this.say(alloc.stat === 'dex' ? `DEX +${alloc.amount}` : `HP +${alloc.amount}`);
   }
 
+  /** Görsel varken YALNIZ başlık metni. Maketin başlık şeridi ORTADA
+   *  olduğu için metin de ortalanır. */
+  private panelTitle(g: DrawApi, title: string, right: string): void {
+    g.text(title, PROTO.screenW / 2, 38,
+      { align: 'center', size: 15, bold: true, color: '#e8d9a0' });
+    if (right) {
+      g.text(right, PROTO.screenW / 2, 58,
+        { align: 'center', size: 11, color: '#8d8272' });
+    }
+  }
+
+  /** Panel kabuğu — YEDEK çizim. Görsel yüklüyse çağıranlar bunu
+   *  ATLAR; yalnız başlık metni yazılır (bkz. `panelTitle`). */
   private panelShell(g: DrawApi, title: string, right: string): void {
     const F = PANEL_FRAME;
     g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.72);
@@ -2453,11 +2466,20 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private renderCharacter(g: DrawApi): void {
+    /* P2.25 — panel görseli. Yüklüyse çerçeveyi O taşır; kod yalnız
+       metin, ikon ve durum vurgusu çizer (bkz. P2.24.2 üzerine çizim
+       hatası). */
+    const art = this.host.assets.has('ui_char_panel');
+    if (art) {
+      g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
+      g.image('ui_char_panel', 0, 0, { w: PROTO.screenW, h: PROTO.screenH, alpha: 1 });
+    }
     const p = this.S.player;
     const final = this.S.stats.finalStats();
     const base = StatCalculator.baseStats(p.level);
     const prog = this.S.stats.progression;
-    this.panelShell(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
+    if (art) this.panelTitle(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
+    else this.panelShell(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
 
     /* ---- stat dağıtımı ---- */
     const AB = ALLOC_BOX;
@@ -2573,12 +2595,21 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private renderSkills(g: DrawApi): void {
+    /* P2.25 — panel görseli. Yüklüyse çerçeveyi O taşır; kod yalnız
+       metin, ikon ve durum vurgusu çizer (bkz. P2.24.2 üzerine çizim
+       hatası). */
+    const art = this.host.assets.has('ui_skill_panel');
+    if (art) {
+      g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.75);
+      g.image('ui_skill_panel', 0, 0, { w: PROTO.screenW, h: PROTO.screenH, alpha: 1 });
+    }
     const pool = this.skillPool();
     const pageCount = Math.max(1, Math.ceil(pool.length / SKILL_PAGE_SIZE));
     const shown = pool.slice(this.skillPage * SKILL_PAGE_SIZE,
       this.skillPage * SKILL_PAGE_SIZE + SKILL_PAGE_SIZE);
     const sp = this.S.stats.progression.skillUnspent;
-    this.panelShell(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
+    if (art) this.panelTitle(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
+    else this.panelShell(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
 
     /* ---- aktif bar ---- */
     const slots = this.S.combat.skills.slots();
