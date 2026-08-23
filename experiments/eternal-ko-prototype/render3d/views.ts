@@ -49,11 +49,16 @@ export interface MobView {
   attackTimer: number;
   /** Profilin vuruş anı (sn) — saldırı klibi seçimi + hizalama. */
   hitMomentSec: number;
+  /** P2.9 — CESET SÜRESİ DOLDU MU? Ölen mob respawn'a kadar listede kalır
+   *  (yuva sahipliği bunu gerektirir), ama görseli birkaç saniye sonra
+   *  KAYBOLUR. Bu bir GÖRÜNÜM alanıdır; gameplay'de karşılığı yoktur. */
+  corpseFaded: boolean;
 }
 /** Test/telemetri kolaylığı — gameplay bunu KULLANMAZ. */
 export const DEFAULT_MOB_VIEW: Omit<MobView, 'uid' | 'generation' | 'worldX' | 'worldY'> = {
   aiType: 'NORMAL', hpRatio: 1, dead: false,
   phase: 'IDLE', attackPhase: 'recovery', attackTimer: 0, hitMomentSec: 0.45,
+  corpseFaded: false,
 };
 
 export interface ProjectileView {

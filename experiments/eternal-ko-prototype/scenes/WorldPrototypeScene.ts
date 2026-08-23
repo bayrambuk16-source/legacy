@@ -30,6 +30,10 @@ import {
   skillPoolRects, statRows,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
+import {
+  ZOOM_DEFAULT, applyZoom, pinchDistance, pinchZoom, type PinchState,
+} from '../ui/camera-zoom.js';
+import { CAMERA_V1 } from '../render3d/CameraRig.js';
 import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
 import {
   INV_LAYOUT, bagCellRects, bagEntries, compareLines, definitionOf, equipSlotRects,
@@ -165,6 +169,12 @@ export class WorldPrototypeScene implements Scene {
   /* joystick */
   private stick: JoystickInput = { dx: 0, dy: 0, active: false };
   private stickPointer: number | null = null;
+  /** P2.9 — İKİ PARMAK ZOOM. Aktif parmakların ekran konumları; ikisi birden
+   *  basılıyken pinch başlar ve joystick DEVRE DIŞI kalır (yanlışlıkla
+   *  yürümemek için). */
+  private pointers = new Map<number, { x: number; y: number }>();
+  private pinch: PinchState | null = null;
+  private zoom = ZOOM_DEFAULT;
   private stickOrigin = { x: PROTO.joystickCenter.x, y: PROTO.joystickCenter.y };
 
   private notice = '';
@@ -546,6 +556,16 @@ export class WorldPrototypeScene implements Scene {
 
   /* ---------------- girdi ---------------- */
   private onDown(p: PointerEventInfo): void {
+    this.pointers.set(p.id, { x: p.x, y: p.y });
+    /* İkinci parmak indi → pinch başlat, joystick'i bırak. */
+    if (this.pointers.size === 2) {
+      const [a, b] = [...this.pointers.values()];
+      this.pinch = { startDistance: pinchDistance(a!, b!), startZoom: this.zoom };
+      this.stickPointer = null;
+      this.stick = { dx: 0, dy: 0, active: false };
+      return;
+    }
+
     /* Genie ayar ekranı MODAL'dır: açıkken alttaki hiçbir kontrol tetiklenmez. */
     if (this.genieOpen) { this.handleGenieSettings(p); return; }
     if (this.invOpen) { this.handleInventory(p); return; }
@@ -631,10 +651,18 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private onMove(p: PointerEventInfo): void {
+    if (this.pointers.has(p.id)) this.pointers.set(p.id, { x: p.x, y: p.y });
+    if (this.pinch !== null && this.pointers.size >= 2) {
+      const [a, b] = [...this.pointers.values()];
+      this.zoom = pinchZoom(this.pinch, pinchDistance(a!, b!));
+      return;
+    }
     if (this.stickPointer !== p.id) return;
     this.stick = { dx: p.x - this.stickOrigin.x, dy: p.y - this.stickOrigin.y, active: true };
   }
   private onUp(p: PointerEventInfo): void {
+    this.pointers.delete(p.id);
+    if (this.pointers.size < 2) this.pinch = null;
     if (this.stickPointer !== p.id) return;
     this.stickPointer = null;
     this.stick = { dx: 0, dy: 0, active: false };
@@ -1138,6 +1166,10 @@ export class WorldPrototypeScene implements Scene {
        Bu çağrı gameplay durumuna hiçbir şey yazmaz; renderer kapalıysa
        (headless/2D) hiç çalışmaz ve sonuçlar değişmez (§26). */
     if (this.three3dActive) {
+      /* P2.9 — ZOOM: çarpan her karede TABAN ayara uygulanır (`CAMERA_V1`),
+         bir önceki değere DEĞİL — yoksa zoom sürüklenir. Zoom yalnız
+         kamerayı değiştirir; menzil/aggro/hitbox world biriminde kalır. */
+      Object.assign(this.three!.tuning, applyZoom(CAMERA_V1, this.zoom));
       this.three!.update(buildWorldFrame(this.S), dt);
       this.three!.render();
     }

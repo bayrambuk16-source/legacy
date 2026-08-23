@@ -40,6 +40,7 @@
 export type { MobSpawnArea, MobSpawnSlot } from './mob-slot-schema.js';
 import type { MobSpawnSlot as Slot } from './mob-slot-schema.js';
 import { ACTIVE_MAP } from './world-map.js';
+import { MORADON_FARM_SLOTS as MORADON_CANONICAL_SLOTS } from './moradon-farm-slots.js';
 
 const SPAWN = { x: 1240, y: 1650 };
 /** Kutupsal yerleşim yardımcısı — okunabilirlik için. */
@@ -92,7 +93,7 @@ export const TEST_FARM_AREA_SLOTS: readonly Slot[] = [
 
 /** Maske taramasıyla seçilmiş 8 ev noktası. `clear` = o noktadaki açıklık
  *  (en yakın kapalı hücreye uzaklık, world birimi); `roamRadius` bundan türer. */
-export const MORADON_FARM_SLOTS: readonly Slot[] = [
+export const MORADON_LEGACY_SINGLE_SLOTS: readonly Slot[] = [
   /* ---- YAKIN (2) ---- */
   { id: 'fa_n1', displayName: 'Toprak Solucanı', monsterRef: 750,
     homeX: 1668, homeY: 1658, aiType: 'NORMAL', roamRadius: 45, visual: SMALL },
@@ -120,6 +121,12 @@ export const MORADON_FARM_SLOTS: readonly Slot[] = [
     homeX: 2073, homeY: 1543, aiType: 'ELITE', roamRadius: 110, visual: BOSS },
 ] as const;
 
+/*  ══════════════ P2.9 NOTU — MORADON ARTIK KANONİK ══════════════
+ *  Aşağıdaki `MORADON_FARM_SLOTS` (tekil, legacy) yerini
+ *  `data/moradon-farm-slots.ts` içindeki KANONİK çok-moblu tabloya bıraktı:
+ *  10 slot × 5..8 örnek. Tekil tablo arşivde duruyor — anahtar geri
+ *  çevrilirse ya da tekil davranış karşılaştırılmak istenirse kullanılır. */
+
 /** Aktif farm tablosu — harita anahtarını izler. */
 export const FARM_AREA_SLOTS: readonly Slot[] =
-  ACTIVE_MAP === 'moradon' ? MORADON_FARM_SLOTS : TEST_FARM_AREA_SLOTS;
+  ACTIVE_MAP === 'moradon' ? MORADON_CANONICAL_SLOTS : TEST_FARM_AREA_SLOTS;

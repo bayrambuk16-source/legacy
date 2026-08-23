@@ -409,7 +409,10 @@ export class PrototypeState {
     this.forge = new ForgeSystem({
       rng, inventory: this.inventory, equipment: this.equipment, player: this.player,
     });
-    this.mobs.ai.respawnOverrideSec = RESPAWN_DEFAULT;
+    /* P2.9 — P2.4D "KAPI 1" AÇILDI: DEV respawn ezmesi artık varsayılan
+       olarak KURULMAZ. Süre slotun kendi `respawnSec` değerinden okunur
+       (Moradon'da 20 sn). Ezme yalnız DEV panelinden bilinçli açılır. */
+    this.mobs.ai.respawnOverrideSec = null;
     this.mobs.populate();
 
     this.genie = new GenieSystem({

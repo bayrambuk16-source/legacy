@@ -45,6 +45,12 @@ export const GENIE_MOVEMENT_V1 = {
   leaveCombatDistance: 400,
   /** Merkeze bu kadar yaklaşınca RETURN biter (pixel-perfect gitmeye çalışma). */
   returnTolerance: 20,
+  /** P2.9 — MERKEZ BİR MIKNATIS DEĞİL, TASMADIR.
+   *  Eskiden hedef yokken oyuncu merkeze 20 birim kalana kadar YÜRÜYORDU;
+   *  respawn boşluklarında karakter sürekli merkeze dönüp duruyordu
+   *  (oyun testinde bildirildi). Artık dönüş YALNIZ bu yarıçapın DIŞINA
+   *  çıkılınca tetiklenir; içeride oyuncu olduğu yerde bekler. */
+  homeLeash: 260,
 } as const;
 
 /** Bir karelik hareket NİYETİ. `magnitude = 0` → hareket yok. */
@@ -158,7 +164,13 @@ export class GenieMovementController {
 
     if (input.farmCenter) {
       const d = Math.hypot(input.farmCenter.x - input.playerX, input.farmCenter.y - input.playerY);
-      if (d > this.tuning.returnTolerance) {
+      /* Tasma dışındaysa merkeze döner; içerideyse BEKLER (bkz. `homeLeash`).
+         Dönüş başladıysa `returnTolerance`a kadar sürer, yoksa tasma
+         sınırında gidip gelme olur. */
+      const returning = this.current === 'RETURN'
+        ? d > this.tuning.returnTolerance
+        : d > this.tuning.homeLeash;
+      if (returning) {
         this.setState('RETURN');
         return {
           state: this.current,

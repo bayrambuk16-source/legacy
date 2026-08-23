@@ -14,6 +14,11 @@ import { MOB_AI_PROFILES } from '../data/mob-ai-profiles.js';
 import type { PrototypeState } from '../state.js';
 import type { BoundaryView, LootView, MobView, ProjectileView, WorldFrame } from './views.js';
 
+/** Cesedin ekranda kaldığı süre (sn). Kullanıcı kararı: ölen mob 3-5 sn
+ *  sonra kaybolsun. Bu YALNIZ GÖRÜNÜM sabitidir; respawn süresini
+ *  (`slot.respawnSec`) etkilemez. */
+export const CORPSE_VISIBLE_SEC = 4;
+
 /** Altın rengi — item sınıfı olmayan para birimi için. */
 const COIN_COLOR = '#e8d9a0';
 /** Katalogda tanımı olmayan item için nötr renk. */
@@ -41,6 +46,10 @@ export function buildWorldFrame(S: PrototypeState): WorldFrame {
       attackPhase: rt?.attackPhase ?? 'recovery',
       attackTimer: rt?.attackTimer ?? 0,
       hitMomentSec: MOB_AI_PROFILES[aiType].hitMomentSec,
+      /* P2.9 — ceset ömrü. Mob respawn'a kadar gameplay listesinde KALIR
+         (yuva sahipliği bunu gerektirir), görseli ise `CORPSE_VISIBLE_SEC`
+         sonra kaybolur. Gameplay'e hiçbir şey yazılmaz. */
+      corpseFaded: m.ai === 'dead' && m.deathTimer > CORPSE_VISIBLE_SEC,
     });
   }
 

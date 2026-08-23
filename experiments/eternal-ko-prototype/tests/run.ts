@@ -52,6 +52,11 @@ import {
   FORGE_EFFECTIVE_MAX, canAttempt, forgePreview, goldCost, scrollCost, successChance,
 } from '../data/forge-model.js';
 import { SCROLL_ITEM_REF } from '../world/ForgeSystem.js';
+import {
+  ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN, applyZoom, clampZoom, pinchDistance, pinchZoom,
+} from '../ui/camera-zoom.js';
+import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
+import { MORADON_POPULATION, MORADON_RESPAWN_SEC } from '../data/moradon-farm-slots.js';
 import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
 import { UI_ASSETS } from '../data/proto-assets.js';
 /* MORADON_WORLD_SPAWN ve SPAWN_POINT dosyanın ilerisinde ZATEN import edilir
@@ -4846,30 +4851,32 @@ test('§2 profiller: TEK durum makinesi, ÜÇ parametre seti', () => {
   }
 });
 
-test('§3 farm alanı: 8 tekil slot, ev noktaları ayrık, sınır içinde', () => {
-  eq(FARM_AREA_SLOTS.length, 8, 'slot sayısı:');
-  eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, 8, 'id benzersiz:');
-  const byType = (t: string): number => FARM_AREA_SLOTS.filter((s) => s.aiType === t).length;
-  eq(byType('NORMAL'), 4, 'NORMAL:'); eq(byType('AGGRESSIVE'), 3, 'AGGRESSIVE:'); eq(byType('ELITE'), 1, 'ELITE:');
-  for (const s of FARM_AREA_SLOTS) ok(Content.monster(s.monsterRef) !== undefined, `${s.id}: monster kaynakta olmalı`);
-  /* ev noktaları üst üste binmemeli */
+test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİR', () => {
+  /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
+     Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
+  eq(FARM_AREA_SLOTS.length, 10, 'slot sayısı:');
+  eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, 10, 'id benzersiz:');
+  for (const s of FARM_AREA_SLOTS) {
+    ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
+    const p = slotPlacement(s);
+    ok(p.count >= MIN_MOBS_PER_SLOT && p.count <= MAX_MOBS_PER_SLOT, `${s.id} population ${p.count}`);
+    ok(Content.monster(s.monsterRef) !== undefined, `${s.id}: monster kaynakta olmalı`);
+    /* Dikdörtgenin DÖRT köşesi de yürünebilir olmalı — mob duvara doğmaz. */
+    for (const [x, y] of [[p.minX, p.minY], [p.maxX - 1, p.minY],
+      [p.minX, p.maxY - 1], [p.maxX - 1, p.maxY - 1]] as const) {
+      ok(isWalkable(x, y), `${s.id} köşesi kapalı: ${x},${y}`);
+    }
+  }
+  /* Merkezler DİP DİBE OLMAMALI (kullanıcı isteği). */
   for (let i = 0; i < FARM_AREA_SLOTS.length; i++) {
     for (let j = i + 1; j < FARM_AREA_SLOTS.length; j++) {
       const a = FARM_AREA_SLOTS[i]!, b = FARM_AREA_SLOTS[j]!;
-      ok(Math.hypot(a.homeX - b.homeX, a.homeY - b.homeY) > 120, `${a.id}/${b.id} çok yakın`);
+      ok(Math.hypot(a.homeX - b.homeX, a.homeY - b.homeY) > 130,
+        `${a.id}/${b.id} çok yakın`);
     }
   }
-  /* hepsi varsayılan Genie Farm Boundary (650) içinde — AKTİF haritanın
-     doğuş noktasına göre (P2.4C'de Moradon). */
-  for (const s of FARM_AREA_SLOTS) {
-    const d = Math.hypot(s.homeX - SPAWN_POINT.x, s.homeY - SPAWN_POINT.y);
-    ok(d <= 650, `${s.id} sınır dışı: ${d.toFixed(0)}`);
-  }
-  /* 2 yakın · 3 orta · 3 uzak */
-  const d = FARM_AREA_SLOTS.map((s) => Math.hypot(s.homeX - SPAWN_POINT.x, s.homeY - SPAWN_POINT.y));
-  eq(d.filter((x) => x < 250).length, 2, 'yakın:');
-  eq(d.filter((x) => x >= 250 && x < 450).length, 3, 'orta:');
-  eq(d.filter((x) => x >= 450).length, 3, 'uzak:');
+  /* Respawn 20 sn — kullanıcı kararı, her slotta AYNI. */
+  for (const s of FARM_AREA_SLOTS) eq(s.respawnSec, 20, `${s.id} respawn:`);
 });
 
 test('TAMAMLANMA #1 — NORMAL mob YALNIZ yaklaşmakla aggro OLMAZ', () => {
@@ -9014,8 +9021,10 @@ test('§27 renderer population’ı GAMEPLAY’den alır (kendi üretmez)', () =
 /* ---------------- §11/§41 legacy uyum + canlı oyun parity ---------------- */
 
 test('§11 LEGACY tekil slot: dikdörtgen ev noktasına ÇÖKER, population 1', () => {
-  const legacy = FARM_AREA_SLOTS[0]!;
-  ok(!isCanonicalSlot(legacy), 'canlı slotlar KANONİK OLMAMALI');
+  /* P2.9 — canlı tablo kanonikleşti; legacy davranışı ARŞİV tablosuyla
+     sınanır. Uyum yolu (`slotPlacement` dallanması) hâlâ korunuyor. */
+  const legacy = TEST_FARM_AREA_SLOTS[0]!;
+  ok(!isCanonicalSlot(legacy), 'arşiv slotları KANONİK OLMAMALI');
   const p = slotPlacement(legacy);
   eq(p.count, 1, 'legacy population:');
   eq(p.minX, legacy.homeX, 'legacy minX = homeX:');
@@ -9708,6 +9717,106 @@ test('§61 Örs paneli yerleşimi panel İÇİNDE ve çakışmıyor', () => {
     const h = forgeHitTest(...mid(rows[i]!), FORGE_PAGE_SIZE);
     ok(h !== null && h.kind === 'row' && h.index === i, `satır ${i} çözülemedi`);
   }
+});
+
+/* ================= P2.9 — CANLI KANONİK SLOTLAR · CESET · ZOOM ================= */
+console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
+
+test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
+  const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
+  eq(S.mobs.slotConfigs().length, 10, 'canlı slot sayısı:');
+  eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
+  ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
+  /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */
+  for (const slot of S.mobs.slotConfigs()) {
+    const inst = S.mobs.instancesOf(slot.id);
+    eq(inst.length, slotPlacement(slot).count, `${slot.id} örnek sayısı:`);
+    eq(new Set(inst.map((m) => m.instanceIndex)).size, inst.length, `${slot.id} yuva benzersiz:`);
+    for (const m of inst) {
+      ok(isInsideArea(slot, m.worldX, m.worldY), `${slot.id}#${m.instanceIndex} dikdörtgen dışında`);
+      ok(isWalkable(m.worldX, m.worldY), `${slot.id}#${m.instanceIndex} kapalı hücrede doğdu`);
+    }
+  }
+});
+
+test('§62 RESPAWN 20 sn — DEV ezmesi artık varsayılan DEĞİL', () => {
+  const S = new PrototypeState(2901);
+  eq(S.mobs.ai.respawnOverrideSec, null, 'ezme kapalı olmalı:');
+  const slot = S.mobs.slotConfigs()[0]!;
+  const victim = S.mobs.instancesOf(slot.id)[0]!;
+  S.mobs.markDead(victim);
+  const rt = S.mobs.ai.runtimeOf(victim.uid)!;
+  eq(Math.round(rt.respawnTimer), MORADON_RESPAWN_SEC, 'respawn sayacı:');
+});
+
+test('§62 respawn AYNI NOKTAYA düşmez (generation kayması)', () => {
+  const S = new PrototypeState(2902);
+  const slot = S.mobs.slotConfigs()[0]!;
+  const m = S.mobs.instancesOf(slot.id)[0]!;
+  const before = { x: m.worldX, y: m.worldY, uid: m.uid, gen: m.generation };
+  S.mobs.markDead(m);
+  for (let i = 0; i < 60 * (MORADON_RESPAWN_SEC + 2); i++) S.mobs.update(1 / 60, S.world);
+  const after = S.mobs.instancesOf(slot.id).find((x) => x.instanceIndex === m.instanceIndex)!;
+  ok(after.generation === before.gen + 1, 'generation artmalı');
+  ok(after.uid !== before.uid, 'uid yeniden kullanılmamalı');
+  ok(Math.hypot(after.homeX - before.x, after.homeY - before.y) > 1,
+    'yeni nesil AYNI noktaya düştü');
+  ok(isInsideArea(slot, after.homeX, after.homeY), 'yeni nokta dikdörtgen dışında');
+});
+
+test('§63 CESET birkaç saniye sonra görünümden düşer, gameplay değişmez', () => {
+  const S = new PrototypeState(2903);
+  const m = S.mobs.mobs[0]!;
+  S.mobs.markDead(m);
+  const count = S.mobs.mobs.length;
+  /* Ölümden hemen sonra ceset GÖRÜNÜR. */
+  let frame = buildWorldFrame(S);
+  eq(frame.mobs.length, count, 'çerçeve mob sayısı değişmemeli:');
+  ok(frame.mobs.find((v) => v.uid === m.uid)!.corpseFaded === false, 'ceset hemen kaybolmamalı');
+  /* Süre dolunca yalnız GÖRÜNÜM düşer — liste aynı kalır. */
+  for (let i = 0; i < 60 * (CORPSE_VISIBLE_SEC + 1); i++) S.mobs.update(1 / 60, S.world);
+  frame = buildWorldFrame(S);
+  eq(frame.mobs.length, count, 'liste değişmemeli:');
+  eq(S.mobs.mobs.length, count, 'gameplay listesi değişmemeli:');
+  ok(frame.mobs.find((v) => v.uid === m.uid)!.corpseFaded === true, 'ceset görünümden düşmeliydi');
+});
+
+test('§64 pinch zoom: sınırlar, yön ve TABANDAN uygulama', () => {
+  eq(clampZoom(0), ZOOM_MIN, 'alt sınır:');
+  eq(clampZoom(99), ZOOM_MAX, 'üst sınır:');
+  const start = { startDistance: 200, startZoom: ZOOM_DEFAULT };
+  /* Parmaklar AÇILINCA yakınlaşır → zoom küçülür. */
+  ok(pinchZoom(start, 400) < ZOOM_DEFAULT, 'açılınca yakınlaşmalı');
+  /* Parmaklar KAPANINCA uzaklaşır → zoom büyür. */
+  ok(pinchZoom(start, 100) > ZOOM_DEFAULT, 'kapanınca uzaklaşmalı');
+  eq(pinchDistance({ x: 0, y: 0 }, { x: 3, y: 4 }), 5, 'mesafe:');
+  /* Zoom TABANA uygulanır — art arda uygulamak SÜRÜKLENME yaratmaz. */
+  const once = applyZoom(CAMERA_V1, 1.5);
+  const twice = applyZoom(CAMERA_V1, 1.5);
+  eq(once.distance, twice.distance, 'aynı çarpan aynı sonuç:');
+  eq(applyZoom(CAMERA_V1, 1).distance, CAMERA_V1.distance, 'zoom 1 tabanı korumalı:');
+  ok(applyZoom(CAMERA_V1, 2).orthoHeight > CAMERA_V1.orthoHeight, 'orto yükseklik büyümeli');
+});
+
+test('§65 farm merkezi MIKNATIS değil TASMA — içeride BEKLER', () => {
+  /* Oyun testi bulgusu: hedef yokken karakter sürekli merkeze dönüyordu.
+     Artık dönüş yalnız tasma yarıçapının DIŞINDA tetiklenir. */
+  const gm = new GenieMovementController();
+  gm.begin();
+  const center = { x: 1000, y: 1000 };
+  const inside = gm.decide({
+    enabled: true, playerX: center.x + 120, playerY: center.y, target: null,
+    hasEligibleTarget: false, farmCenter: center,
+  });
+  eq(inside.state, 'WAIT', 'tasma içinde durum:');
+  eq(inside.intent.x, 0, 'tasma içinde X hareketi:');
+  eq(inside.intent.y, 0, 'tasma içinde Y hareketi:');
+  const outside = gm.decide({
+    enabled: true, playerX: center.x + 600, playerY: center.y, target: null,
+    hasEligibleTarget: false, farmCenter: center,
+  });
+  eq(outside.state, 'RETURN', 'tasma dışında durum:');
+  ok(outside.intent.x < 0, 'merkeze doğru dönmeli');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

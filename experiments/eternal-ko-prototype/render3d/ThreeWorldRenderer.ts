@@ -588,6 +588,9 @@ export class ThreeWorldRenderer {
     this.mobClipRows.length = 0;
     this.mobDeathActive = 0;
     for (const m of frame.mobs) {
+      /* P2.9 — ceset süresi dolduysa görsel ÜRETİLMEZ ve dokunulmaz;
+         `endFrame()` onu kendiliğinden söker. Gameplay listesi değişmez. */
+      if (m.corpseFaded) continue;
       const key = mobVisualKey(m.uid, m.generation);
       const g = this.mobs.touch(key);
       if (g.children.length === 0) this.fillMobVisual(g, m, key);
