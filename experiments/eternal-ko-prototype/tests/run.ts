@@ -150,7 +150,7 @@ import { LOOT_DEFAULTS, LootPolicy } from '../world/LootPolicy.js';
 import type { DropEvent, DropRecord } from '../world/DropSystem.js';
 import {
   ITEM_CLASSES, ITEM_CLASS_COLOR, ITEM_CLASS_RANK, resolveStats,
-  type ItemClass, type WeaponDefinition,
+  type WeaponDefinition,
 } from '../data/item-model.js';
 import {
   ARCHER_ACCESSORIES, ARCHER_ARMOR, ARCHER_WEAPONS,
