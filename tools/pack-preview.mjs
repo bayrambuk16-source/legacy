@@ -18,12 +18,24 @@ const js = readFileSync(join(ROOT, JS_PATH), 'utf-8');
 const manifestSrc = readFileSync(join(ROOT, 'src', 'game', 'data', 'assets-manifest.ts'), 'utf-8');
 const entries = [...manifestSrc.matchAll(/(\w+):\s*'(assets\/[^']+)'/g)];
 
-/* --manifest <path>: EK manifest (deneyler icin). Ana preview cagrisinda verilmez,
-   bu yuzden ana cikti bu ekten etkilenmez. */
+/* --manifest <path[,path2,...]>: EK manifest(ler) (deneyler icin). Ana preview
+   cagrisinda verilmez, bu yuzden ana cikti bu ekten etkilenmez.
+
+   P2.25.1 — VIRGULLE AYRILMIS COKLU YOL. Tarama METIN TABANLIDIR:
+   `key: 'assets/...'` desenini arar. Bu yuzden bir manifest baska bir
+   dosyadan `...SPREAD` ile besleniyorsa O DOSYA DA verilmelidir; yoksa
+   varliklar sessizce paketlenmez.
+
+   Gercek ornek: `proto-assets.ts` icindeki `...ITEM_ICON_PATHS` yayilimi
+   `item-icons.ts` dosyasindan geliyordu. Tarama yayilimi izleyemedigi
+   icin 39 item ikonu preview'a HIC girmedi ve oyunda yedek daireler
+   cizildi. */
 const EXTRA = arg('manifest', null);
 if (EXTRA) {
-  const extraSrc = readFileSync(join(ROOT, EXTRA), 'utf-8');
-  entries.push(...extraSrc.matchAll(/(\w+):\s*'(assets\/[^']+)'/g));
+  for (const rel of EXTRA.split(',').map((x) => x.trim()).filter(Boolean)) {
+    const extraSrc = readFileSync(join(ROOT, rel), 'utf-8');
+    entries.push(...extraSrc.matchAll(/(\w+):\s*'(assets\/[^']+)'/g));
+  }
 }
 
 /* P2.1: .glb de gomulur (model/gltf-binary). Ana preview manifestinde model

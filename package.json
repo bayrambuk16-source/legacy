@@ -16,7 +16,7 @@
     "verify": "npm run typecheck && npm run validate && npm run test && npm run build",
     "typecheck:proto": "tsc -p tsconfig.proto.json",
     "test:proto": "tsx experiments/eternal-ko-prototype/tests/run.ts",
-    "build:proto": "node tools/build.mjs --entry experiments/eternal-ko-prototype/main.ts --out dist/eternal-ko-p2-2.js --preview dist/preview-eternal-ko-p2-2.html --manifest experiments/eternal-ko-prototype/data/proto-assets.ts --title \"P2.2 — Archer + Mutant GLB · Dummy Kaldırıldı\"",
+    "build:proto": "node tools/build.mjs --entry experiments/eternal-ko-prototype/main.ts --out dist/eternal-ko-p2-2.js --preview dist/preview-eternal-ko-p2-2.html --manifest experiments/eternal-ko-prototype/data/proto-assets.ts,experiments/eternal-ko-prototype/data/item-icons.ts --title \"P2.2 — Archer + Mutant GLB · Dummy Kaldırıldı\"",
     "verify:proto": "npm run verify:three && npm run typecheck:proto && npm run test:proto && npm run build:proto",
     "telemetry:archer": "tsx experiments/eternal-ko-prototype/tools/balance-telemetry.ts",
     "telemetry:feel": "tsx experiments/eternal-ko-prototype/tools/combat-feel-telemetry.ts",

@@ -156,7 +156,7 @@ import {
 } from '../data/item-catalog.js';
 import { EquipService } from '../world/EquipService.js';
 /* ---- P2.0 renderer katmanı ---- */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   facingToYaw, normalizeAngle, toGameplay, toScene, yawToFacing,
@@ -11441,6 +11441,32 @@ test('§93 KARAKTER blokları sıralı — kimlik → dağıtım → stat → di
     ok(b.y >= ALLOC_BOX.y && b.y + b.h <= ALLOC_BOX.y + ALLOC_BOX.h,
       `${b.id} dağıtım bloğunun dışında`);
   }
+});
+
+test('§94 PAKETLEME KAPSAMI: her ikon build komutunda listelenen bir dosyada', () => {
+  /* `pack-preview.mjs` manifesti METİN olarak tarar (`key: 'assets/…'`).
+     Yayılım (`...SPREAD`) izlenmez — kaynak dosya build komutunda
+     listelenmezse varlıklar SESSİZCE paketlenmez. P2.24'te 39 item
+     ikonu tam olarak böyle kayboldu. */
+  const pkg = JSON.parse(readFileSync(join(PROTO_ROOT, '..', '..', 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+  const cmd = pkg.scripts['build:proto'] ?? '';
+  const m = /--manifest\s+(\S+)/.exec(cmd);
+  ok(m !== null, 'build:proto --manifest taşımıyor');
+  const listed = (m![1] ?? '').split(',');
+  ok(listed.some((f) => f.includes('item-icons')),
+    `item-icons.ts manifest listesinde yok: ${listed.join(', ')}`);
+  /* Listelenen her dosya GERÇEKTEN var olmalı. */
+  for (const rel of listed) {
+    const abs = join(PROTO_ROOT, '..', '..', rel);
+    ok(existsSync(abs), `manifest dosyası yok: ${rel}`);
+  }
+  /* Ve ikon yolları düz metin olarak taranabilir olmalı. */
+  const iconSrc = readFileSync(join(PROTO_ROOT, 'data', 'item-icons.ts'), 'utf8');
+  const found = [...iconSrc.matchAll(/(\w+):\s*'(assets\/[^']+)'/g)];
+  eq(found.length, Object.keys(ITEM_ICON_PATHS).length,
+    'taranabilir ikon yolu sayısı manifestle eşleşmeli:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
