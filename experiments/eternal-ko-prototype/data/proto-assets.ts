@@ -1,4 +1,3 @@
-import { ITEM_ICON_PATHS } from './item-icons.js';
 /** PROTOTİPE ÖZEL varlık manifesti.
  *
  *  Ana `src/game/data/assets-manifest.ts` DEĞİŞTİRİLMEDİ: bu dosyadaki anahtarlar
@@ -19,10 +18,56 @@ import { ITEM_ICON_PATHS } from './item-icons.js';
  *  farkı 5,8 → döşendiğinde dikiş görünmez). 512×512 WebP, 35 KB. */
 export const GROUND_TEXTURE_KEY = 'ground_texture';
 
-/* P2.24 — item ikonları AYRI dosyada tanımlı ve buraya yayılır.
-   39 ayrı yolu elle yazmak yerine tek kaynaktan gelir. */
+/* ═══ P2.25.2 — ITEM İKONLARI DÜZ METİN OLARAK BURADA ═══
+   Önceden `...ITEM_ICON_PATHS` yayılımıyla geliyorlardı. Ama
+   `tools/pack-preview.mjs` manifesti KOD OLARAK DEĞİL, DÜZ METİN
+   olarak tarıyor (`key: 'assets/…'` deseni) ve yayılımı izleyemiyor.
+   Sonuç: 39 ikon önizleme paketine hiç girmedi, oyunda yedek daireler
+   çizildi. İki tur boyunca yanlış yerde arandı.
+
+   Kesin çözüm: yollar BURADA düz yazılı. Eşleme (`ref → anahtar`)
+   hâlâ `item-icons.ts` içinde; orası tek kaynak olmaya devam eder,
+   yalnız YOLLAR çift yazılır ve test ikisinin eşitliğini bağlar. */
 export const UI_ASSETS: Record<string, string> = {
-  ...ITEM_ICON_PATHS,
+  item_kul_agaci_yay: 'assets/ui/items/kul_agaci_yay.webp',
+  item_mese_yay: 'assets/ui/items/mese_yay.webp',
+  item_kisa_avci_yayi: 'assets/ui/items/kisa_avci_yayi.webp',
+  item_avci_yayi: 'assets/ui/items/avci_yayi.webp',
+  item_celik_tendon: 'assets/ui/items/celik_tendon.webp',
+  item_yirtici_yay: 'assets/ui/items/yirtici_yay.webp',
+  item_akrep_disi: 'assets/ui/items/akrep_disi.webp',
+  item_karanlik_yemin: 'assets/ui/items/karanlik_yemin.webp',
+  item_avci_basligi: 'assets/ui/items/avci_basligi.webp',
+  item_deri_baslik: 'assets/ui/items/deri_baslik.webp',
+  item_zirhli_migfer: 'assets/ui/items/zirhli_migfer.webp',
+  item_sertlestirilmis_baslik: 'assets/ui/items/sertlestirilmis_baslik.webp',
+  item_golge_basligi: 'assets/ui/items/golge_basligi.webp',
+  item_avci_gomlegi: 'assets/ui/items/avci_gomlegi.webp',
+  item_deri_gogusluk: 'assets/ui/items/deri_gogusluk.webp',
+  item_sertlestirilmis_gogusluk: 'assets/ui/items/sertlestirilmis_gogusluk.webp',
+  item_zirhli_gogusluk: 'assets/ui/items/zirhli_gogusluk.webp',
+  item_avci_dizligi: 'assets/ui/items/avci_dizligi.webp',
+  item_deri_pantolon: 'assets/ui/items/deri_pantolon.webp',
+  item_zirhli_dizlik: 'assets/ui/items/zirhli_dizlik.webp',
+  item_iz_surucu_pantolon: 'assets/ui/items/iz_surucu_pantolon.webp',
+  item_avci_eldiveni: 'assets/ui/items/avci_eldiveni.webp',
+  item_deri_eldiven: 'assets/ui/items/deri_eldiven.webp',
+  item_zirhli_eldiven: 'assets/ui/items/zirhli_eldiven.webp',
+  item_iz_surucu_eldiven: 'assets/ui/items/iz_surucu_eldiven.webp',
+  item_avci_cizmesi: 'assets/ui/items/avci_cizmesi.webp',
+  item_deri_cizme: 'assets/ui/items/deri_cizme.webp',
+  item_zirhli_cizme: 'assets/ui/items/zirhli_cizme.webp',
+  item_golge_cizmesi: 'assets/ui/items/golge_cizmesi.webp',
+  item_tunc_kupe: 'assets/ui/items/tunc_kupe.webp',
+  item_sahin_kupesi: 'assets/ui/items/sahin_kupesi.webp',
+  item_kekuri_yuzugu: 'assets/ui/items/kekuri_yuzugu.webp',
+  item_zumrut_yuzuk: 'assets/ui/items/zumrut_yuzuk.webp',
+  item_kizil_ejder: 'assets/ui/items/kizil_ejder.webp',
+  item_yasam_kusagi: 'assets/ui/items/yasam_kusagi.webp',
+  item_parsomen: 'assets/ui/items/parsomen.webp',
+  item_yasam_tasi: 'assets/ui/items/yasam_tasi.webp',
+  item_yasam_suyu: 'assets/ui/items/yasam_suyu.webp',
+  item_ruh_iksiri: 'assets/ui/items/ruh_iksiri.webp',
   /* P2.18 — zemin dokusu (GEÇİCİ, sonra değişecek).
      Kullanıcının ürettiği çim/toprak dokusu. Tileable olduğu ÖLÇÜLEREK
      doğrulandı: sol-sağ kenar farkı 13,9 ve üst-alt 13,1; dokunun kendi

@@ -150,14 +150,12 @@ export function parseAllocId(id: string): { stat: AllocStatId; amount: number } 
 /* ═══════════════════════ YETENEK PANELİ ═══════════════════════ */
 
 /** Aktif bar yuvalarının dikdörtgenleri (üstteki şerit). */
+/** Aktif bar yuvaları. P2.25.2 — MAKET TABLOSUNDAN. Eskiden formülle
+ *  ortalanıyordu ve maketin yuvalarıyla hizasızdı; çizim ile dokunma
+ *  ayrışıyordu. Artık tek kaynak `SKILL_BAR_SLOTS`. */
 export function skillBarRects(count: number): UiRect[] {
-  const w = 96, h = 74, gap = 8;
-  const total = count * w + (count - 1) * gap;
-  const x0 = PANEL_FRAME.x + (PANEL_FRAME.w - total) / 2;
-  const y = PANEL_FRAME.y + 96;
-  const out: UiRect[] = [];
-  for (let i = 0; i < count; i++) out.push({ x: x0 + i * (w + gap), y, w, h });
-  return out;
+  return SKILL_BAR_SLOTS.slice(0, count)
+    .map(([x, w]) => ({ x, y: SKILL_BAR_Y, w, h: SKILL_BAR_H }));
 }
 
 /** Havuzdaki skill satırlarının dikdörtgenleri (alttaki liste). */
@@ -170,7 +168,13 @@ export function skillPoolCells(): UiRect[] {
   return out;
 }
 
+/** Havuz hücreleri. P2.25.2 — `skillPoolCells()` ile AYNI tablodan;
+ *  eski formül yerine maket konumları. */
 export function skillPoolRects(count: number): UiRect[] {
+  return skillPoolCells().slice(0, count);
+}
+
+function skillPoolRectsLegacy(count: number): UiRect[] {
   const h = 52, gap = 6;
   const x = PANEL_FRAME.x + 20;
   const w = PANEL_FRAME.w - 40;
@@ -211,8 +215,9 @@ export const SKILL_PAGE_ROW: UiRect = { x: 190, y: 864, w: 240, h: 43 };
 export function skillPageButtons(): Array<UiRect & { id: string; label: string }> {
   const y = PANEL_FRAME.y + PANEL_FRAME.h - 62;
   return [
-    { id: 'skill_prev', label: '‹', x: PANEL_FRAME.x + 20, y, w: 72, h: 44 },
-    { id: 'skill_next', label: '›', x: PANEL_FRAME.x + PANEL_FRAME.w - 92, y, w: 72, h: 44 },
+    /* Maketin ok düğmeleri sayfa şeridinin İKİ YANINDA. */
+    { id: 'skill_prev', label: '‹', x: SKILL_PAGE_ROW.x - 66, y: SKILL_PAGE_ROW.y, w: 56, h: SKILL_PAGE_ROW.h },
+    { id: 'skill_next', label: '›', x: SKILL_PAGE_ROW.x + SKILL_PAGE_ROW.w + 10, y: SKILL_PAGE_ROW.y, w: 56, h: SKILL_PAGE_ROW.h },
   ];
 }
 
@@ -230,6 +235,7 @@ export function skillHitTest(
   const c = invCloseButton();
   if (inside(c, x, y)) return { kind: 'button', id: c.id };
   for (const b of skillPageButtons()) if (inside(b, x, y)) return { kind: 'button', id: b.id };
+  /* P2.25.2 — çözümleme ÇİZİMLE AYNI fonksiyonları kullanır. */
   const bar = skillBarRects(barCount);
   for (let i = 0; i < bar.length; i++) if (inside(bar[i]!, x, y)) return { kind: 'bar', index: i };
   const pool = skillPoolRects(poolCount);

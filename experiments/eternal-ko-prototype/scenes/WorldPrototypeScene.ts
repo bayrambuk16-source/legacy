@@ -25,11 +25,11 @@ import {
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
 import {
-  ALLOC_BOX, ALLOC_ROWS, CHAR_GEAR_BOX, CHAR_STATS_BOX, FORGE_LIST_BOX, FORGE_PAGE_SIZE,
+  ALLOC_ROWS, FORGE_LIST_BOX, FORGE_PAGE_SIZE,
   FORGE_PREVIEW_BOX, allocButtons, parseAllocId,
   PANEL_FRAME, SKILL_PAGE_SIZE, charHitTest, forgeButtons, forgeHitTest, forgeRowRects,
-  gearSlotOrder, panelCloseButton, skillBarRects, skillHitTest, skillPageButtons,
-  skillPoolRects, statRows,
+  panelCloseButton, skillHitTest, skillPageButtons,
+  statRows,
 } from '../ui/character-panel.js';
 import { canAttempt, forgePreview } from '../data/forge-model.js';
 import { MORADON_PLAY_SPAWN } from '../data/moradon-farm-slots.js';
@@ -2481,66 +2481,71 @@ export class WorldPrototypeScene implements Scene {
     if (art) this.panelTitle(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
     else this.panelShell(g, 'KARAKTER', `Sv ${p.level} · ${prog.stage.stage}`);
 
+    /* ═══ P2.25.2 — MAKETE OTURTULMUŞ ÇİZİM ═══
+       Bir önceki turda görsel eklendi ama YERLEŞİM eski kalmıştı:
+       stat listesi portre çemberinin üstüne, ekipman özeti direnç
+       bloğunun üstüne biniyordu. Artık her blok maketten ölçülen
+       konumdan çizilir ve görsel varken kendi zeminini çizmez. */
+
+    /* ---- kimlik ---- */
+    CHAR_IDENTITY_ROWS.forEach(([y, h], i) => {
+      if (!art) g.rect(CHAR_IDENTITY_X, y, CHAR_IDENTITY_W, h, '#0b0908', 0.9);
+      const text = i === 0 ? `Sv ${p.level}`
+        : i === 1 ? `Okçu · ${prog.stage.stage}`
+          : `${p.coins} altın`;
+      g.text(text, CHAR_IDENTITY_X + 14, y + h / 2 - 7,
+        { size: 12, bold: i === 0, color: i === 0 ? '#e8d9a0' : '#cfc7b6' });
+    });
+
     /* ---- stat dağıtımı ---- */
-    const AB = ALLOC_BOX;
-    g.rect(AB.x, AB.y, AB.w, AB.h, '#0b0908', 0.95);
-    g.text(`DAĞITILABİLİR PUAN: ${prog.unspent}`, AB.x + 12, AB.y + 8,
-      { size: 11, bold: true, color: prog.unspent > 0 ? '#e8d9a0' : '#6f655a' });
+    g.text(`DAĞITILABİLİR PUAN: ${prog.unspent}`,
+      ALLOC_POINT_ROW.x + 14, ALLOC_POINT_ROW.y + 9,
+      { size: 12, bold: true, color: prog.unspent > 0 ? '#e8d9a0' : '#6f655a' });
     const btns = allocButtons();
     ALLOC_ROWS.forEach((stat, i) => {
-      const y = AB.y + 32 + i * 40;
+      const [y, h] = ALLOC_STAT_ROWS[i]!;
       const label = stat === 'dex' ? 'DEX (saldırı)' : 'HP (can + mana)';
       const value = stat === 'dex' ? this.S.stats.effectiveDex() : this.S.stats.effectiveSta();
       const spent = stat === 'dex' ? prog.spent.dex : prog.spent.hp;
-      g.text(label, AB.x + 14, y + 8, { size: 12, color: '#cfc7b6' });
-      g.text(`${value}`, AB.x + 186, y + 6,
+      g.text(label, 78, y + h / 2 - 7, { size: 12, color: '#cfc7b6' });
+      g.text(`${value}`, 415, y + h / 2 - 8,
         { align: 'right', size: 13, bold: true, color: '#e8e0d0' });
-      if (spent > 0) g.text(`(+${spent})`, AB.x + 186, y + 22, { align: 'right', size: 9, color: '#7fa85c' });
+      if (spent > 0) {
+        g.text(`+${spent}`, 415, y + h / 2 + 6,
+          { align: 'right', size: 9, color: '#7fa85c' });
+      }
       for (const b of btns.filter((x) => x.stat === stat)) {
         const on = prog.unspent >= b.amount;
-        g.rect(b.x, b.y, b.w, b.h, on ? '#2c2417' : '#141009', 0.95);
-        g.rect(b.x, b.y, b.w, 2, on ? '#e08a3c' : '#3a3128');
+        if (!art || !on) g.rect(b.x, b.y, b.w, b.h, on ? '#2c2417' : '#0b0908', on ? 0.5 : 0.6);
         g.text(`+${b.amount}`, b.x + b.w / 2, b.y + b.h / 2 - 7,
           { align: 'center', size: 12, bold: true, color: on ? '#e8d9a0' : '#4a4239' });
       }
     });
 
-    /* ---- stat blokları ---- */
-    const S1 = CHAR_STATS_BOX;
-    g.rect(S1.x, S1.y, S1.w, S1.h, '#0b0908', 0.95);
-    g.text('STATLAR', S1.x + 12, S1.y + 10, { size: 11, bold: true, color: '#8d8272' });
-    statRows(final, base, this.S.timing.actionTime(0)).forEach((row, i) => {
-      const y = S1.y + 34 + i * 29;
-      g.text(row.label, S1.x + 16, y, { size: 12, color: '#cfc7b6' });
-      g.text(row.value, S1.x + S1.w * 0.62, y, { align: 'right', size: 12, bold: true, color: '#e8e0d0' });
+    /* ---- stat listesi ---- */
+    const rows = statRows(final, base, this.S.timing.actionTime(0));
+    rows.forEach((row, i) => {
+      const y = CHAR_STAT_FIRST_Y + i * CHAR_STAT_ROW_H;
+      g.text(row.label, 84, y, { size: 11, color: '#cfc7b6' });
+      g.text(row.value, CHAR_STAT_DIVIDER_X - 14, y,
+        { align: 'right', size: 12, bold: true, color: '#e8e0d0' });
       if (row.fromGear !== null) {
-        g.text(`(${row.fromGear})`, S1.x + S1.w - 16, y,
-          { align: 'right', size: 11, color: row.fromGear.startsWith('-') ? '#c96a5a' : '#7fa85c' });
+        g.text(row.fromGear, 560, y,
+          { align: 'right', size: 10, color: row.fromGear.startsWith('-') ? '#c96a5a' : '#7fa85c' });
       }
     });
+    /* Maket 11 satır taşıyor, listemiz 10 — sonuncusuna GÜÇ SKORU. */
+    const extraY = CHAR_STAT_FIRST_Y + rows.length * CHAR_STAT_ROW_H;
+    g.text('Güç skoru', 84, extraY, { size: 11, color: '#c9a05a' });
+    g.text(formatPower(this.S.autoGear.score()), CHAR_STAT_DIVIDER_X - 14, extraY,
+      { align: 'right', size: 12, bold: true, color: '#e8d9a0' });
 
-    /* ---- kuşanılı ekipman özeti ---- */
-    const S2 = CHAR_GEAR_BOX;
-    g.rect(S2.x, S2.y, S2.w, S2.h, '#0b0908', 0.95);
-    g.text('EKİPMAN', S2.x + 12, S2.y + 10, { size: 11, bold: true, color: '#8d8272' });
-    const views = this.S.stats.slots();
-    gearSlotOrder().forEach((slot, i) => {
-      const y = S2.y + 34 + i * 25;
-      const v = views.find((x) => x.slotId === slot.id);
-      g.text(slot.label, S2.x + 16, y, { size: 11, color: '#6f655a' });
-      if (v?.definition) {
-        g.text(v.upgradeLevel > 0 ? `${v.definition.displayName} +${v.upgradeLevel}` : v.definition.displayName,
-          S2.x + S2.w - 16, y,
-          { align: 'right', size: 11, color: ITEM_CLASS_COLOR[v.definition.itemClass] });
-      } else {
-        g.text('—', S2.x + S2.w - 16, y, { align: 'right', size: 11, color: '#3a3128' });
-      }
+    /* ---- direnç (sistem PASİF: değerler gösterilmez, blok yer tutar) ---- */
+    CHAR_RESIST_ROWS.forEach(([y, h]) => {
+      g.text('—', 200, y + h / 2 - 7, { size: 11, color: '#4a4239' });
+      g.text('—', 560, y + h / 2 - 7, { align: 'right', size: 11, color: '#4a4239' });
     });
   }
-
-  /* ═══════════════ P2.7 — YETENEK EKRANI ═══════════════
-     Yuva ataması `SkillLoadout.setSlot()` authority'sindedir; panel yalnız
-     hangi skill'in nereye gideceğini iletir. */
 
   private skillPool(): number[] {
     return GENIE_SKILL_POOL.filter((ref) => SkillRegistry.get(ref) !== undefined);
@@ -2611,33 +2616,33 @@ export class WorldPrototypeScene implements Scene {
     if (art) this.panelTitle(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
     else this.panelShell(g, 'YETENEKLER', `${sp} puan · ${this.skillPage + 1}/${pageCount}`);
 
-    /* ---- aktif bar ---- */
+    /* ═══ P2.25.2 — MAKETE OTURTULMUŞ AKTİF BAR ═══
+       Yuva konumları maketten ölçüldü; isim yuvanın ALTINDAKİ şeritte
+       (maketin ayırdığı yer), mana ise yuvanın içinde. Eskiden ikisi de
+       yuvanın içine yazılıyor ve üst üste biniyordu. */
+    g.text(`${sp} puan`, SKILL_POINT_ROW.x + 14, SKILL_POINT_ROW.y + 18,
+      { size: 12, bold: true, color: sp > 0 ? '#e8d9a0' : '#6f655a' });
     const slots = this.S.combat.skills.slots();
-    skillBarRects(ACTIVE_BAR_SLOTS).forEach((r, i) => {
+    SKILL_BAR_SLOTS.forEach(([x, w], i) => {
       const def = slots[i]?.def;
       const on = this.skillBarSel === i;
-      g.rect(r.x, r.y, r.w, r.h, on ? '#2c2417' : '#1a1610');
-      g.rect(r.x, r.y, r.w, 2, on ? '#e08a3c' : '#3a3128');
-      g.text(`${i + 1}`, r.x + 6, r.y + 5, { size: 9, color: '#6f655a' });
+      if (!art) g.rect(x, SKILL_BAR_Y, w, SKILL_BAR_H, '#1a1610');
+      if (on) g.rect(x, SKILL_BAR_Y, w, SKILL_BAR_H, '#2c2417', 0.55);
+      g.text(`${i + 1}`, x + 5, SKILL_BAR_Y + 4, { size: 9, color: '#6f655a' });
       if (def) {
-        g.text(def.displayName, r.x + r.w / 2, r.y + 26,
-          { align: 'center', size: 10, bold: true, color: '#e8e0d0' });
-        g.text(`${def.manaCost}MP`, r.x + r.w / 2, r.y + 50,
-          { align: 'center', size: 10, color: '#6f8fd0' });
+        g.text(`${def.manaCost}`, x + w / 2, SKILL_BAR_Y + SKILL_BAR_H / 2 - 8,
+          { align: 'center', size: 13, bold: true, color: '#6f8fd0' });
+        g.text(this.shortLabel(def.displayName), x + w / 2, SKILL_BAR_LABEL_Y + 4,
+          { align: 'center', size: 9, color: '#cfc7b6' });
       } else {
-        g.text('boş', r.x + r.w / 2, r.y + r.h / 2 - 6,
-          { align: 'center', size: 11, color: '#3a3128' });
+        g.text('—', x + w / 2, SKILL_BAR_Y + SKILL_BAR_H / 2 - 8,
+          { align: 'center', size: 13, color: '#3a3128' });
       }
     });
-    g.text(sp > 0
-      ? `${sp} skill puanın var — kilitli yeteneğe dokunarak aç`
-      : 'Yuva seç, sonra alttan yetenek seç · aynı yuvaya iki kez dokun = boşalt',
-      PANEL_FRAME.x + PANEL_FRAME.w / 2, PANEL_FRAME.y + 178,
-      { align: 'center', size: 10, color: '#6f655a' });
 
     /* ---- havuz ---- */
     const equipped = new Set(slots.map((s) => s.def?.sourceRef).filter((v) => v !== undefined));
-    skillPoolRects(shown.length).forEach((r, i) => {
+    skillPoolCells().slice(0, shown.length).forEach((r, i) => {
       const ref = shown[i]!;
       const def = SkillRegistry.get(ref);
       if (!def) return;
@@ -2645,23 +2650,37 @@ export class WorldPrototypeScene implements Scene {
       const unlocked = this.S.stats.progression.isUnlocked(ref);
       const locked = levelLocked || !unlocked;
       const inBar = equipped.has(ref);
-      g.rect(r.x, r.y, r.w, r.h, inBar ? '#1c1710' : '#141009', 0.95);
-      g.rect(r.x, r.y, 3, r.h, inBar ? '#e08a3c' : '#3a3128');
-      g.text(def.displayName, r.x + 14, r.y + 10,
-        { size: 12, bold: true, color: locked ? '#4a4239' : '#e8e0d0' });
-      g.text(`Sv ${def.requiredLevel} · ${def.manaCost}MP`
-        + (def.cooldownSec > 0 ? ` · ${def.cooldownSec.toFixed(1)}s` : ''),
-        r.x + 14, r.y + 30, { size: 10, color: locked ? '#4a4239' : '#8d8272' });
-      if (inBar) g.text('kuşanılı', r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#e08a3c' });
-      else if (levelLocked) g.text(`Sv ${def.requiredLevel}`, r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#c96a5a' });
-      else if (!unlocked) g.text(`AÇ · ${ArcherProgression.SKILL_COST} puan`, r.x + r.w - 14, r.y + 18, { align: 'right', size: 10, color: '#7fa85c' });
+      /* Hücre zemini GÖRSELDEN; kod yalnız durum vurgusu ve metin.
+         Metin ikon karesinin SAĞINDAN başlar — maketin sol tarafında
+         kare bir ikon alanı var. */
+      if (!art) g.rect(r.x, r.y, r.w, r.h, '#141009', 0.95);
+      if (inBar) g.rect(r.x, r.y, 3, r.h, '#e08a3c');
+      const tx = r.x + SKILL_POOL_ICON_W + 10;
+      g.text(def.displayName, tx, r.y + 12,
+        { size: 11, bold: true, color: locked ? '#4a4239' : '#e8e0d0' });
+      g.text(`Sv ${def.requiredLevel} · ${def.manaCost}MP`,
+        tx, r.y + 30, { size: 9, color: locked ? '#4a4239' : '#8d8272' });
+      if (inBar) {
+        g.text('kuşanılı', r.x + r.w - 10, r.y + 22,
+          { align: 'right', size: 9, color: '#e08a3c' });
+      } else if (levelLocked) {
+        g.text(`Sv ${def.requiredLevel}`, r.x + r.w - 10, r.y + 22,
+          { align: 'right', size: 9, color: '#c96a5a' });
+      } else if (!unlocked) {
+        g.text(`AÇ ${ArcherProgression.SKILL_COST}p`, r.x + r.w - 10, r.y + 22,
+          { align: 'right', size: 9, color: '#7fa85c' });
+      }
     });
 
+    g.text(`${this.skillPage + 1} / ${pageCount}`,
+      SKILL_PAGE_ROW.x + SKILL_PAGE_ROW.w / 2, SKILL_PAGE_ROW.y + 14,
+      { align: 'center', size: 12, bold: true, color: '#cfc7b6' });
     for (const b of skillPageButtons()) {
-      g.rect(b.x, b.y, b.w, b.h, '#1c1710', 0.95);
-      g.rect(b.x, b.y, b.w, 2, '#4a3f30');
-      g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 9,
-        { align: 'center', size: 18, bold: true, color: '#cfc7b6' });
+      if (!art) {
+        g.rect(b.x, b.y, b.w, b.h, '#1c1710', 0.95);
+        g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 9,
+          { align: 'center', size: 18, bold: true, color: '#cfc7b6' });
+      }
     }
   }
 
@@ -2959,6 +2978,11 @@ export class WorldPrototypeScene implements Scene {
 
   /** P2.24 — item ikonu. Eşleme `data/item-icons.ts` içinde; ikon yoksa
    *  kalite renginde daireye düşer (eksik ikon HATA DEĞİL). */
+  /** Uzun skill adını yuva şeridine sığdırır. */
+  private shortLabel(name: string): string {
+    return name.length <= 12 ? name : `${name.slice(0, 11)}…`;
+  }
+
   private drawItemIcon(
     g: DrawApi, itemRef: number, cx: number, cy: number, size: number, fallback: string,
   ): void {

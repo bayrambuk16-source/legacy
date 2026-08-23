@@ -11462,11 +11462,18 @@ test('§94 PAKETLEME KAPSAMI: her ikon build komutunda listelenen bir dosyada', 
     const abs = join(PROTO_ROOT, '..', '..', rel);
     ok(existsSync(abs), `manifest dosyası yok: ${rel}`);
   }
-  /* Ve ikon yolları düz metin olarak taranabilir olmalı. */
-  const iconSrc = readFileSync(join(PROTO_ROOT, 'data', 'item-icons.ts'), 'utf8');
-  const found = [...iconSrc.matchAll(/(\w+):\s*'(assets\/[^']+)'/g)];
+  /* P2.25.2 — YOLLAR ARTIK `proto-assets.ts` İÇİNDE DÜZ METİN.
+     Paketleyici yayılımı izleyemediği için orada olmak ZORUNDALAR. */
+  const manifestSrc = readFileSync(join(PROTO_ROOT, 'data', 'proto-assets.ts'), 'utf8');
+  const found = [...manifestSrc.matchAll(/(item_\w+):\s*'(assets\/[^']+)'/g)];
   eq(found.length, Object.keys(ITEM_ICON_PATHS).length,
-    'taranabilir ikon yolu sayısı manifestle eşleşmeli:');
+    'manifestte düz yazılı ikon sayısı:');
+  /* İki kaynak AYRIŞAMAZ: eşleme dosyası ile manifest aynı yolları
+     taşımalı. Çift yazım kaçınılmazdı, test onu bağlar. */
+  for (const m2 of found) {
+    const key = m2[1]!, path = m2[2]!;
+    eq(ITEM_ICON_PATHS[key], path, `${key} yolu ayrışmış:`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
