@@ -28,7 +28,7 @@ import type { Rng } from '../../../src/engine/rng.js';
 import { SCROLL_ITEM_REF } from './ForgeSystem.js';
 import {
   HIGH_TIER_MONSTER_LEVEL, HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF,
-  equipChanceFor, pickFromPool, poolFor,
+  WEAPON_PITY_LIMIT, equipChanceFor, pickFromPool, poolFor, weaponsIn,
 } from '../data/moradon-loot-pool.js';
 import { WAVE_REWARD_MULT, coinForKill, dungeonLootLevel } from '../data/wave-floors.js';
 import {
@@ -143,6 +143,8 @@ export class DropSystem {
   last: DropEvent | null = null;
   /** Toplam sayaçlar (soak/telemetri). */
   readonly totals = { kills: 0, items: 0, coin: 0, toInventory: 0, toGround: 0, blockedFull: 0 };
+  /** P3.22 — art arda kaç ekipman düştü ve hiçbiri silah değildi. */
+  private weaponDry = 0;
 
   /** `deps` PUBLIC: zindan kancası kurulumdan SONRA bağlanır
    *  (`DungeonSession`). Kurucuya taşımak `PrototypeState` imzasını
@@ -212,7 +214,18 @@ export class DropSystem {
          yarıya indirmek üst katlarda modu ölü hissettiriyor). */
       const lootLv = dg ? dungeonLootLevel(mob.monster.level) : mob.monster.level;
       const pool = poolFor(lootLv);
-      const pick = pickFromPool(pool, lootLv, this.deps.rng());
+      /* P3.22 — SİLAH ACIMA SAYACI. Okçuda güç yaya bağlıdır; yay
+         düşmezse ilerleme kilitlenir (ölçüldü: 32 ekipman, 0 yay).
+         Sayaç dolduysa havuz silahlara daraltılır — eşya yine
+         havuzdan ve kendi ağırlığıyla seçilir. */
+      const dry = this.weaponDry >= WEAPON_PITY_LIMIT;
+      const narrowed = dry ? weaponsIn(pool) : pool;
+      const pick = pickFromPool(
+        narrowed.length > 0 ? narrowed : pool, lootLv, this.deps.rng(),
+      );
+      if (pick) {
+        this.weaponDry = pick.category === 'weapon' ? 0 : this.weaponDry + 1;
+      }
       if (pick) {
         ev.records.push(this.deliverItem(
           mob, pick.definitionRef, 1, 'group', autoLoot, owner, dg?.dropUpgrade ?? 0,

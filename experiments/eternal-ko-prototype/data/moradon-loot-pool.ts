@@ -168,3 +168,27 @@ export const HIGH_TIER_TROPHY_REF = 379107000;
 export const HIGH_TIER_TROPHY_CHANCE = 0.005;
 export const HIGH_TIER_TROPHY_VALUE = 50_000;
 export const HIGH_TIER_TROPHY_STACK = 9999;
+
+/* ═══════════════ SİLAH ACIMA SAYACI (P3.22) ═══════════════
+ *
+ *  Oyun testi bulgusu: "bow çıkmadı, ilerleyemedim". Ölçüldü — yirmi
+ *  dakikada 32 ekipman düştü, HİÇBİRİ yay değildi.
+ *
+ *  Sebep yapısal: okçuda saldırı gücü YAYA bağlıdır (KO formülünde
+ *  DEX yay hasarıyla ÇARPILIR). Yay düşmezse güç artmaz, güç artmazsa
+ *  kat çıkılamaz, kat çıkılamazsa daha iyi yay düşmez. Diğer dokuz
+ *  yuva bu kilidi açamaz.
+ *
+ *  Havuz on yuvaya bölündüğü için yay şansı ~%10; birkaç talihsiz
+ *  seri oyuncuyu saatlerce kilitleyebiliyor. Sayaç bunu sınırlar:
+ *  art arda bu kadar ekipman düşüp hiç yay çıkmadıysa SONRAKİ düşüş
+ *  yay olur.
+ *
+ *  Bu bir OLASILIK DÜZELTMESİDİR, bedava eşya değil: yay yine
+ *  havuzdan ve kendi ağırlığıyla seçilir, yalnız yuvası garantilenir. */
+export const WEAPON_PITY_LIMIT = 8;
+
+/** Havuzu YALNIZ silahlara daraltır. Havuzda silah yoksa `null`. */
+export function weaponsIn(pool: readonly ItemDefinition[]): ItemDefinition[] {
+  return pool.filter((d) => d.category === 'weapon');
+}

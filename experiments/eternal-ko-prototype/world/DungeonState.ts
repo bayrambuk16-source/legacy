@@ -68,8 +68,18 @@ export class DungeonState {
 
   /** Sıradaki dalgayı doğurur. Zaten sahada dalga varsa hiçbir şey
    *  yapmaz — çifte doğuş mob sayısını sessizce ikiye katlardı. */
-  startNextWave(): SpawnedWave | null {
-    if (this.waveActive) return null;
+  startNextWave(overlapThreshold = 0): SpawnedWave | null {
+    /* ═══ P3.23 — ÖRTÜŞMEYE İZİN ═══
+       Sahadaki dalga İNCELDİYSE (eşik kadar veya daha az canlı)
+       sonraki dalga doğabilir. Ölçüldü: örtüşme olmadan dakikada
+       5 kill, Moradon'da 30 — fark dalga arasındaki ölü zamandı.
+
+       Eşik 0 iken davranış eskisiyle AYNI: dalga tamamen bitmeden
+       yenisi doğmaz. */
+    const alive = this.active === null
+      ? 0
+      : this.active.mobs.filter((m) => m.hp > 0 && m.ai !== 'dead').length;
+    if (this.active !== null && alive > overlapThreshold) return null;
     this.active = this.spawner.spawn(this.floorValue, this.waveValue);
     return this.active;
   }
@@ -115,12 +125,17 @@ export class DungeonState {
     return { ok: true, floor: this.floorValue };
   }
 
-  /** ÖLÜM: bir kat düş, dalga sayacı sıfırlansın.
+  /** ÖLÜM: yalnız DALGA sıfırlanır, KAT DÜŞMEZ.
    *
-   *  `highestFloor` DÜŞMEZ — oyuncu güçlenince geri çıkabilsin.
-   *  Kayıp kalıcı değil, zamandır. */
+   *  ═══ P3.22 — KAT DÜŞÜŞÜ KALDIRILDI ═══
+   *  Otuz dakikalık oturumda ölçüldü: on sekiz ölüm, on sekiz kez
+   *  kat düşüşü demekti ve oyuncu hiç ivme kazanamıyordu. Dalga
+   *  sıfırlanması zaten yeterli bir kayıp — o katın ilerlemesi gider.
+   *
+   *  Tasarımın ruhu da buydu: kat oyuncunun KENDİ kararıyla değişsin
+   *  (NEXT/GERİ). Ölümün kat düşürmesi, oyuncunun seçimini elinden
+   *  alıyordu. */
   onDeath(): number {
-    this.floorValue = Math.max(1, this.floorValue - 1);
     this.resetWaves();
     return this.floorValue;
   }

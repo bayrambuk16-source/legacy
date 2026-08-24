@@ -119,6 +119,21 @@ async function attachThree(): Promise<void> {
         err instanceof Error ? err.message : err);
     }
 
+    /* ══ P3.20 — ZİNDAN ORTAM MODELİ (su-taş salon) ══
+       Bağımsız `try`: yüklenemezse zindan yalnız koyu zemin/gök renk
+       değişimiyle oynanır — görsel kayıp, gameplay kaybı yok. */
+    try {
+      const [{ loadGlb }, { modelSrc }] = await Promise.all([
+        import('./render3d/GlbLoader.js'),
+        import('./data/proto-assets.js'),
+      ]);
+      const url = modelSrc('dungeon_env_glb');
+      if (url) renderer.attachDungeonEnv(await loadGlb(url));
+    } catch (err) {
+      console.warn('[P3.20] Zindan ortamı yüklenemedi, renk moduna düşüldü:',
+        err instanceof Error ? err.message : err);
+    }
+
     /* ══ P2.11 — ZEMİN DOKUSU ══
        Görsel ön-yükleyici bu anahtarı zaten indirdi; burada yalnız
        materyale bağlanır. Doku yoksa düz renk devrede kalır. */

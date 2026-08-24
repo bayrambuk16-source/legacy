@@ -30,7 +30,7 @@ import { OBSTACLES, ROADS, WORLD_BOUNDS } from '../data/world-map.js';
 import {
   HUD_EXP_BAR, HUD_EXP_FILL, HUD_EXP_TEXT, HUD_GENIE, HUD_JOY_BASE_W, HUD_JOY_KNOB_W, HUD_PAGE_DOTS,
   HUD_CAMERA_BTN, HUD_DUNGEON_BTN, HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN,
-  HUD_TARGET_CARD, HUD_BARS,
+  HUD_TARGET_CARD, HUD_BARS, HUD_POTION_HP, HUD_POTION_MP,
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
 /* `character-panel.js` üç ekranın yerleşimini taşır: karakter, yetenek
@@ -91,7 +91,7 @@ import {
   DISTANCE_OPTIONS, FOV_OPTIONS, HEIGHT_OPTIONS, PITCH_OPTIONS, YAW_OPTIONS, cycle,
   screenToWorldMove,
 } from '../render3d/CameraRig.js';
-import { koPotion, potionLabel, potionOptions } from '../data/ko-potions.js';
+import { koPotion, potionLabel, potionOptions, DEFAULT_HP_POTION_REF, DEFAULT_MP_POTION_REF } from '../data/ko-potions.js';
 import type { MovementSource } from '../world/GenieMovement.js';
 import { OKCU_FOOT_PAD, okcuSheet } from '../data/proto-assets.js';
 import {
@@ -420,6 +420,36 @@ export class WorldPrototypeScene implements Scene {
   private nearestBtn(): Btn {
     const b = HUD_TARGET_BTN;
     return { id: 'nearest', x: b.x, y: b.y, w: b.w, h: b.h, label: 'Hedef' };
+  }
+  /** P2.33 — HP/MP iksir hızlı kullanım düğmeleri. Genie'nin seçili iksirini
+   *  kullanır (ayarlardan kapatıldıysa varsayılana düşer); Genie'nin kendi
+   *  otomatik içişinden BAĞIMSIZ tek dokunuşluk manuel yoldur. */
+  private potionButtons(): Array<Btn & { resource: 'hp' | 'mp' }> {
+    return [
+      { id: 'potion_hp', resource: 'hp', x: HUD_POTION_HP.x, y: HUD_POTION_HP.y, w: HUD_POTION_HP.w, h: HUD_POTION_HP.h, label: 'HP' },
+      { id: 'potion_mp', resource: 'mp', x: HUD_POTION_MP.x, y: HUD_POTION_MP.y, w: HUD_POTION_MP.w, h: HUD_POTION_MP.h, label: 'MP' },
+    ];
+  }
+  private potionRefFor(resource: 'hp' | 'mp'): number {
+    const gset = this.S.genie.settings;
+    return resource === 'hp'
+      ? (gset.hpPotionRef ?? DEFAULT_HP_POTION_REF)
+      : (gset.mpPotionRef ?? DEFAULT_MP_POTION_REF);
+  }
+  private usePotion(resource: 'hp' | 'mp'): void {
+    const res = this.S.potions.use(this.potionRefFor(resource));
+    if (res.ok) {
+      this.host.audio.play('ui');
+      this.say(`${res.displayName} +${res.actual} ${resource.toUpperCase()} (×${res.remaining})`);
+    } else if (res.fail === 'full') {
+      this.say(`${resource.toUpperCase()} zaten dolu`);
+    } else if (res.fail === 'cooldown') {
+      this.say('İksir beklemede');
+    } else if (res.fail === 'outOfStock') {
+      this.say(`${res.displayName} bitti`);
+    } else {
+      this.say('İksir kullanılamadı');
+    }
   }
   /** Alt menü — Çanta paneli bağlı, diğerleri sonraki görevlerde. */
   private navButtons(): Btn[] {
@@ -755,6 +785,13 @@ export class WorldPrototypeScene implements Scene {
     }
     const near = this.S.worldLoot.nearest(this.S.world.worldX, this.S.world.worldY);
     if (near && this.hit(p, this.pickupBtn())) { this.pickup(near.lootUid); return; }
+
+    /* P2.33 — iksir düğmeleri. Joystick bölgesiyle KISMEN çakışırlar
+       (alt kenarları %66 çizgisinin altına sarkar), bu yüzden joystick
+       yakalamasından ÖNCE denetlenirler. */
+    for (const b of this.potionButtons()) {
+      if (this.hit(p, b)) { this.usePotion(b.resource); return; }
+    }
 
     /* joystick bölgesi: sol alt çeyrek */
     if (p.x < PROTO.screenW * 0.55 && p.y > PROTO.screenH * 0.66) {
@@ -1406,6 +1443,8 @@ export class WorldPrototypeScene implements Scene {
       Object.assign(this.three!.tuning, base, applyZoom(base, this.zoom), {
         yawDeg: this.camMode === 'third' ? this.camYaw : base.yawDeg,
       });
+      /* P3.20 — zindan görünümü: salon + koyu zemin. Idempotent çağrı. */
+      this.three!.setDungeonMode(this.inDungeon);
       this.three!.update(buildWorldFrame(this.S), dt);
       this.three!.render();
     }
@@ -1861,35 +1900,66 @@ export class WorldPrototypeScene implements Scene {
     if (!tel.enabled) {
       g.rect(HUD_GENIE.x, HUD_GENIE.y, HUD_GENIE.w, HUD_GENIE.h, '#0b0908', 0.45);
     }
+    /* P2.33 — GENIE BOŞTA GERİ BİLDİRİMİ. Oyuncu şehirde Genie'yi açınca
+       hiçbir şey olmuyordu ve neden anlaşılmıyordu (menzilde mob yok).
+       Açık + hedefsizken lambanın altına küçük durum satırı çizilir. */
+    if (tel.enabled && tel.targetUid === null) {
+      const gx = HUD_GENIE.x + HUD_GENIE.w / 2;
+      const gy = HUD_GENIE.y + HUD_GENIE.h + 12;
+      g.rect(gx - 70, gy - 9, 140, 18, '#0f0c08', 0.75);
+      g.rect(gx - 70, gy - 9, 140, 1, '#6a5637', 0.8);
+      g.text('Menzilde hedef yok', gx, gy, { align: 'center', size: 9, color: '#c9a05a' });
+    }
 
-    /* ---- güç skoru (sürekli görünür) ---- */
+    /* ---- güç skoru + aktif görev — TEK PLAKET (P2.33) ----
+     *  Önceden çıplak metin + 4 px düz çizgiydi; şimdi koyu plaket, altın
+     *  kenar çizgileri, `ui_divider_small` süsü ve çerçeveli ilerleme
+     *  çubuğu. Yerleşim değişmedi (aynı y bandı), yalnız giydirildi.
+     *  ZİNDANDA ÇİZİLMEZ: aynı bandı zindanın KAT/Dalga/Güç şeridi
+     *  kullanır ve görevler normal dünyanın kavramıdır. */
     const power = this.S.autoGear.score();
-    g.text(`GÜÇ ${formatPower(power)}`, PROTO.screenW / 2, 96,
-      { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
-
-    /* ---- aktif görev ---- */
     const quest = this.S.quests.active();
-    if (quest) {
-      const pr = this.S.quests.progress(quest)!;
-      const parts = quest.objectives.map((o) => {
-        const nm = Content.monster(o.monsterRef)?.displayName ?? `#${o.monsterRef}`;
-        return `${nm} ${pr.counts[o.monsterRef] ?? 0}/${o.count}`;
-      });
-      g.text(quest.title, PROTO.screenW / 2, 112,
-        { align: 'center', size: 11, bold: true, color: '#c9a05a' });
-      g.text(parts.join('   ·   '), PROTO.screenW / 2, 128,
-        { align: 'center', size: 10, color: '#8d8272' });
-      /* İlerleme çubuğu — tek bakışta ne kadar kaldığı. */
-      const bw = 200, bx = PROTO.screenW / 2 - bw / 2;
-      g.rect(bx, 144, bw, 4, '#241c14', 0.9);
-      g.rect(bx, 144, bw * this.S.quests.ratio(quest), 4, '#c9a05a', 0.95);
+    if (!this.inDungeon) {
+      const pw = 300, px = PROTO.screenW / 2 - pw / 2;
+      const py = 80, ph = quest ? 78 : 30;
+      g.rect(px, py, pw, ph, '#0f0c08', 0.72);
+      /* altın kenarlar: üst/alt tam, yanlar kısa köşe vurgusu */
+      g.rect(px, py, pw, 1, '#6a5637', 0.9);
+      g.rect(px, py + ph - 1, pw, 1, '#6a5637', 0.9);
+      g.rect(px, py, 1, 12, '#6a5637', 0.9);
+      g.rect(px + pw - 1, py, 1, 12, '#6a5637', 0.9);
+      g.rect(px, py + ph - 12, 1, 12, '#6a5637', 0.9);
+      g.rect(px + pw - 1, py + ph - 12, 1, 12, '#6a5637', 0.9);
+      g.text(`GÜÇ ${formatPower(power)}`, PROTO.screenW / 2, py + 15,
+        { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
+      if (quest) {
+        /* süs ayracı — GÜÇ ile görev arasında */
+        const dw = 132, dh = dw * (68 / 200);
+        g.image('ui_divider_small', PROTO.screenW / 2 - dw / 2, py + 20 - dh / 2 + 11,
+          { w: dw, h: dh, alpha: A * 0.9 });
+        const pr = this.S.quests.progress(quest)!;
+        const parts = quest.objectives.map((o) => {
+          const nm = Content.monster(o.monsterRef)?.displayName ?? `#${o.monsterRef}`;
+          return `${nm} ${pr.counts[o.monsterRef] ?? 0}/${o.count}`;
+        });
+        g.text(quest.title, PROTO.screenW / 2, py + 42,
+          { align: 'center', size: 11, bold: true, color: '#c9a05a' });
+        g.text(parts.join('   ·   '), PROTO.screenW / 2, py + 56,
+          { align: 'center', size: 10, color: '#9d9282' });
+        /* İlerleme çubuğu — çerçeveli yuva + altın dolgu. */
+        const bw = 220, bx = PROTO.screenW / 2 - bw / 2, by = py + 66;
+        g.rect(bx - 1, by - 1, bw + 2, 7, '#6a5637', 0.65);
+        g.rect(bx, by, bw, 5, '#191410', 0.95);
+        g.rect(bx, by, bw * this.S.quests.ratio(quest), 5, '#c9a05a', 0.95);
+      }
     }
 
     /* ---- oto giy bildirimi ---- */
     if (this.powerToast) {
       const t = this.powerToast;
       const alpha = Math.min(1, t.t / 0.4);
-      const ty = 160;
+      /* P2.33 — görev plaketi 80..158 bandını kapladı; toast altına indi. */
+      const ty = 196;
       g.rect(PROTO.screenW / 2 - 120, ty, 240, 34, '#100d08', 0.9 * alpha);
       g.rect(PROTO.screenW / 2 - 120, ty, 240, 2, '#7fa85c', alpha);
       g.text(t.name, PROTO.screenW / 2 - 110, ty + 6,
@@ -1901,7 +1971,16 @@ export class WorldPrototypeScene implements Scene {
     }
 
     if (this.noticeTimer > 0) {
-      g.text(this.notice, PROTO.screenW / 2, 158, { align: 'center', size: 15, color: '#e8d9a0' });
+      /* P2.33 — çıplak metin yerine küçük plaket: koyu zemin + altın çizgi.
+       *  Sönerken zeminle birlikte kaybolur. */
+      const na = Math.min(1, this.noticeTimer / 0.35);
+      const nw = Math.min(PROTO.screenW - 40, Math.max(180, this.notice.length * 8.4 + 44));
+      const nx = PROTO.screenW / 2 - nw / 2, ny = 166;
+      g.rect(nx, ny, nw, 26, '#0f0c08', 0.78 * na);
+      g.rect(nx, ny, nw, 1, '#6a5637', 0.9 * na);
+      g.rect(nx, ny + 25, nw, 1, '#6a5637', 0.9 * na);
+      g.text(this.notice, PROTO.screenW / 2, ny + 13,
+        { align: 'center', size: 14, color: '#e8d9a0', alpha: na });
     }
 
     /* ---- joystick ---- */
@@ -1953,11 +2032,16 @@ export class WorldPrototypeScene implements Scene {
             { align: 'center', size: 20, bold: true, color: GATE_COLOR[gate], alpha });
         }
       }
-      /* Kalıcı kilit rozeti — Sv1 oyuncu neyi kullanamadığını görsün. */
+      /* Kalıcı kilit rozeti — Sv1 oyuncu neyi kullanamadığını görsün.
+         P2.33 — tam genişlik şerit yuvarlak butonların altından taşıyordu;
+         artık buton içine oturan KOMPAKT kapsül. */
       const badge = def ? gateBadge(gate, def.requiredLevel) : null;
       if (badge !== null) {
-        g.rect(b.x, b.y + b.h - 16, b.w, 16, '#0b0908', 0.85);
-        g.text(badge, b.x + b.w / 2, b.y + b.h - 14,
+        const bw2 = Math.min(b.w - 8, badge.length * 7 + 14);
+        const bx2 = b.x + (b.w - bw2) / 2, by2 = b.y + b.h - 18;
+        g.rect(bx2, by2, bw2, 14, '#0b0908', 0.85);
+        g.rect(bx2, by2, bw2, 1, GATE_COLOR[gate], 0.7);
+        g.text(badge, b.x + b.w / 2, by2 + 7,
           { align: 'center', size: 10, bold: true, color: GATE_COLOR[gate] });
       }
       if (cdRatio > 0) {
@@ -1981,6 +2065,29 @@ export class WorldPrototypeScene implements Scene {
     g.image(HUD_TARGET_BTN.key, nb.x, nb.y, { w: nb.w, h: nb.h, alpha: A });
     g.image(HUD_PAGE_DOTS.key, HUD_PAGE_DOTS.x, HUD_PAGE_DOTS.y,
       { w: HUD_PAGE_DOTS.w, h: HUD_PAGE_DOTS.h, alpha: A * 0.85 });
+
+    /* ---- P2.33 — iksir hızlı düğmeleri ----
+     *  Çerçeve `ui_btn_potion`; içindeki şişe yerine SEÇİLİ iksirin kendi
+     *  ikonu çizilir (çantadakiyle aynı görsel — oyuncu ne içeceğini görür).
+     *  Adet sağ-alt rozette; stok bitince düğme kararır. */
+    for (const b of this.potionButtons()) {
+      const pRef = this.potionRefFor(b.resource);
+      const pStock = this.S.potions.stock(pRef);
+      const dim = pStock <= 0;
+      g.image('ui_btn_potion', b.x, b.y, { w: b.w, h: b.h, alpha: dim ? A * 0.5 : A });
+      const iconKey = itemIconKey(pRef);
+      if (iconKey && this.host.assets.has(iconKey)) {
+        const pad = b.w * 0.18;
+        g.image(iconKey, b.x + pad, b.y + pad,
+          { w: b.w - pad * 2, h: b.h - pad * 2, alpha: dim ? A * 0.45 : A });
+      }
+      if (dim) g.rect(b.x, b.y, b.w, b.h, '#0b0908', 0.45);
+      const rx = b.x + b.w - 12, ry = b.y + b.h - 12;
+      g.circle(rx, ry, 12, '#100d08', 0.92);
+      g.circle(rx, ry, 12, b.resource === 'hp' ? '#7a3a30' : '#31456f', 0.35);
+      g.text(String(pStock), rx, ry, { align: 'center', size: 10, bold: true,
+        color: dim ? '#6f655a' : '#e8e0d0' });
+    }
 
     /* ---- ganimet toplama ---- */
     const nearLoot = this.S.worldLoot.nearest(this.S.world.worldX, this.S.world.worldY);
@@ -2681,7 +2788,9 @@ export class WorldPrototypeScene implements Scene {
       this.say(`Dalga ${d.dungeon.wave - 1} temiz`);
       return;                                // bir kare nefes: art arda doğmasın
     }
-    if (!d.dungeon.waveActive) d.startNextWave();
+    /* P3.23 — dalga İNCELDİĞİNDE sonrakini çağır: yürüyüş süresi
+       dövüşle örtüşsün, akış kesilmesin. */
+    if (!d.dungeon.waveActive || d.waveThin) d.startNextWave();
   }
 
   /** Zindan HUD'ı: üstte bilgi, altta eylem. Savaş alanı BOŞ kalır. */

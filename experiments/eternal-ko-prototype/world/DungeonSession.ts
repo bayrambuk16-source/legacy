@@ -26,9 +26,9 @@ import { DungeonState } from './DungeonState.js';
 import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
 import { WaveSpawner } from './WaveSpawner.js';
 import { mulberry32 } from '../../../src/engine/rng.js';
-import { ACTIVE_WORLD } from '../data/world-map.js';
+import { DUNGEON_WORLD } from '../data/dungeon-world.js';
 import {
-  DUNGEON_DROP_UPGRADE, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE,
+  DUNGEON_DROP_UPGRADE, WAVE_OVERLAP_THRESHOLD, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE,
 } from '../data/wave-floors.js';
 import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 import { planPurchase, shopCatalog, type BuyResult } from '../ui/potion-shop.js';
@@ -42,7 +42,10 @@ export class DungeonSession {
 
   constructor(seed = 20260824) {
     /* BOŞ SLOT TABLOSU: zindanda sabit mob yok, yalnız dalga. */
-    this.state = new PrototypeState(seed, [], ACTIVE_WORLD, DUNGEON_SAVE_KEY);
+    /* P3.20 — ZİNDAN ARTIK KENDİ HARİTASINDA: Moradon yapılandırması
+       yerine küçük düz arena (bkz. `data/dungeon-world.ts`). Doğuş arena
+       merkezidir; Moradon yürüme maskesi ve engelleri burada GEÇERSİZ. */
+    this.state = new PrototypeState(seed, [], DUNGEON_WORLD, DUNGEON_SAVE_KEY);
     this.spawner = new WaveSpawner({
       rng: mulberry32(seed ^ 0x5eed),
       ai: this.state.mobs.ai,
@@ -91,8 +94,21 @@ export class DungeonSession {
 
   /** Doğan dalgayı dünyaya bağlar: `MobSlotSystem`in mob listesine
    *  eklenir ki savaş, hedefleme ve ganimet aynı kapılardan geçsin. */
+  /** ═══ P3.23 — DALGALAR ÖRTÜŞÜR ═══
+   *  Ölçüldü: zindanda dakikada 5 kill, Moradon'da 30. Fark dalga
+   *  döngüsündeki ÖLÜ ZAMANDAN geliyordu — dalga bitiyor, sonraki
+   *  doğuyor, 720 birim yürüyor, ancak sonra dövüş başlıyor.
+   *
+   *  Artık sahadaki dalga İNCELDİĞİNDE sonraki doğar; yürüyüş süresi
+   *  dövüşle örtüşür ve akış kesilmez. "Yukarıdan gelen dalga" hissi
+   *  korunur, yalnız aralık kapanır. */
+  get waveThin(): boolean {
+    const alive = this.dungeon.activeMobs.filter((m) => m.ai !== 'dead').length;
+    return alive <= WAVE_OVERLAP_THRESHOLD;
+  }
+
   startNextWave(): boolean {
-    const w = this.dungeon.startNextWave();
+    const w = this.dungeon.startNextWave(WAVE_OVERLAP_THRESHOLD);
     if (!w) return false;
     for (const m of w.mobs) this.state.mobs.mobs.push(m);
     return true;

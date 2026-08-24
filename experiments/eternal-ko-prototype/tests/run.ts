@@ -41,7 +41,8 @@ import {
   hitTest as invHitTest, invButtons, invCloseButton, targetSlotFor, type UiRect,
 } from '../ui/inventory-panel.js';
 import {
-  HUD_CAMERA_BTN, HUD_DUNGEON_BTN, HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_SETTINGS,
+  HUD_CAMERA_BTN, HUD_DUNGEON_BTN, HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_POTION_HP,
+  HUD_POTION_MP, HUD_SETTINGS,
   HUD_TARGET_BTN, UI_MOCK, UI_SCALE,
   hudNavBoxes, hudSkillBoxes, hudSpriteKeys,
 } from '../ui/hud-layout.js';
@@ -68,7 +69,7 @@ import { LEVELING } from '../../../src/game/config.js';
 import {
   EQUIP_DROP_CHANCE, HIGH_TIER_EQUIP_CHANCE, HIGH_TIER_MONSTER_LEVEL,
   HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF, equipChanceFor,
-  itemTierLevel, pickFromPool, poolFor, slotCoverage,
+  WEAPON_PITY_LIMIT, itemTierLevel, pickFromPool, poolFor, slotCoverage, weaponsIn,
 } from '../data/moradon-loot-pool.js';
 import {
   FIXED_SELL_PRICES, SELL_UPGRADE_PER_LEVEL, equipSellPrice, fixedSellPrice,
@@ -78,10 +79,18 @@ import {
 } from '../data/combat-power.js';
 import type { PowerInput } from '../data/power-score.js';
 import {
-  SPAWN_BAND_AHEAD, SPAWN_BAND_WIDTH, WaveSpawner,
+  SPAWN_BAND_AHEAD, SPAWN_BAND_DEPTH, SPAWN_BAND_WIDTH, WaveSpawner,
 } from '../world/WaveSpawner.js';
 import { DungeonState } from '../world/DungeonState.js';
 import { DungeonSession } from '../world/DungeonSession.js';
+import {
+  DUNGEON_BOUNDS, DUNGEON_EDGE_MARGIN, DUNGEON_ENV, DUNGEON_SPAWN, DUNGEON_WORLD,
+  dungeonStepAllowed,
+} from '../data/dungeon-world.js';
+import {
+  MOB_ASSETS, MODEL_BANDS, allAttributions, assetForClips, assetForLevel,
+  assetScaleFor, dungeonAssetForLevel, pickLocomotion, playbackRate,
+} from '../data/mob-assets.js';
 import { DUNGEON_SAVE_KEY, PROTO_SAVE_KEY } from '../data/proto-save.js';
 import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 import {
@@ -93,8 +102,10 @@ import { planPurchase, restorePerCoin, shopCatalog } from '../ui/potion-shop.js'
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_MIN_COUNT,
+  WAVE_OVERLAP_THRESHOLD,
   WAVE_REWARD_MULT,
-  WAVE_TROPHY_CHANCE, coinForKill, dungeonLootLevel, floorLevelBand,
+  WAVE_TROPHY_CHANCE, FLOOR_LEVEL_STEP, coinForKill, dungeonLootLevel, floorLevelBand,
+  playerPowerAtLevel,
   floorMonsters, floorStatMult, planWave, recommendedPower, trophyValue,
 } from '../data/wave-floors.js';
 import {
@@ -272,7 +283,7 @@ import {
   MORADON_WORLD_WIDTH, MORADON_ZONE_ID, koToWorld, worldToKo,
 } from '../data/moradon-coords.js';
 import {
-  DEFAULT_MP_POTION_REF, DEV_TEST_POTIONS, KO_POTIONS, koPotion,
+  DEFAULT_HP_POTION_REF, DEFAULT_MP_POTION_REF, DEV_TEST_POTIONS, KO_POTIONS, koPotion,
   potionOptions, potionsFor,
 } from '../data/ko-potions.js';
 import { PLAYER_SPEED_DEFAULT, PLAYER_SPEED_OPTIONS } from '../config.js';
@@ -12483,19 +12494,28 @@ test('§111 KAT → MOB BANDI: mevcut moblar, ADLARI DEĞİŞMEDEN', () => {
     const refs = floorMonsters(f);
     ok(refs.length > 0, `kat ${f} mobsuz`);
     const band = floorLevelBand(f);
+    /* Bant BOŞSA en yakın mob kullanılır (güvenlik ağı) — o durumda
+       bant kontrolü geçerli değildir. */
+    const exact = Content.monsters.some(
+      (m) => m.level >= band.min && m.level <= band.max,
+    );
     for (const r of refs) {
       const m = Content.monster(r);
       ok(m !== undefined, `kat ${f}: mob kaynakta yok (${r})`);
-      ok(m!.level >= band.min && m!.level <= band.max,
-        `kat ${f}: ${m!.displayName} bant dışı (Sv${m!.level})`);
+      if (exact) {
+        ok(m!.level >= band.min && m!.level <= band.max,
+          `kat ${f}: ${m!.displayName} bant dışı (Sv${m!.level})`);
+      }
       /* Ad DEĞİŞMEMELİ — normal haritadaki mobun aynısı. */
       eq(m!.displayName, Content.monster(r)!.displayName, 'ad:');
     }
   }
-  /* Kat 10'dan sonra mob AYNI kalır, çarpan büyür. */
-  eq(floorMonsters(11).join(','), floorMonsters(10).join(','), 'kat 11 mobları:');
-  eq(floorStatMult(10), 1, 'kat 10 çarpanı:');
-  ok(floorStatMult(15) > floorStatMult(11), 'çarpan katla büyümeli');
+  /* `MAX_DISTINCT_FLOOR`tan sonra mob AYNI kalır, çarpan büyür. */
+  const cap = MAX_DISTINCT_FLOOR;
+  eq(floorMonsters(cap + 1).join(','), floorMonsters(cap).join(','),
+    `kat ${cap + 1} mobları:`);
+  eq(floorStatMult(cap), 1, 'tavan katın çarpanı:');
+  ok(floorStatMult(cap + 5) > floorStatMult(cap + 1), 'çarpan katla büyümeli');
 });
 
 test('§112 COIN kaynaktan türer, satılabilir DOĞRUSAL büyür', () => {
@@ -12503,9 +12523,11 @@ test('§112 COIN kaynaktan türer, satılabilir DOĞRUSAL büyür', () => {
      Oran ≈ 17 coin/seviye. */
   eq(COIN_PER_LEVEL, 17, 'coin/seviye:');
   ok(coinForKill(10, 1) > coinForKill(5, 1), 'coin seviyeyle artmalı');
-  /* Ödül YARIYA — kullanıcı kararı. */
-  eq(WAVE_REWARD_MULT, 0.5, 'ödül çarpanı:');
-  eq(coinForKill(10, 1), Math.floor(17 * 10 * 0.5), 'coin hesabı:');
+  /* P3.23 — YARIM ÖDÜL KALDIRILDI. Ölçüm: yarım ödülle zindan
+     Moradon'un altıda biri kadar ganimet veriyordu ve yükseltme
+     malzemesi toplama amacı anlamsızlaşıyordu. */
+  eq(WAVE_REWARD_MULT, 1.0, 'ödül çarpanı:');
+  eq(coinForKill(10, 1), Math.floor(17 * 10 * WAVE_REWARD_MULT), 'coin hesabı:');
 
   /* Satılabilir DOĞRUSAL — ikiye katlanma REDDEDİLDİ. */
   eq(trophyValue(1), TROPHY_BASE_VALUE, 'kat 1 ganimeti:');
@@ -12533,7 +12555,11 @@ test('§112 ÖNERİLEN GÜÇ mob verisinden TÜRER ve katla artar', () => {
     attack: f.attack, defense: f.defense, maxHp: f.maxHp, maxMp: f.maxMp,
     dex: S.stats.effectiveDex(), sta: S.stats.effectiveSta(),
   });
-  ok(p >= recommendedPower(1), `Sv1 oyuncu kat 1'e yetmiyor: ${p} < ${recommendedPower(1)}`);
+  /* P3.22 — öneri artık ÖLÇÜLEN oyuncu eğrisinden geliyor ve kat adımı
+     ikiye indi. Sv1 karakter kat 1'i zorlanarak da olsa oynayabilmeli;
+     kat 3 ise açıkça erken olmalı. */
+  ok(p >= recommendedPower(1) * 0.6,
+    `Sv1 oyuncu kat 1'e çok uzak: ${p} < ${recommendedPower(1)}`);
   ok(p < recommendedPower(3), `Sv1 oyuncu kat 3'e fazla güçlü: ${p}`);
 });
 
@@ -12568,9 +12594,11 @@ test('§113 ZİNDAN GİRİŞİ ana ekranda ve ÇAKIŞMIYOR', () => {
 test('§113 ZİNDAN DROPLARI +1 gelir, normal harita ETKİLENMEZ', () => {
   eq(DUNGEON_DROP_UPGRADE, 1, 'zindan yükseltmesi:');
   /* Kademe cezası: eşya düşer ama bir bant aşağıdan. */
-  eq(dungeonLootLevel(30), 30 - DUNGEON_TIER_PENALTY, 'kademe cezası:');
-  eq(dungeonLootLevel(2), 1, 'alt sınır korunmalı:');
-  ok(DUNGEON_TIER_PENALTY > 0, 'zindan kademesi normal haritayla aynı');
+  /* P3.22 — kademe cezası KALDIRILDI: ölçümde modu çökertiyordu
+     (30 dk → Sv8, kat 2, AP sabit; oyuncu daha iyi yay bulamıyordu). */
+  eq(DUNGEON_TIER_PENALTY, 0, 'kademe cezası:');
+  eq(dungeonLootLevel(30), 30, 'zindan havuzu mobun seviyesinden:');
+  eq(dungeonLootLevel(1), 1, 'alt sınır:');
 
   /* NORMAL HARİTA: drop hâlâ +0 gelmeli. Zindan kuralı oraya
      sızarsa normal ilerleme bozulur. */
@@ -12746,7 +12774,7 @@ test('§115 GÜÇ KAPISI YOK — zayıf oyuncu da geçebilir', () => {
   eq(floorRisk(1, recommendedPower(9)), 'extreme', 'zayıf oyuncu etiketi:');
 });
 
-test('§115 ÖLÜM bir kat düşürür, TAVAN düşmez', () => {
+test('§115 ÖLÜM dalgayı sıfırlar, KAT ve TAVAN düşmez', () => {
   const { D } = dungeonSetup(6003);
   for (let i = 0; i < 6; i++) { clearWave(D); D.completeWaveIfCleared(); D.nextFloor(); }
   eq(D.floor, 7, 'ulaşılan kat:');
@@ -12755,10 +12783,11 @@ test('§115 ÖLÜM bir kat düşürür, TAVAN düşmez', () => {
   clearWave(D); D.completeWaveIfCleared();
   eq(D.wave, 2, 'ilerleyen dalga:');
 
-  eq(D.onDeath(), 6, 'ölümde bir kat düşmeli:');
+  /* P3.22 — ölüm KAT DÜŞÜRMEZ, yalnız dalgayı sıfırlar. On sekiz
+     ölüm on sekiz kat düşüşü demekti ve oyuncu ivme kazanamıyordu. */
+  eq(D.onDeath(), 7, 'ölümde kat DEĞİŞMEMELİ:');
   eq(D.highestFloor, 7, 'tavan korunmalı:');
   eq(D.wave, 1, 'dalga sıfırlanmalı:');
-  /* Kat 1'de ölmek daha aşağı indirmez. */
   D.jumpTo(1);
   eq(D.onDeath(), 1, 'en altta ölüm:');
 });
@@ -12784,12 +12813,12 @@ test('§115 KAYIT: kat ve tavan korunur, DALGA sıfırlanır', () => {
   D.onDeath();
   for (let i = 0; i < 3; i++) { clearWave(D); D.completeWaveIfCleared(); }
   const snap = D.serialize();
-  eq(snap.floor, 5, 'kaydedilen kat:');
+  eq(snap.floor, 6, 'kaydedilen kat (ölüm kat düşürmez):');
   eq(snap.highestFloor, 6, 'kaydedilen tavan:');
 
   const { D: D2 } = dungeonSetup(6006);
   D2.restore(snap);
-  eq(D2.floor, 5, 'geri yüklenen kat:');
+  eq(D2.floor, 6, 'geri yüklenen kat:');
   eq(D2.highestFloor, 6, 'geri yüklenen tavan:');
   eq(D2.wave, 1, 'dalga 1\'den başlamalı:');
 
@@ -12894,7 +12923,7 @@ test('§116 ÖLÜM sahayı temizler ve karakteri diriltir', () => {
   D.state.player.takeDamage(999_999);
   ok(!D.state.player.alive, 'ölmüş olmalı');
 
-  eq(D.onDeath(), 3, 'bir kat düşmeli:');
+  eq(D.onDeath(), 4, 'ölümde kat değişmemeli:');
   eq(D.state.mobs.mobs.length, 0, 'saha temizlenmeli:');
   ok(D.state.player.alive, 'karakter dirilmeli');
   eq(D.dungeon.highestFloor, 4, 'tavan korunmalı:');
@@ -12979,13 +13008,17 @@ test('§117 COIN her mobdan düşer ve SEVİYEYLE artar', () => {
   ok(lowGain > 0, 'alt katta coin yok');
 });
 
-test('§117 ÖDÜL YARIYA — EXP çarpanı zindanda düşük', () => {
+test('P3.23 — ZİNDAN ÖDÜLÜ MORADON İLE AYNI', () => {
+  /* Ölçüldü: yarım ödülle 30 dakikada Sv9/153 kill, Moradon'da
+     Sv10/908 kill. Seviye yakındı ama ganimet hacmi altıda birdi.
+     Kullanıcı kararı: aynı seviyeye getir. */
   const normal = new PrototypeState(8004);
   const D = new DungeonSession(8005);
-  ok(D.state.balance.exp < normal.balance.exp, 'zindan EXP çarpanı düşük değil');
-  ok(Math.abs(D.state.balance.exp - normal.balance.exp * WAVE_REWARD_MULT) < 1e-9,
-    'EXP çarpanı yarıya inmemiş');
+  ok(Math.abs(D.state.balance.exp - normal.balance.exp) < 1e-9,
+    'zindan EXP çarpanı Moradon\'dan farklı');
+  eq(WAVE_REWARD_MULT, 1.0, 'ödül çarpanı:');
 });
+
 
 test('§117 ZİNDAN GANİMETİ: kata göre değeri artar, yığılabilir', () => {
   eq(fixedSellPrice(DUNGEON_TROPHY_REF), 50_000, 'sabit fiyat (normal harita):');
@@ -13321,12 +13354,14 @@ test('§123 GENIE\'İ HER KARE BAŞLATMAK ONU SUSTURUR', () => {
   ok(drive(false) > 0, 'doğru yolda kill olmalı');
 });
 
-test('§123 İLK DALGALAR SEYREK — üç mob Sv1\'i öldürüyordu', () => {
+test('§123 DALGA BOYU ARTAR ama ölüm makul kalır', () => {
   /* Ölçüldü: üç mobla başlayan kat 1, Sv1 karakteri iki dakikada
      DOKUZ KEZ öldürüyordu. Çözüm iksir yığmak DEĞİL (karakter zaten
      yirmi iksirle doğuyor), erken dalgaları seyreltmekti. */
-  eq(WAVE_MIN_COUNT, 1, 'ilk dalga mob sayısı:');
-  eq(planWave(1).count, 1, 'dalga 1:');
+  /* P3.23 — kat adımı ikiye inince (kat 1 = Sv1-2) üç zayıf mob
+     sorun olmaktan çıktı; kill hacmi üç katına çıktı. */
+  eq(WAVE_MIN_COUNT, 3, 'ilk dalga mob sayısı:');
+  eq(planWave(1).count, 3, 'dalga 1:');
   ok(planWave(6).count > planWave(1).count, 'tempo artmalı');
   /* Geç dalgalar kalabalıklaşmalı — ELİT dalgalar normalin yarısı
      kadar gelir, o yüzden ölçüm NORMAL bir dalgadan alınır. */
@@ -13732,6 +13767,360 @@ test('§130 ZİNDAN GİRDİSİ paneli KAPATMAZ — alt menü erişilebilir', () 
     eq(dungeonHitTest(sk.x + sk.w / 2, sk.y + sk.h / 2), null,
       `skill yuvası zindan girdisine takılıyor (${sk.key}):`);
   }
+});
+
+/* ================= P2.33 (Fable) — İKSİR DÜĞMELERİ VE İKONLAR ================= */
+console.log('P2.33 — iksir hızlı kullanım ve ikon kapsamı:');
+
+test('§131 HER İKSİRİN İKONU VAR', () => {
+  /* Eskiden yalnız iki iksirin ikonu vardı; kalan yedisi çantada
+     renkli daire olarak görünüyordu. */
+  for (const k of KO_POTIONS) {
+    ok(itemIconKey(k.itemRef) !== null, `ikonsuz iksir: ${k.displayName}`);
+    const key = itemIconKey(k.itemRef)!;
+    ok(PROTO_ASSETS[key] !== undefined, `manifestte yok: ${key}`);
+  }
+  /* İkon anahtarları BENZERSİZ — iki iksir aynı görseli kullanmamalı,
+     yoksa çantada ayırt edilemezler. */
+  const keys = KO_POTIONS.map((k) => itemIconKey(k.itemRef)!);
+  eq(new Set(keys).size, keys.length, 'aynı ikon iki iksirde:');
+});
+
+test('§131 İKSİR DÜĞMELERİ ekran içinde ve HUD ile çakışmıyor', () => {
+  const pots: Array<UiRect & { id: string }> = [
+    { id: 'potion_hp', ...HUD_POTION_HP },
+    { id: 'potion_mp', ...HUD_POTION_MP },
+  ];
+  const ov = (a: UiRect, b: UiRect): boolean =>
+    !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+
+  for (const b of pots) {
+    ok(b.x >= 0 && b.x + b.w <= PROTO.screenW, `${b.id} yatay taşıyor`);
+    ok(b.y >= 0 && b.y + b.h <= PROTO.screenH, `${b.id} dikey taşıyor`);
+    ok(b.w >= 60 && b.h >= 60, `${b.id} parmakla dokunulamaz: ${b.w}×${b.h}`);
+    /* Alt menü, skill barı ve zindan şeridiyle çakışmamalı. */
+    for (const n of hudNavBoxes()) ok(!ov(b, n), `${b.id} alt menüyle çakışıyor`);
+    for (const sk of hudSkillBoxes()) ok(!ov(b, sk), `${b.id} skill barıyla çakışıyor`);
+    for (const a of dungeonActions()) ok(!ov(b, a), `${b.id} zindan şeridiyle çakışıyor`);
+    ok(!ov(b, DUNGEON_SHOP_BTN), `${b.id} mağaza düğmesiyle çakışıyor`);
+  }
+  ok(!ov(pots[0]!, pots[1]!), 'iksir düğmeleri birbiriyle çakışıyor');
+
+  /* JOYSTICK ile kısmi çakışma BİLİNÇLİ (başparmak erişimi). Bu yüzden
+     girdi sırası kritik: düğmeler joystick yakalamasından ÖNCE
+     denetlenmeli, yoksa dokunuş joystick sanılır. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  const potAt = src.indexOf('for (const b of this.potionButtons())');
+  const joyAt = src.indexOf('/* joystick bölgesi');
+  ok(potAt >= 0 && joyAt >= 0, 'girdi blokları bulunamadı');
+  ok(potAt < joyAt, 'iksir düğmeleri joystick\'ten SONRA denetleniyor');
+});
+
+test('§131 İKSİR DÜĞMESİ Genie\'nin SEÇİLİ iksirini kullanır', () => {
+  const S = protoState(9990);
+  S.giveTestPotions();
+  S.player.hp = 1;
+  /* Genie ayarındaki iksir kullanılmalı — iki ayrı seçim olmamalı. */
+  S.genie.settings.hpPotionRef = 389012000;
+  const before = S.inventory.count(389012000);
+  const r = S.potions.use(S.genie.settings.hpPotionRef ?? DEFAULT_HP_POTION_REF);
+  ok(r.ok, 'seçili iksir kullanılamadı');
+  eq(S.inventory.count(389012000), before - 1, 'seçili iksirden düşmeli:');
+});
+
+/* ================= P3.21 — BEŞ YENİ MOB MODELİ ================= */
+console.log('P3.21 — mob varlık kayıtları:');
+
+test('§132 KLİP ADLARI MANİFESTTEN — uydurma yok', () => {
+  /* İki yollu dallanma (`02_WALK` varsa goblin) beş modelle çöküyordu:
+     üçü `03_WALK`, biri `02_WALK`, biri hiç yürüyemiyor. */
+  for (const [key, rec] of Object.entries(MOB_ASSETS)) {
+    /* GLB'ler `PROTO_MODELS` tablosundadır — `PROTO_ASSETS` görseller
+       içindir. İki tablo ayrı: modeller ayrıca yüklenir. */
+    ok(PROTO_MODELS[rec.assetKey] !== undefined, `${key} model manifestinde yok`);
+    ok(rec.clips.idle.length > 0, `${key} boşta klibi yok`);
+    ok(rec.attribution.includes('CC-BY'), `${key} künyesi eksik`);
+    ok(rec.heightMeters > 0, `${key} boyu yok`);
+    /* Saldırı klibi OLMALI — saldıramayan mob dövüşemez. */
+    ok(rec.clips.attacks.length > 0, `${key} saldırı klibi yok`);
+    /* Yürüyebiliyorsa hızı da OLMALI, yoksa oynatma oranı hesaplanamaz. */
+    if (rec.clips.walk !== null) ok(rec.walkSpeed !== null, `${key} yürüyüş hızı yok`);
+    if (rec.clips.run !== null) ok(rec.runSpeed !== null, `${key} koşu hızı yok`);
+    /* Kovalayamayan varlıkta yürüyüş klibi de OLMAMALI. */
+    if (!rec.canChase) eq(rec.clips.walk, null, `${key} kovalayamıyor ama yürüyor:`);
+  }
+});
+
+test('§132 KLİP LİSTESİNDEN VARLIK ÇÖZÜLÜR', () => {
+  /* `MobRig` model adı bilmez; elindeki klip listesini verir. */
+  for (const [key, rec] of Object.entries(MOB_ASSETS)) {
+    const names = [
+      rec.clips.idle, rec.clips.idleLong, rec.clips.walk, rec.clips.run,
+      ...rec.clips.attacks, rec.clips.death, rec.clips.hitReact, rec.clips.roar,
+    ].filter((n): n is string => n !== null);
+    const found = assetForClips(names);
+    ok(found !== null, `${key} klip listesinden çözülemedi`);
+    eq(found!.assetKey, rec.assetKey, `${key} yanlış varlığa çözüldü:`);
+  }
+  /* Bilinmeyen klip kümesi `null` döner — patlamaz. */
+  eq(assetForClips(['YOK_BOYLE_KLIP']), null, 'bilinmeyen küme:');
+});
+
+test('§133 OYNATMA ORANI ayak kaymasını önler', () => {
+  /* Bir klibi doğal hızından farklı kullanmak zaman ölçeği ister:
+     oran = hedef / doğal. Fable\'in düzeltmesi. */
+  eq(playbackRate(75, 75), 1, 'aynı hız:');
+  ok(Math.abs(playbackRate(75, 115.8) - 0.648) < 0.01, 'gergedan koşu oranı');
+  ok(Math.abs(playbackRate(75, 54.0) - 1.389) < 0.01, 'Monster X koşu oranı');
+  /* AŞIRI oran KIRPILIR — Monster X yürüyüşüyle 75'e çıkmak 5,03×
+     gerektiriyor ve bozuk görünür. */
+  eq(playbackRate(75, 14.9), 2.0, 'aşırı oran kırpılmalı:');
+  eq(playbackRate(1, 132.4), 0.5, 'alt sınır:');
+  /* Hız bilinmiyorsa 1 döner, hesap patlamaz. */
+  eq(playbackRate(75, null), 1, 'hızsız klip:');
+  eq(playbackRate(75, 0), 1, 'sıfır hız:');
+});
+
+test('§133 HIZ SEÇİMİ: 75 için hangi klip', () => {
+  /* Oran 1'e en yakın olan klip seçilmeli — Monster X ve gergedan
+     KOŞUYU kullanır, yürüyüşle zorlanmaz. */
+  const mx = pickLocomotion(MOB_ASSETS['monsterx']!, 75);
+  eq(mx.clip, '04_RUN', 'Monster X 75\'te koşmalı:');
+  ok(mx.rate > 1 && mx.rate < 2, `Monster X oranı: ${mx.rate}`);
+
+  const rb = pickLocomotion(MOB_ASSETS['rhinobeast']!, 75);
+  eq(rb.clip, '04_RUN', 'gergedan 75\'te koşmalı:');
+  ok(rb.rate < 1, `gergedan oranı: ${rb.rate}`);
+
+  /* Yavaş hedefte YÜRÜYÜŞ seçilmeli. */
+  const slow = pickLocomotion(MOB_ASSETS['crab']!, 30);
+  eq(slow.clip, '03_WALK', 'yavaş hedefte yürüyüş:');
+
+  /* Yürüyemeyen varlık patlamaz. */
+  const spider = pickLocomotion(MOB_ASSETS['lavaspider']!, 75);
+  ok(spider.clip !== null, 'yürüyemeyen varlık için klip yok');
+});
+
+test('§134 SEVİYE BANDI: her seviyenin bir modeli var', () => {
+  /* Bantlar ÇAKIŞMAMALI ve BOŞLUK bırakmamalı. */
+  let prevMax = 0;
+  for (const b of MODEL_BANDS) {
+    eq(b.minLevel, prevMax + 1, `bant boşluğu/çakışması: ${b.minLevel}`);
+    ok(b.maxLevel >= b.minLevel, 'bant ters');
+    prevMax = b.maxLevel;
+  }
+  eq(prevMax, LEVELING.maxLevel, 'bantlar tavana kadar gitmeli:');
+
+  /* Oyundaki HER mob seviyesinin modeli olmalı. */
+  for (const s of FARM_AREA_SLOTS) {
+    const m = Content.monster(s.monsterRef);
+    if (!m) continue;
+    ok(assetForLevel(m.level) !== null, `Sv${m.level} modelsiz (${m.displayName})`);
+  }
+  /* Boy merdiveni: bant yükseldikçe silüet büyümeli. */
+  let prevH = 0;
+  for (const b of MODEL_BANDS) {
+    const rec = MOB_ASSETS[b.asset ?? ''];
+    if (!rec) continue;
+    if (b.minLevel > 2) {          // Sv1-2 örümcek boy sırasına girmez
+      ok(rec.heightMeters >= prevH, `boy merdiveni kırıldı: ${rec.displayName}`);
+      prevH = rec.heightMeters;
+    }
+  }
+});
+
+test('§134 ZİNDANDA KOVALAYAMAYAN MODEL KULLANILMAZ', () => {
+  /* Dalga oyuncuya gelmek zorunda; lav örümceği yürüyemiyor.
+     Kullanıcı kararı: yalnız açık dünyada. */
+  const spider = MOB_ASSETS['lavaspider']!;
+  eq(spider.canChase, false, 'örümcek kovalayabiliyor görünüyor:');
+  eq(assetForLevel(1)?.assetKey, spider.assetKey, 'açık dünyada Sv1 örümcek olmalı:');
+
+  /* Zindanda AYNI seviye başka bir modele düşmeli. */
+  const dungeon = dungeonAssetForLevel(1);
+  ok(dungeon !== null, 'zindanda Sv1 modelsiz kaldı');
+  eq(dungeon!.canChase, true, 'zindan modeli kovalayamıyor:');
+  ok(dungeon!.assetKey !== spider.assetKey, 'zindanda örümcek kullanılıyor');
+
+  /* Her seviye için zindan modeli KOVALAYABİLMELİ. */
+  for (let lv = 1; lv <= LEVELING.maxLevel; lv++) {
+    const rec = dungeonAssetForLevel(lv);
+    ok(rec !== null, `zindanda Sv${lv} modelsiz`);
+    eq(rec!.canChase, true, `zindanda Sv${lv} kovalayamıyor:`);
+  }
+});
+
+test('§134 ÖLÇEK: silüet hiyerarşisi korunur', () => {
+  for (const rec of Object.values(MOB_ASSETS)) {
+    const n = assetScaleFor(rec, 'NORMAL');
+    const a = assetScaleFor(rec, 'AGGRESSIVE');
+    const e = assetScaleFor(rec, 'ELITE');
+    ok(n > 0 && Number.isFinite(n), `${rec.displayName} ölçeği geçersiz`);
+    ok(e > a && a > n, `${rec.displayName} hiyerarşisi bozuk`);
+  }
+});
+
+test('§135 LİSANS künyeleri kodda TAŞINIYOR', () => {
+  /* Altı varlık CC-BY-4.0; oyunda GÖRÜNÜR künye zorunlu. */
+  const list = allAttributions();
+  eq(list.length, Object.keys(MOB_ASSETS).length, 'künye sayısı:');
+  for (const a of list) ok(a.includes('CC-BY'), `lisans adı eksik: ${a}`);
+  /* Goblin künyesi de duruyor olmalı. */
+  ok(KECOON_ATTRIBUTION.includes('CC-BY'), 'goblin künyesi kayıp');
+});
+
+test('§136 ÖNERİLEN GÜÇ GERÇEĞE YAKIN — risk etiketi yalan söylemesin', () => {
+  /* Eski formül mob statlarından tahmin yürütüyordu ve ölçümde
+     yalan çıktı: kat 3 için 65 diyordu, gerçekte 254 gerekiyordu.
+     "Güvenli" etiketiyle oyuncu dakikada bir ölüyordu. */
+  for (let f = 1; f <= 25; f++) {
+    const band = floorLevelBand(f);
+    const rec = recommendedPower(f);
+    const real = playerPowerAtLevel(band.max);
+    ok(Math.abs(rec - real) <= real * 0.1,
+      `kat ${f} önerisi gerçekten uzak: ${rec} vs ${real}`);
+  }
+  /* Öneri katla MONOTON artmalı. */
+  let prev = 0;
+  for (let f = 1; f <= 30; f++) {
+    const r = recommendedPower(f);
+    ok(r >= prev, `kat ${f} önerisi geriye gitti`);
+    prev = r;
+  }
+  /* Oyuncu eğrisi de monoton olmalı. */
+  let pp = 0;
+  for (let lv = 1; lv <= 50; lv++) {
+    const v = playerPowerAtLevel(lv);
+    ok(v >= pp, `oyuncu eğrisi Sv${lv}'te düştü`);
+    pp = v;
+  }
+});
+
+test('§136 KAT ADIMI oyuncunun kazanç hızına yakın', () => {
+  /* Beş seviyelik adım katları oyuncunun önüne geçiriyordu: bir kat
+     farm ederken ancak bir-iki seviye kazanılıyor. */
+  eq(FLOOR_LEVEL_STEP, 2, 'kat adımı:');
+  eq(floorLevelBand(1).min, 1, 'kat 1 alt:');
+  eq(floorLevelBand(1).max, 2, 'kat 1 üst:');
+  /* Kat sayısı tavanı kapsamalı. */
+  eq(floorLevelBand(MAX_DISTINCT_FLOOR).max, LEVELING.maxLevel, 'son kat:');
+  /* İki komşu kat arasındaki güç farkı MAKUL olmalı — oyuncu bir kat
+     farm ederek geçebilsin. */
+  for (let f = 1; f < 20; f++) {
+    const a = recommendedPower(f), b = recommendedPower(f + 1);
+    /* Eşik 1,7: en sert adım kat 1→2 (1,64) ve bu KO'nun kendi seviye
+       eğrisinin şeklinden gelir — ilk seviyeler en hızlı büyür. Sonraki
+       bütün adımlar 1,4'ün altında. */
+    ok(b <= a * 1.7, `kat ${f}→${f + 1} sıçraması sert: ${a} → ${b}`);
+  }
+});
+
+test('§137 SİLAH ACIMA SAYACI ilerlemeyi kilitlenmekten kurtarır', () => {
+  /* Oyun testi bulgusu: "bow çıkmadı, ilerleyemedim". Ölçüldü —
+     yirmi dakikada 32 ekipman düştü, HİÇBİRİ yay değildi. Okçuda
+     güç yaya bağlı olduğu için ilerleme tamamen kilitleniyordu. */
+  ok(WEAPON_PITY_LIMIT > 0 && WEAPON_PITY_LIMIT <= 15,
+    `acıma sınırı makul değil: ${WEAPON_PITY_LIMIT}`);
+  /* Havuzda silah OLMALI, yoksa daraltma boş küme verir. */
+  for (const lv of [5, 10, 20, 40]) {
+    ok(weaponsIn(poolFor(lv)).length > 0, `Sv${lv} havuzunda silah yok`);
+  }
+
+  /* CANLI: yeterince kill'de yay DÜŞMELİ. */
+  const S = protoState(9970);
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  let weapons = 0, equip = 0;
+  for (let i = 0; i < 900; i++) {
+    const m = S.mobs.mobs[i % S.mobs.mobs.length]!;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+    for (const { drop } of S.reapDead()) {
+      for (const r of drop.records) {
+        if (r.kind !== 'item') continue;
+        const d = definitionOf(r.itemRef);
+        if (!d) continue;
+        equip += 1;
+        if (d.category === 'weapon') weapons += 1;
+      }
+    }
+    m.ai = 'idle'; m.hp = m.maxHp; m.state = 'walk';
+  }
+  ok(equip > 0, 'senaryo ekipman düşürmedi');
+  ok(weapons > 0, `${equip} ekipman düştü, hiç silah yok — sayaç çalışmıyor`);
+  /* Sayaç bir GARANTİ değil, olasılık düzeltmesi: silah oranı
+     yuvaların payından (≈%10) belirgin biçimde YÜKSEK olmalı ama
+     her düşüş silah OLMAMALI. */
+  const ratio = weapons / equip;
+  ok(ratio > 0.08, `silah oranı hâlâ düşük: %${(ratio * 100).toFixed(1)}`);
+  ok(ratio < 0.6, `silah oranı fazla: %${(ratio * 100).toFixed(1)}`);
+});
+
+test('§138 DALGA ÖRTÜŞMESİ akışı kesmez', () => {
+  /* Ölçüldü: zindanda dakikada 5 kill, Moradon'da 30. Fark dalga
+     döngüsündeki ÖLÜ ZAMANDI — dalga bitiyor, sonraki doğuyor,
+     720 birim yürüyor, ancak sonra dövüş başlıyor. */
+  ok(WAVE_OVERLAP_THRESHOLD >= 0 && WAVE_OVERLAP_THRESHOLD < WAVE_MIN_COUNT,
+    `örtüşme eşiği makul değil: ${WAVE_OVERLAP_THRESHOLD}`);
+
+  const D = new DungeonSession(9980);
+  D.startNextWave();
+  const S = D.state;
+  ok(!D.waveThin, 'dolu dalga ince sayılıyor');
+  /* Bir tanesi hariç hepsini öldür → dalga İNCE sayılmalı. */
+  const wave = S.mobs.mobs.filter((m) => m.slotId.startsWith('wave_'));
+  for (const m of wave.slice(1)) { m.hp = 0; m.state = 'dying'; m.ai = 'idle'; }
+  S.reapDead();
+  ok(D.waveThin, 'incelen dalga fark edilmedi');
+  /* Sonraki dalga, önceki henüz temizlenmeden doğabilmeli. */
+  const before = S.mobs.mobs.length;
+  ok(D.startNextWave(), 'örtüşen dalga doğmadı');
+  ok(S.mobs.mobs.length > before, 'yeni dalga sahaya eklenmedi');
+});
+
+/* ================= P3.24 — ZİNDAN ARENASI ================= */
+console.log('P3.24 — ayrı zindan haritası:');
+
+test('§139 ARENA dalga bandını İÇERİDE tutuyor', () => {
+  /* Arena, doğuş bandını (`SPAWN_BAND_AHEAD` + `DEPTH`) kapsamak
+     zorunda; kapsamazsa moblar kenar payının dışında doğar ve içeri
+     giremez — dalga hiç gelmez. */
+  const northEdge = DUNGEON_SPAWN.y - SPAWN_BAND_AHEAD - SPAWN_BAND_DEPTH;
+  ok(northEdge >= DUNGEON_EDGE_MARGIN,
+    `dalga bandı arena dışında: ${northEdge} < ${DUNGEON_EDGE_MARGIN}`);
+  /* Yatayda da sığmalı. */
+  const half = SPAWN_BAND_WIDTH / 2;
+  ok(DUNGEON_SPAWN.x - half >= DUNGEON_EDGE_MARGIN, 'band batıdan taşıyor');
+  ok(DUNGEON_SPAWN.x + half <= DUNGEON_BOUNDS.width - DUNGEON_EDGE_MARGIN,
+    'band doğudan taşıyor');
+  /* Güneyde geri çekilme payı olmalı — oyuncu kaçabilsin. */
+  ok(DUNGEON_BOUNDS.height - DUNGEON_SPAWN.y > 300, 'geri çekilme payı yok');
+});
+
+test('§139 DOĞAN MOBLAR arena içinde', () => {
+  const D = new DungeonSession(9990);
+  eq(D.state.world.worldX, DUNGEON_SPAWN.x, 'zindan doğuş X:');
+  eq(D.state.world.worldY, DUNGEON_SPAWN.y, 'zindan doğuş Y:');
+  for (let w = 1; w <= 15; w++) {
+    const out = D.spawner.spawn(1, w);
+    for (const m of out.mobs) {
+      ok(dungeonStepAllowed(0, 0, m.worldX, m.worldY),
+        `mob arena dışında doğdu: ${Math.round(m.worldX)},${Math.round(m.worldY)}`);
+    }
+  }
+});
+
+test('§139 ARENA GÖRSELDİR — gameplay engel taşımaz', () => {
+  /* Salon duvarları Moradon ağaçları gibi: görsel katman gameplay'e
+     yazmaz (§26). */
+  eq(DUNGEON_WORLD.obstacles.length, 0, 'zindanda engel:');
+  /* Kenar payı içinde HER adım serbest olmalı. */
+  const c = DUNGEON_BOUNDS;
+  ok(dungeonStepAllowed(0, 0, c.width / 2, c.height / 2), 'merkez kapalı');
+  ok(!dungeonStepAllowed(0, 0, 0, c.height / 2), 'batı sınırı açık');
+  ok(!dungeonStepAllowed(0, 0, c.width, c.height / 2), 'doğu sınırı açık');
+  ok(!dungeonStepAllowed(0, 0, c.width / 2, 0), 'kuzey sınırı açık');
+  /* Ortam modeli manifestte olmalı. */
+  ok(PROTO_MODELS[DUNGEON_ENV.modelKey] !== undefined, 'zindan salonu manifestte yok');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

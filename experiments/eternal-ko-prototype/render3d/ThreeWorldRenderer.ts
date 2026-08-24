@@ -25,7 +25,7 @@
  *  · Animasyon karıştırıcısı P2.0'da yoktur; primitive görseller (§28) */
 import {
   AmbientLight, BoxGeometry, CapsuleGeometry, Color, ConeGeometry, CylinderGeometry,
-  DirectionalLight, DoubleSide, GridHelper, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial,
+  DirectionalLight, DoubleSide, GridHelper, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial,
   InstancedMesh, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster,
   RepeatWrapping, Texture,
   Matrix4, RingGeometry, Scene, SphereGeometry, Vector2, Vector3, Vector4, WebGLRenderer,
@@ -36,6 +36,7 @@ import { facingToYaw } from './coords.js';
 import { usesGoblinModel } from '../data/kecoon-model.js';
 import { MAX_MOB_VISUALS, MOB_DRAW_DISTANCE } from '../data/mob-draw-distance.js';
 import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
+import { DUNGEON_ENV } from '../data/dungeon-world.js';
 import {
   QUALITY_PROFILES, effectivePixelRatio,
   type QualityLevel, type QualityProfile,
@@ -457,6 +458,84 @@ export class ThreeWorldRenderer {
     this.rebuildMobVisuals();
   }
 
+  /* ═══════════════ P3.20 — ZİNDAN ORTAMI (ayrı harita görünümü) ═══════════════
+     Su-taş salon modeli + koyu zemin/gök. TAMAMEN GÖRSEL: WorldFrame'e
+     yazılmaz, collision'a girmez (§26). Model yüklenemezse zindan yalnız
+     renk değişimiyle oynanmaya devam eder — gameplay kaybı YOKTUR. */
+  private dungeonEnv: Group | null = null;
+  private dungeonMode = false;
+
+  attachDungeonEnv(glb: LoadedGlb): void {
+    this.detachDungeonEnv();
+    const g = glb.scene;
+    g.scale.set(DUNGEON_ENV.scale, DUNGEON_ENV.scale, DUNGEON_ENV.scale);
+    g.rotation.y = (DUNGEON_ENV.yawDeg * Math.PI) / 180;
+    g.position.set(DUNGEON_ENV.x,
+      groundElevationAt(DUNGEON_ENV.x, DUNGEON_ENV.y), DUNGEON_ENV.y);
+    /* Sketchfab dışa aktarımı DOKUSUZ ve kaynak paleti ÇİĞ CAMGÖBEĞİ:
+       zemin örtüsü (Carpet), bayraklar ve ışıyan öğeler cyan geliyor,
+       sahneyi boyuyor. Bağlama anında oyunun paletine çekilir: örtü koyu
+       "durgun su" tonuna (su-taş teması), bayraklar bordoya, ışıyanlar
+       meşale sıcağına. Kaynak DOSYAYA dokunulmaz (P2.1 asset override
+       kuralı) — düzeltme yalnız çalışma anındaki malzeme örneğinde. */
+    const MAT_FIX: Record<string, { color: number; emissive?: number; intensity?: number }> = {
+      Carpet: { color: 0x16333b },
+      Cloth_flag: { color: 0x6a2424 },
+      Wood_elment_emissive: { color: 0x3a2a18, emissive: 0xd8892a, intensity: 0.5 },
+    };
+    g.traverse((o) => {
+      o.receiveShadow = true;
+      const mesh = o as Mesh;
+      const mats = Array.isArray(mesh.material) ? mesh.material : (mesh.material ? [mesh.material] : []);
+      for (const m of mats) {
+        const std = m as MeshStandardMaterial;
+        const fix = MAT_FIX[m.name];
+        if (fix) {
+          if (std.color) std.color.setHex(fix.color);
+          if (std.emissive) std.emissive.setHex(fix.emissive ?? 0x000000);
+          /* Vendored tip tanımında `emissiveIntensity` kırpılmış; çalışma
+             anında var. Tip kapısını index erişimiyle aşarız. */
+          const ei = std as unknown as { emissiveIntensity?: number };
+          if (typeof ei.emissiveIntensity === 'number') {
+            ei.emissiveIntensity = fix.intensity ?? 0;
+          }
+        }
+      }
+    });
+    g.name = 'dungeon_env';
+    g.visible = this.dungeonMode;
+    this.scene.add(g);
+    this.dungeonEnv = g;
+  }
+
+  detachDungeonEnv(): void {
+    if (this.dungeonEnv) { this.scene.remove(this.dungeonEnv); this.dungeonEnv = null; }
+  }
+
+  get dungeonEnvAvailable(): boolean { return this.dungeonEnv !== null; }
+
+  /** Zindan görünümünü aç/kapa. Idempotent — Scene her karede çağırabilir.
+   *  Açıkken: salon görünür, bitki örtüsü gizlenir, zemin/gök koyulaşır. */
+  setDungeonMode(on: boolean): void {
+    if (this.dungeonMode === on) return;
+    this.dungeonMode = on;
+    if (this.dungeonEnv) this.dungeonEnv.visible = on;
+    for (const inst of this.foliage.values()) inst.visible = !on;
+    if (this.groundMat) {
+      /* Moradon'a dönüşte: doku bağlıysa beyaz çarpan (P2.18 kuralı),
+         yoksa eski düz yeşil. */
+      this.groundMat.color.setHex(on ? DUNGEON_ENV.groundColor
+        : (this.groundTex ? 0xffffff : 0x38472b));
+      /* Moradon zemin dokusu zindanda ÇIKAR — taş salonda çayır dokusu
+         olmaz. Kapanışta doku yeniden bağlanmaz (renk yeterli); Moradon'a
+         dönüşte main.ts'in bağladığı doku haritası materyalde durur. */
+      if (on) { this.groundMat.map = null; }
+      else if (this.groundTex) { this.groundMat.map = this.groundTex; }
+      this.groundMat.needsUpdate = true;
+    }
+    this.scene.background = new Color(on ? DUNGEON_ENV.backgroundColor : 0x1d2417);
+  }
+
   get usingKecoon(): boolean { return this.kecoonFactory !== null; }
 
   attachMutant(glb: LoadedGlb): MutantRigFactory {
@@ -640,6 +719,8 @@ export class ThreeWorldRenderer {
    *  Renk çarpanı beyaza çekilir, yoksa doku yeşil filtreden geçer. */
   private groundMat: MeshLambertMaterial | null = null;
 
+  private groundTex: Texture | null = null;
+
   applyGroundTexture(image: TexImageSource, worldSize = 5120, tile = 260): boolean {
     if (!this.groundMat) return false;
     const tex = new Texture(image as unknown as HTMLImageElement);
@@ -648,6 +729,7 @@ export class ThreeWorldRenderer {
     tex.repeat.set(worldSize / tile, worldSize / tile);
     tex.needsUpdate = true;
     this.groundMat.map = tex;
+    this.groundTex = tex;
     /* P2.18 — doku ARTIK KENDİ RENGİNİ TAŞIYOR (çim/toprak). Eskiden
        çıplak kaya dokusu vardı ve yeşile boyanıyordu; artık boyamaya
        gerek yok, beyaz çarpan dokuyu olduğu gibi gösterir. */

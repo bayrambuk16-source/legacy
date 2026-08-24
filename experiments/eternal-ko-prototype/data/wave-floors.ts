@@ -34,15 +34,19 @@ export interface WavePlan {
  *
  *  Mob sayısı dalga ile ARTAR ama TAVANLIDIR: çizim tavanımız 30 görsel
  *  (`MAX_MOB_VISUALS`) ve mobil performansı bunun üstünü kaldırmaz. */
-/** ═══ P3.11 — İLK DALGALAR SEYREK ═══
- *  Ölçüldü: üç mobla başlayan kat 1, Sv1 karakteri iki dakikada
- *  DOKUZ KEZ öldürüyordu. Üç mobun aynı anda saldırması 38 canlı bir
- *  başlangıç karakteri için fazla.
+/** ═══ P3.23 — DALGA BOYU YENİDEN AÇILDI ═══
+ *  P3.11'de tek moba indirilmişti çünkü kat 1 Sv1-5 bandındaydı ve
+ *  üç mob başlangıç karakterini eziyordu. Kat adımı ikiye inince
+ *  (`FLOOR_LEVEL_STEP`) kat 1 artık Sv1-2; üç zayıf mob sorun değil
+ *  ve kill hacmi üç katına çıkıyor.
  *
- *  Bir mobla başlar, üçüncü dalgada ikiye, altıncıda üçe çıkar.
- *  Oyuncu ısınarak girer; tempo hâlâ artar. */
-export const WAVE_MIN_COUNT = 1;
+ *  Bu, ölçülen asıl darboğazın çözümü: dalga başına mob sayısı. */
+export const WAVE_MIN_COUNT = 3;
 export const WAVE_MAX_COUNT = 12;
+
+/** Sahadaki dalga bu kadar veya daha az canlıya inince SONRAKİ dalga
+ *  doğar. Yürüyüş süresi dövüşle örtüşür; akış kesilmez. */
+export const WAVE_OVERLAP_THRESHOLD = 1;
 export const ELITE_EVERY = 5;
 export const BOSS_EVERY = 25;
 
@@ -61,8 +65,17 @@ export function planWave(waveIndex: number): WavePlan {
  *  Kat 1 Sv1-5, sonra her kat beş seviye yukarı. Kat 10'da Sv46-50,
  *  yani mevcut mob havuzunun tepesi. Kat 10'dan sonra mob aynı kalır,
  *  yalnız `statMult` büyür — kullanıcı kararı: yeni mob eklenmeyecek. */
-export const FLOOR_LEVEL_STEP = 5;
-export const MAX_DISTINCT_FLOOR = 10;
+/** ═══ P3.22 — KAT ADIMI 5'TEN 2'YE ═══
+ *
+ *  Ölçüldü: her kat mob seviyesini BEŞ artırıyordu ama oyuncu bir katı
+ *  farm ederken ancak bir-iki seviye kazanıyordu. Katlar oyuncuyu
+ *  geride bırakıyor, kat 3'te (Sv11-15) Sv6 bir karakter kilitleniyordu
+ *  — otuz dakikalık oturumda 15. dakikadan sonra HİÇ kill yok.
+ *
+ *  İki seviyelik adım, oyuncunun kazanç hızına yakın. Kat sayısı 10'dan
+ *  25'e çıkar; her kat daha kısa ve NEXT daha sık anlamlı olur. */
+export const FLOOR_LEVEL_STEP = 2;
+export const MAX_DISTINCT_FLOOR = 25;
 
 export function floorLevelBand(floor: number): { min: number; max: number } {
   const f = Math.max(1, Math.min(MAX_DISTINCT_FLOOR, floor));
@@ -94,13 +107,21 @@ export function floorMonsters(floor: number): number[] {
 
 /** ═══ ÖDÜL ÖLÇEĞİ ═══
  *
- *  Kullanıcı kararı: dalga modu ödülü normal haritanın YARISI.
- *  EXP ve coin'e uygulanır; DROP ŞANSINA UYGULANMAZ.
+ *  ═══ P3.23 — YARIM ÖDÜL KALDIRILDI ═══
+ *  İlk tasarımda ödül normal haritanın yarısıydı. Otuz dakikalık
+ *  ölçüm bunun modu geride bıraktığını gösterdi:
  *
- *  Gerekçe: drop zaten seyrek (üst bantta %3). Yarıya inerse üst
- *  katlarda saatlerce hiçbir şey düşmez ve mod ölü hisseder. Bunun
- *  yerine düşen eşyanın KADEMESİ bir bant aşağıdadır. */
-export const WAVE_REWARD_MULT = 0.5;
+ *      Moradon 30 dk → Sv10 · 908 kill · sıfır ölüm
+ *      Zindan  30 dk → Sv 9 · 153 kill · on üç ölüm
+ *
+ *  Seviye yakın ama KİLL HACMİ altıda bir; yani ganimet, altın ve
+ *  parşömen de altıda bir. Zindanın amacı yükseltme malzemesi
+ *  toplamaktı, o yüzden bu fark modu anlamsız kılıyordu.
+ *
+ *  Kullanıcı kararı: Moradon'la aynı seviyeye getir. Ödül çarpanı
+ *  1.0 oldu; zindanın dengesi artık ölüm riskiyle kurulur, ödül
+ *  kısıntısıyla değil. */
+export const WAVE_REWARD_MULT = 1.0;
 
 /** ═══ COIN ═══
  *
@@ -140,21 +161,52 @@ export function trophyValue(floor: number): number {
  *  Ölçü: bir mobu makul sürede öldürebilmek ve birkaç vuruşa
  *  dayanabilmek. `combatPower` ile AYNI birimde olması için aynı
  *  karekök yapısı kullanılır. */
-export function recommendedPower(floor: number): number {
-  const refs = floorMonsters(floor);
-  const mult = floorStatMult(floor);
-  let hp = 0, atk = 0, n = 0;
-  for (const r of refs) {
-    const m = Content.monster(r);
-    if (!m) continue;
-    hp += m.hp * mult; atk += m.attack * mult; n += 1;
+/** ═══ P3.22 — ÖNERİ OYUNCU EĞRİSİNDEN TÜRER ═══
+ *
+ *  Önceki formül mob statlarından tahmin yürütüyordu ve ÖLÇÜMDE
+ *  yalan söylediği görüldü:
+ *
+ *      kat 3 → öneri 65 · gerçek gereken 254
+ *      kat 5 → öneri 232 · gerçek gereken 459
+ *
+ *  Yani risk etiketi "Güvenli" derken oyuncu dakikada bir ölüyordu.
+ *  Otuz dakikalık oturumda oyuncu kat 3'te kilitlendi: 15. dakikadan
+ *  sonra HİÇ kill yok, yalnız ölüm.
+ *
+ *  Artık öneri ÖLÇÜLEN oyuncu eğrisinden gelir: bandın tepesindeki
+ *  seviyeye uygun +1 ekipmanlı bir karakterin gücü. Tablo tek tek
+ *  ölçüldü, formülle uydurulmadı. */
+const PLAYER_POWER_CURVE: ReadonlyArray<readonly [number, number]> = [
+  [1, 25], [5, 70], [10, 129], [15, 254], [20, 394],
+  [25, 459], [30, 574], [40, 756], [50, 973],
+];
+
+/** Bir seviyedeki iyi donanımlı oyuncunun gücü — tablo arası
+ *  doğrusal geçiş. */
+export function playerPowerAtLevel(level: number): number {
+  const c = PLAYER_POWER_CURVE;
+  if (level <= c[0]![0]) return c[0]![1];
+  for (let i = 1; i < c.length; i++) {
+    const [l1, p1] = c[i]!;
+    if (level <= l1) {
+      const [l0, p0] = c[i - 1]!;
+      const t = (level - l0) / (l1 - l0);
+      return Math.round(p0 + (p1 - p0) * t);
+    }
   }
-  if (n === 0) return 1;
-  const avgHp = hp / n, avgAtk = atk / n;
-  /* Oyuncunun mobu ~8 vuruşta indirmesi ve ~10 vuruşa dayanması
-     hedeflenir; ikisinin karekök çarpımı `combatPower` ile aynı
-     ölçekte durur. */
-  return Math.max(1, Math.round(1.35 * Math.sqrt((avgHp / 8) * (avgAtk * 10))));
+  /* Tablonun ötesi: son iki nokta arasındaki eğimle uzatılır. */
+  const [lA, pA] = c[c.length - 2]!;
+  const [lB, pB] = c[c.length - 1]!;
+  return Math.round(pB + ((pB - pA) / (lB - lA)) * (level - lB));
+}
+
+export function recommendedPower(floor: number): number {
+  const band = floorLevelBand(floor);
+  /* Bandın TEPESİ ölçüt: oyuncu o seviyedeki mobları rahat
+     öldürebilmeli. Kat 10'un ötesinde mob değişmez, çarpan büyür —
+     öneri de aynı oranda büyür. */
+  const base = playerPowerAtLevel(band.max);
+  return Math.max(1, Math.round(base * floorStatMult(floor)));
 }
 
 /* ═══════════════ ZİNDAN DROPLARI ═══════════════ */
@@ -168,14 +220,24 @@ export function recommendedPower(floor: number): number {
  *  Normal harita ETKİLENMEZ — orada droplar +0 gelmeye devam eder. */
 export const DUNGEON_DROP_UPGRADE = 1;
 
-/** Zindanda düşen eşyanın KADEMESİ bir bant aşağıdadır.
+/** ═══ P3.22 — KADEME CEZASI KALDIRILDI ═══
  *
- *  Kullanıcı kararı ödülün yarıya inmesiydi; drop ŞANSINI yarıya
- *  indirmek yerine kademeyi düşürüyoruz. Sebep ölçüldü: üst bantta
- *  drop zaten %3; yarıya inerse üst katlarda saatlerce hiçbir şey
- *  düşmez ve mod ölü hisseder. Böylece oyuncu eşya alır ama en iyisini
- *  normal haritada aramaya devam eder. */
-export const DUNGEON_TIER_PENALTY = 5;
+ *  Bu ceza BENİM eklediğim bir fikirdi (kullanıcı kararı değildi) ve
+ *  otuz dakikalık oturumda modu ÇÖKERTTİĞİ ölçüldü:
+ *
+ *      30 dk → Sv8 · kat 2 · 18 ölüm · AP 8'de SABİT
+ *
+ *  Zincir şuydu: kat 1'in mobları Sv1-5; eksi beş kademe yapınca havuz
+ *  yalnız kademe 1'e iniyor — katalogdaki en zayıf eşyalar. Oyuncu
+ *  zindanda DAHA İYİ BİR YAY ASLA BULAMIYOR.
+ *
+ *  KO formülünde DEX yay hasarıyla ÇARPILIR (`0.005×BowAP×(DEX+40)+…`);
+ *  yay 8'de kalınca puan dağıtmak da işe yaramıyor. Güç artmıyor → kat
+ *  çıkılamıyor → daha iyi eşya düşmüyor. Kapalı döngü.
+ *
+ *  Ödül yarıya inişi EXP ve COIN'de KALIR; ekipman artık mobun kendi
+ *  seviyesinden düşer. Zindan bir ilerleme yolu olmalı, çıkmaz değil. */
+export const DUNGEON_TIER_PENALTY = 0;
 
 /** Zindanda bir mobun ganimet havuzu için kullanılacak "sanal seviye". */
 export function dungeonLootLevel(monsterLevel: number): number {

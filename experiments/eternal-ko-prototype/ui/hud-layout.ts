@@ -124,6 +124,16 @@ export function hudSkillBoxes(): UiSprite[] {
 /** "Hedef" düğmesi — skill çemberinin sol üstü. Kaynak 180×191. */
 export const HUD_TARGET_BTN = sprite('ui_target_btn', 806, 936, 92, 180 / 191);
 
+/* ───────────────────────── iksir hızlı kullanım (P2.33) ───────────────────────── */
+
+/** HP/MP iksir düğmeleri. Joystick'in HEMEN ÜSTÜNDE dururlar: başparmak
+ *  joystick'ten kalkmadan tek dokunuşla erişilir. Alt kenarları joystick
+ *  bölgesine (y > %66) sarkar; dokunma önceliği Scene'de düğmelere verilir.
+ *  Kaynak 110×116 (`ui_btn_potion`); MP aynı çerçeveyi kullanır, rozet
+ *  rengi ayrıştırır. */
+export const HUD_POTION_HP = sprite('ui_btn_potion', 40, 1030, 104, 110 / 116);
+export const HUD_POTION_MP = sprite('ui_btn_potion', 168, 1030, 104, 110 / 116);
+
 /** Sayfa noktaları (1..8). Kaynak 520×73. */
 export const HUD_PAGE_DOTS = sprite('ui_page_dots', 566, 1348, 310, 520 / 73);
 
@@ -175,7 +185,7 @@ export const HUD_EXP_TEXT = {
 export function hudSpriteKeys(): string[] {
   return [
     HUD_PLAYER_CARD.key, HUD_TARGET_CARD.key, HUD_GENIE.key, HUD_SETTINGS.key,
-    HUD_TARGET_BTN.key, HUD_PAGE_DOTS.key, HUD_EXP_BAR.key, HUD_CAMERA_BTN.key,
+    HUD_TARGET_BTN.key, HUD_POTION_HP.key, HUD_POTION_MP.key, HUD_PAGE_DOTS.key, HUD_EXP_BAR.key, HUD_CAMERA_BTN.key,
     HUD_DUNGEON_BTN.key,
     'ui_joy_base', 'ui_joy_knob',
     ...hudSkillBoxes().map((s) => s.key),

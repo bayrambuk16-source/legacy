@@ -62,6 +62,16 @@ export const ITEM_ICONS: Readonly<Record<number, string>> = {
   379006000: 'item_yasam_tasi',
   389011000: 'item_yasam_suyu',
   389016000: 'item_ruh_iksiri',
+  /* P2.33 — kalan yedi iksirin ikonları. İki kaynak şişeden (yasam_suyu,
+     ruh_iksiri) sıvı rengi kaydırılarak türetildi; şişe/mantar aynı kaldı.
+     HP ailesi yuvarlak, MP ailesi uzun şişedir — çantada tek bakışta ayrışır. */
+  389012000: 'item_sevgi_suyu',
+  389013000: 'item_zarafet_suyu',
+  389014000: 'item_lutuf_suyu',
+  389020000: 'item_can_iksiri',
+  389017000: 'item_zihin_iksiri',
+  389018000: 'item_bilgelik_iksiri',
+  389019000: 'item_irfan_iksiri',
 };
 
 /** Manifest yolları — `PROTO_ASSETS` bunları yükler. */
@@ -106,6 +116,13 @@ export const ITEM_ICON_PATHS: Readonly<Record<string, string>> = {
   item_yasam_tasi: 'assets/ui/items/yasam_tasi.webp',
   item_yasam_suyu: 'assets/ui/items/yasam_suyu.webp',
   item_ruh_iksiri: 'assets/ui/items/ruh_iksiri.webp',
+  item_sevgi_suyu: 'assets/ui/items/sevgi_suyu.webp',
+  item_zarafet_suyu: 'assets/ui/items/zarafet_suyu.webp',
+  item_lutuf_suyu: 'assets/ui/items/lutuf_suyu.webp',
+  item_can_iksiri: 'assets/ui/items/can_iksiri.webp',
+  item_zihin_iksiri: 'assets/ui/items/zihin_iksiri.webp',
+  item_bilgelik_iksiri: 'assets/ui/items/bilgelik_iksiri.webp',
+  item_irfan_iksiri: 'assets/ui/items/irfan_iksiri.webp',
 };
 
 /** Bir eşyanın ikon anahtarı. Yoksa `null` — çağıran slot ikonuna düşer. */

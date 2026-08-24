@@ -68,6 +68,13 @@ export const UI_ASSETS: Record<string, string> = {
   item_yasam_tasi: 'assets/ui/items/yasam_tasi.webp',
   item_yasam_suyu: 'assets/ui/items/yasam_suyu.webp',
   item_ruh_iksiri: 'assets/ui/items/ruh_iksiri.webp',
+  item_sevgi_suyu: 'assets/ui/items/sevgi_suyu.webp',
+  item_zarafet_suyu: 'assets/ui/items/zarafet_suyu.webp',
+  item_lutuf_suyu: 'assets/ui/items/lutuf_suyu.webp',
+  item_can_iksiri: 'assets/ui/items/can_iksiri.webp',
+  item_zihin_iksiri: 'assets/ui/items/zihin_iksiri.webp',
+  item_bilgelik_iksiri: 'assets/ui/items/bilgelik_iksiri.webp',
+  item_irfan_iksiri: 'assets/ui/items/irfan_iksiri.webp',
   /* P2.18 — zemin dokusu (GEÇİCİ, sonra değişecek).
      Kullanıcının ürettiği çim/toprak dokusu. Tileable olduğu ÖLÇÜLEREK
      doğrulandı: sol-sağ kenar farkı 13,9 ve üst-alt 13,1; dokunun kendi
@@ -183,6 +190,21 @@ export const PROTO_MODELS: Record<string, string> = {
      kullanmaya devam eder — silüet farkı seviye bandını okutur.
      LİSANS: mesh CC-BY-4.0 / RapidAssets, GÖRÜNÜR künye zorunlu. */
   kecoon_glb: 'assets/models/kecoon_goblin_mobile_v1.glb',
+  /* P3.21 — beş yeni mob modeli. Klip adları ve hızlar
+     `data/mob-assets.ts` içinde manifestten birebir kayıtlı.
+     LİSANS: hepsi CC-BY-4.0, GÖRÜNÜR künye zorunlu. */
+  crab_glb: 'assets/models/crab_mobile_v1.glb',
+  monsterx_glb: 'assets/models/monsterx_mobile_v1.glb',
+  rhinobeast_glb: 'assets/models/rhinobeast_mobile_v1.glb',
+  spikebeast_glb: 'assets/models/spikebeast_mobile_v1.glb',
+  lavaspider_glb: 'assets/models/lavaspider_mobile_v1.glb',
+  /* P3.20 — ZİNDAN ORTAM MODELİ (su-taş salon). 1 660 512 bayt,
+     34 067 üçgen, dokusuz (7 düz PBR malzeme), animasyonsuz statik sahne.
+     Kaynak: Sketchfab dışa aktarımı, kullanıcı yüklemesi
+     ("game_level_design_-_water_stone_dungeon"). LİSANS: kaynak sayfadaki
+     lisans künyesi DOLDURULMALI (yazar/lisans bilinmiyor); yayın öncesi
+     görünür künye zorunlu. Dosya YENİDEN OPTİMİZE EDİLMEDİ. */
+  dungeon_env_glb: 'assets/models/water_stone_dungeon_v1.glb',
 
   /* ═══════════ P2.11 — DOĞA VARLIKLARI ═══════════
      Kaynak: Stylized Nature MegaKit (68 model). Yalnız 7 aile alındı;
