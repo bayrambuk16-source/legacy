@@ -61,6 +61,7 @@ import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import { NON_GEAR_COLOR, nonGearInfo } from '../ui/non-gear-info.js';
 import { itemIconKey } from '../data/item-icons.js';
 import { upgradeGlow } from '../data/upgrade-glow.js';
+import { displayQuality } from '../data/moradon-loot-pool.js';
 import {
   GATE_ALPHA, GATE_COLOR, gateBadge, skillGate, skillIconKey, skillInitial,
   type SkillGateState,
@@ -2616,7 +2617,9 @@ export class WorldPrototypeScene implements Scene {
          kalite şeridi çizer. */
       if (!art) g.rect(r.x, r.y, r.w, r.h, '#1a1610');
       if (on) g.rect(r.x, r.y, r.w, r.h, '#2c2417', 0.55);
-      if (v.itemClass) g.rect(r.x, r.y, r.w, 2, ITEM_CLASS_COLOR[v.itemClass]);
+      /* Ekipman yuvası kalite şeridi — kademeden türeyen renk. */
+      const eqDef = v.definitionRef !== null ? definitionOf(v.definitionRef) : undefined;
+      if (eqDef) g.rect(r.x, r.y, r.w, 2, ITEM_CLASS_COLOR[displayQuality(eqDef)]);
       /* P2.24 — etiket yuvanın ÜSTÜNDEKİ şeritte (maketin ayırdığı yer),
          ikon yuvanın ortasında. Eskiden ikisi de kutunun içindeydi ve
          item adı ikonla çakışıyordu. */
@@ -2624,7 +2627,7 @@ export class WorldPrototypeScene implements Scene {
         { align: 'center', size: 9, color: '#8d8272' });
       if (v.definition) {
         this.drawItemIcon(g, v.definition.definitionRef, r.x + r.w / 2, r.y + r.h / 2,
-          r.w - 12, ITEM_CLASS_COLOR[v.definition.itemClass]);
+          r.w - 12, ITEM_CLASS_COLOR[displayQuality(v.definition)]);
         /* ═══ P2.39 — YÜKSELTME PARILTISI ═══
            Tam takımı +7 yapmak 114 390 altın ve 110 parşömen istiyor
            ama kazanılan şey ekranda hiç görünmüyordu. +3'e kadar her
@@ -2653,7 +2656,7 @@ export class WorldPrototypeScene implements Scene {
       if (on) g.rect(c.x, c.y, c.w, c.h, '#2c2417', 0.55);
       if (!e) continue;
       const def = definitionOf(e.itemRef);
-      const col = def ? ITEM_CLASS_COLOR[def.itemClass] : '#6f655a';
+      const col = def ? ITEM_CLASS_COLOR[displayQuality(def)] : '#6f655a';
       g.rect(c.x, c.y, c.w, 2, col);
       /* P2.24 — GERÇEK İKON. Yoksa eski renkli daireye düşülür;
          katalog büyüdükçe ikonlar sonradan eklenebilsin diye. */
@@ -3276,9 +3279,9 @@ export class WorldPrototypeScene implements Scene {
       const def = definitionOf(e.itemRef)!;
       const on = this.forgeSel === e.instanceId;
       g.rect(r.x, r.y, r.w, r.h, on ? '#2c2417' : '#141009', 0.95);
-      g.rect(r.x, r.y, 3, r.h, ITEM_CLASS_COLOR[def.itemClass]);
+      g.rect(r.x, r.y, 3, r.h, ITEM_CLASS_COLOR[displayQuality(def)]);
       g.text(e.upgradeLevel > 0 ? `${def.displayName} +${e.upgradeLevel}` : def.displayName,
-        r.x + 14, r.y + 8, { size: 12, bold: true, color: ITEM_CLASS_COLOR[def.itemClass] });
+        r.x + 14, r.y + 8, { size: 12, bold: true, color: ITEM_CLASS_COLOR[displayQuality(def)] });
       const pv = forgePreview(e.upgradeLevel);
       g.text(pv.atMax ? 'tavan' : `+${pv.to} · %${Math.round(pv.chance * 100)}`,
         r.x + r.w - 14, r.y + 16,
@@ -3303,7 +3306,7 @@ export class WorldPrototypeScene implements Scene {
       const def = definitionOf(sel.itemRef)!;
       const pv = forgePreview(sel.upgradeLevel);
       g.text(`${def.displayName} +${sel.upgradeLevel} → +${pv.to}`, B.x + 14, B.y + 14,
-        { size: 13, bold: true, color: ITEM_CLASS_COLOR[def.itemClass] });
+        { size: 13, bold: true, color: ITEM_CLASS_COLOR[displayQuality(def)] });
       if (pv.atMax) {
         g.text('Bu eşya kaynak eğrisinin tavanında — denenemez.', B.x + 14, B.y + 42,
           { size: 11, color: '#8d8272' });
@@ -3447,12 +3450,12 @@ export class WorldPrototypeScene implements Scene {
       const price = this.S.autoGear.sellPrice(inst);
       g.rect(r.row.x, r.row.y, r.row.w, r.row.h, '#141009', 0.95);
       g.rect(r.row.x, r.row.y, 3, r.row.h,
-        def ? ITEM_CLASS_COLOR[def.itemClass] : '#3a3128');
+        def ? ITEM_CLASS_COLOR[displayQuality(def)] : '#3a3128');
       const name = def
         ? (inst.upgradeLevel > 0 ? `${def.displayName} +${inst.upgradeLevel}` : def.displayName)
         : `#${inst.itemRef}`;
       g.text(name, r.row.x + 14, r.row.y + 10,
-        { size: 12, bold: true, color: def ? ITEM_CLASS_COLOR[def.itemClass] : '#8d8272' });
+        { size: 12, bold: true, color: def ? ITEM_CLASS_COLOR[displayQuality(def)] : '#8d8272' });
       g.text(`${price} altın`, r.row.x + 14, r.row.y + 30, { size: 10, color: '#8d8272' });
       for (const [b, label, col] of [
         [r.keep, 'TUT', '#7fa85c'], [r.sell, 'SAT', '#e08a3c'],
@@ -3541,7 +3544,7 @@ export class WorldPrototypeScene implements Scene {
         lines.push({ t: 'Kuşanılamaz', c: '#8d8272', s: 10 });
       } else {
         const st = resolveStats(def);
-        lines.push({ t: `${def.displayName}  +0`, c: ITEM_CLASS_COLOR[def.itemClass] });
+        lines.push({ t: `${def.displayName}  +0`, c: ITEM_CLASS_COLOR[displayQuality(def)] });
         lines.push({ t: `${ITEM_CLASS_LABEL[def.itemClass]} · Sv ${def.requiredLevel}`
           + ` · ${def.equipSlot}`, c: '#8d8272', s: 10 });
         if (st.attack) lines.push({ t: `Saldırı  ${st.attack}`, c: '#e8e0d0', s: 11 });
@@ -3565,7 +3568,7 @@ export class WorldPrototypeScene implements Scene {
     const y = 962 - h - 8;
     g.rect(x, y, w, h, '#100d08', 0.92);
     g.rect(x, y, w, 2, itemRef !== null && itemDefinition(itemRef)
-      ? ITEM_CLASS_COLOR[itemDefinition(itemRef)!.itemClass] : '#4a3f30');
+      ? ITEM_CLASS_COLOR[displayQuality(itemDefinition(itemRef)!)] : '#4a3f30');
     lines.forEach((l, i) => {
       g.text(l.t, x + 10, y + 14 + i * 15, { size: l.s ?? 13, color: l.c, bold: i === 0 });
     });
@@ -3625,7 +3628,7 @@ export class WorldPrototypeScene implements Scene {
       const rst = Object.entries(st.resist).filter(([, v]) => v > 0)
         .map(([k, v]) => `r-${k} ${v}`);
       if (rst.length) parts.push(rst.join('/'));
-      line(`${s.label.padEnd(10)} ${d.displayName}  +${s.upgradeLevel}`, ITEM_CLASS_COLOR[d.itemClass]);
+      line(`${s.label.padEnd(10)} ${d.displayName}  +${s.upgradeLevel}`, ITEM_CLASS_COLOR[displayQuality(d)]);
       line(`           [${ITEM_CLASS_LABEL[d.itemClass]}] #${s.instanceId} · def ${d.definitionRef}`
         + ` · kaynak ${d.source.sourceRef} · ${parts.join(' · ')}`, '#8d8272', 8);
     }
@@ -3678,7 +3681,7 @@ export class WorldPrototypeScene implements Scene {
         + ` · ${Math.round(l.worldX)},${Math.round(l.worldY)} · d${d}`
         + ` · ${l.life.toFixed(1)}/${l.lifetimeSec}s`
         + ` · kaynak mob #${l.sourceMobUid} n${l.sourceGeneration}`,
-      def ? ITEM_CLASS_COLOR[def.itemClass]
+      def ? ITEM_CLASS_COLOR[displayQuality(def)]
         : d <= this.S.worldLoot.tuning.pickupRadius ? '#7fa85c' : '#cfc7b6');
     }
     if (this.S.worldLoot.count > list.length) {

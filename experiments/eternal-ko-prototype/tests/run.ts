@@ -74,7 +74,8 @@ import { LEVELING } from '../../../src/game/config.js';
 import {
   EQUIP_DROP_CHANCE, HIGH_TIER_EQUIP_CHANCE, HIGH_TIER_MONSTER_LEVEL,
   HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF, equipChanceFor,
-  WEAPON_PITY_LIMIT, itemTierLevel, pickFromPool, poolFor, slotCoverage, weaponsIn,
+  QUALITY_HIGH_TIER, QUALITY_MIDDLE_TIER, WEAPON_PITY_LIMIT, displayQuality,
+  itemTierLevel, pickFromPool, poolFor, qualityForTier, slotCoverage, weaponsIn,
 } from '../data/moradon-loot-pool.js';
 import {
   FIXED_SELL_PRICES, SELL_UPGRADE_PER_LEVEL, equipSellPrice, fixedSellPrice,
@@ -14928,6 +14929,81 @@ test('§151 SOL BAR sekiz yuva, on iki skill — hepsi sığmaz', () => {
   for (const r of refs) {
     ok(!ARCHER_SKILL_ORDER.includes(r), `destek kimliği okçuyla çakışıyor: ${r}`);
   }
+});
+
+test('§152 KALİTE KADEMEDEN TÜRER — renk artık bilgi taşıyor', () => {
+  /* Elle atanan kalite kademeyle uyuşmuyordu: kademe 21'lik Çelik
+     Tendon Yay LOW, kademe 2'lik Yaşam Kuşağı MIDDLE idi. */
+  eq(qualityForTier(1), 'LOW', 'kademe 1:');
+  eq(qualityForTier(QUALITY_MIDDLE_TIER), 'MIDDLE', 'orta eşik:');
+  eq(qualityForTier(QUALITY_HIGH_TIER), 'HIGH', 'yüksek eşik:');
+  eq(qualityForTier(999), 'HIGH', 'tavan:');
+
+  /* MONOTON: güçlü eşya asla daha düşük kalitede olamaz. */
+  const order = ['LOW', 'MIDDLE', 'HIGH'];
+  let prev = -1;
+  for (let t = 1; t <= 40; t++) {
+    const idx = order.indexOf(qualityForTier(t));
+    ok(idx >= prev, `kademe ${t}: kalite geriye gitti`);
+    prev = idx;
+  }
+
+  /* Katalogda her kalite TEMSİL EDİLMELİ — biri boşsa renk ayrımı
+     kaybolur. */
+  const counts: Record<string, number> = { LOW: 0, MIDDLE: 0, HIGH: 0 };
+  for (const d of allDefinitions()) counts[displayQuality(d)] += 1;
+  for (const k of order) ok(counts[k]! > 0, `${k} kalitesinde eşya yok`);
+  /* En iyi yay MAVİ olmalı — kullanıcı kararı. */
+  const bows = allDefinitions().filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack);
+  eq(displayQuality(bows[0]!), 'HIGH', `${bows[0]!.displayName} kalitesi:`);
+});
+
+test('§152 RENK TEK KAYNAKTAN — elle atanan sınıf GÖSTERİLMEZ', () => {
+  /* Katalogdaki `itemClass` denetim için DURUYOR ama çizimde
+     kullanılmamalı, yoksa iki farklı renk görünür. */
+  for (const file of ['scenes/WorldPrototypeScene.ts', 'ui/inventory-panel.ts']) {
+    const src = readFileSync(join(PROTO_ROOT, file), 'utf8');
+    const bad = src.match(/ITEM_CLASS_COLOR\[[^\]]*itemClass[^\]]*\]/g) ?? [];
+    eq(bad.join(','), '', `${file} hâlâ elle atanan sınıfı çiziyor:`);
+  }
+  /* Mavi gerçekten mavi olmalı. */
+  eq(ITEM_CLASS_COLOR.HIGH, '#6f8fd0', 'HIGH rengi:');
+  ok(ITEM_CLASS_COLOR.HIGH !== ITEM_CLASS_COLOR.MIDDLE, 'mavi yeşille aynı');
+});
+
+test('§153 VERTEX RENGİ olan materyal ÖZNİTELİKSİZ geometriyle paylaşılamaz', () => {
+  /* Oyun siyah ekranda kalıyordu: zindanın düz tabanı arazi
+     materyalini paylaşıyordu, o materyalde `vertexColors` açık ama
+     `PlaneGeometry`nin `color` özniteliği YOK. three shader'da
+     `attribute vec3 color` arıyor, bulamıyor, program bağlanamıyor.
+
+     İki geometri ancak AYNI öznitelikleri taşıyorsa materyal
+     paylaşabilir. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'ThreeWorldRenderer.ts'), 'utf8');
+
+  /* Düz taban KENDİ materyalini kullanmalı. */
+  ok(!/new Mesh\(new PlaneGeometry\(6000, 6000\), groundMat\)/.test(src),
+    'zindan tabanı arazi materyalini paylaşıyor — siyah ekran');
+  ok(/dungeonFloorMat/.test(src), 'zindan tabanının ayrı materyali yok');
+
+  /* Ayrı materyalde `vertexColors` AÇILMAMALI. */
+  const at = src.indexOf('P3.26 — ZİNDANIN DÜZ TABANI');
+  ok(at >= 0, 'taban bloğu bulunamadı');
+  /* Blok, tabanın KENDİ materyal tanımıyla sınırlı okunur — yorumda
+     geçen kelime yanlış eşleşme üretmesin. */
+  const matAt = src.indexOf('const floorMat = ', at);
+  const blk = src.slice(matAt, src.indexOf('}));', matAt) + 4);
+  ok(!/vertexColors/.test(blk), 'düz tabanda vertexColors açılmış');
+
+  /* Renk değişimi İKİ materyale de uygulanmalı, yoksa mod geçişinde
+     zemin iki farklı renkte görünür. */
+  ok(/dungeonFloorMat\.color\.setHex/.test(src),
+    'mod geçişinde taban rengi güncellenmiyor');
+
+  /* Arazi materyalinde `vertexColors` KOŞULLU kalmalı. */
+  ok(/vertexColors: TERRAIN_MESH_ACTIVE/.test(src),
+    'arazi materyalinde vertexColors koşulsuz');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

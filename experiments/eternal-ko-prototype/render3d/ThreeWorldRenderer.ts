@@ -317,9 +317,22 @@ export class ThreeWorldRenderer {
     }));
     this.groundMat = groundMat;
     this.ground = new Mesh(groundGeo, groundMat);
-    /* P3.26 — zindanın DÜZ tabanı. Moradon arazisiyle aynı materyali
-       paylaşır; yalnız biri görünürken diğeri gizlenir. */
-    this.dungeonFloor = new Mesh(new PlaneGeometry(6000, 6000), groundMat);
+    /* ═══ P3.26 — ZİNDANIN DÜZ TABANI ═══
+       AYRI MATERYAL kullanır, arazininkini PAYLAŞMAZ.
+
+       Paylaşıyordu ve oyun siyah ekranda kalıyordu: arazi materyalinde
+       `vertexColors` açık (P2.36 biome katmanı), ama `PlaneGeometry`nin
+       `color` özniteliği YOK. three shader'da `attribute vec3 color`
+       arıyor, bulamıyor, program bağlanamıyor ve sahne hiç çizilmiyor.
+
+       İki farklı geometri ancak aynı öznitelikleri taşıyorsa materyal
+       paylaşabilir. Renk değişimi (`setDungeonMode`) iki materyale de
+       uygulanır. */
+    const floorMat = this.keepMat(new MeshLambertMaterial({
+      color: DUNGEON_ENV.groundColor,
+    }));
+    this.dungeonFloorMat = floorMat;
+    this.dungeonFloor = new Mesh(new PlaneGeometry(6000, 6000), floorMat);
     this.dungeonFloor.rotation.x = -Math.PI / 2;
     this.dungeonFloor.position.y = DUNGEON_GROUND_Y;
     this.dungeonFloor.receiveShadow = true;
@@ -500,6 +513,7 @@ export class ThreeWorldRenderer {
      renk değişimiyle oynanmaya devam eder — gameplay kaybı YOKTUR. */
   private dungeonEnv: Group | null = null;
   private dungeonFloor!: Mesh;
+  private dungeonFloorMat!: MeshLambertMaterial;
 
   /** P3.26 — zemin yüksekliği. Zindanda DÜZ; Moradon'da arazi.
    *  Oyuncu, moblar ve yerdeki ganimet AYNI kapıdan geçer, yoksa
@@ -599,6 +613,11 @@ export class ThreeWorldRenderer {
       if (on) { this.groundMat.map = null; }
       else if (this.groundTex) { this.groundMat.map = this.groundTex; }
       this.groundMat.needsUpdate = true;
+      /* Zindan tabanı AYRI materyal taşır (arazininki `vertexColors`
+         açık, düz düzlemde renk özniteliği yok). Renk ikisine de
+         uygulanır ki mod geçişi tek görünsün. */
+      this.dungeonFloorMat.color.setHex(DUNGEON_ENV.groundColor);
+      this.dungeonFloorMat.needsUpdate = true;
     }
     this.scene.background = new Color(on ? DUNGEON_ENV.backgroundColor : 0x1d2417);
   }

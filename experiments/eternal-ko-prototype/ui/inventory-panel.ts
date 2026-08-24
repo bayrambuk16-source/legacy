@@ -17,6 +17,7 @@
 import { EQUIP_SLOTS } from '../../../src/game/systems/EquipmentState.js';
 import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import { itemDefinition } from '../data/item-catalog.js';
+import { displayQuality } from '../data/moradon-loot-pool.js';
 import {
   ITEM_CLASS_COLOR, ITEM_CLASS_LABEL, resolveStats,
   type ItemDefinition, type ResolvedItemStats,
@@ -235,7 +236,9 @@ export function itemHeadline(def: ItemDefinition, upgradeLevel: number): {
 } {
   return {
     text: upgradeLevel > 0 ? `${def.displayName} +${upgradeLevel}` : def.displayName,
-    color: ITEM_CLASS_COLOR[def.itemClass],
+    /* P2.43 — kalite KADEMEDEN türer; katalogdaki elle yazılmış
+       `itemClass` denetim için durur ama gösterimde kullanılmaz. */
+    color: ITEM_CLASS_COLOR[displayQuality(def)],
     sub: `${ITEM_CLASS_LABEL[def.itemClass]} · Sv ${def.requiredLevel} · ${def.equipSlot}`,
   };
 }

@@ -192,3 +192,38 @@ export const WEAPON_PITY_LIMIT = 8;
 export function weaponsIn(pool: readonly ItemDefinition[]): ItemDefinition[] {
   return pool.filter((d) => d.category === 'weapon');
 }
+
+/* ═══════════════ KALİTE KADEMEDEN TÜRER (P2.43) ═══════════════
+ *
+ *  ══════════════ NEDEN DEĞİŞTİ ══════════════
+ *  Kalite elle atanıyordu ve kademeyle UYUŞMUYORDU: kademe 21'lik Çelik
+ *  Tendon Yay LOW, kademe 2'lik Yaşam Kuşağı MIDDLE idi. Renk oyuncuya
+ *  hiçbir şey söylemiyordu.
+ *
+ *  Artık kalite eşyanın GÜCÜNDEN türer — aynı yerden kademe de türüyor,
+ *  yani ikisi asla ayrışamaz. Yeni eşya eklenince rengi kendiliğinden
+ *  doğru olur.
+ *
+ *  ══════════════ EŞİKLER ══════════════
+ *  Katalogdaki 35 eşyanın kademe dağılımına göre seçildi:
+ *      LOW     kademe 1-6    → 20 eşya  (beyaz)
+ *      MIDDLE  kademe 7-14   →  9 eşya  (yeşil)
+ *      HIGH    kademe 15+    →  6 eşya  (mavi)
+ *
+ *  Kullanıcı kararı: üst seviye eşyaların çerçevesi MAVİ olsun.
+ *  RARE ve UNIQUE bilerek BOŞ: üst haritalar için ayrıldı. */
+export const QUALITY_MIDDLE_TIER = 7;
+export const QUALITY_HIGH_TIER = 15;
+
+export function qualityForTier(tier: number): 'LOW' | 'MIDDLE' | 'HIGH' {
+  if (tier >= QUALITY_HIGH_TIER) return 'HIGH';
+  if (tier >= QUALITY_MIDDLE_TIER) return 'MIDDLE';
+  return 'LOW';
+}
+
+/** Bir eşyanın GÖSTERİLECEK kalitesi. Katalogdaki elle yazılmış
+ *  `itemClass` alanı KORUNUR (denetlenebilir kalsın) ama gösterimde bu
+ *  kullanılır. */
+export function displayQuality(def: ItemDefinition): 'LOW' | 'MIDDLE' | 'HIGH' {
+  return qualityForTier(itemTierLevel(def));
+}
