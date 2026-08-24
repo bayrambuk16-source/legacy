@@ -78,6 +78,7 @@ import type { PowerInput } from '../data/power-score.js';
 import {
   SPAWN_BAND_AHEAD, SPAWN_BAND_WIDTH, WaveSpawner,
 } from '../world/WaveSpawner.js';
+import { DungeonState } from '../world/DungeonState.js';
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
@@ -12618,6 +12619,124 @@ test('§114 KAT ÇARPANI kat 10 sonrası devreye girer', () => {
   /* Kat 15 mobu aynı türden ama daha sert olmalı. */
   eq(f15.monster.sourceRef !== undefined, true, 'mob kaynağı yok');
   ok(f15.maxHp > f10.maxHp, `kat 15 daha sert olmalı: ${f10.maxHp} → ${f15.maxHp}`);
+});
+
+/* ================= P3.4 — KAT DURUMU VE ÖLÜM ================= */
+console.log('P3.4 — kat/dalga durumu (aşama 3):');
+
+function dungeonSetup(seed = 6000): { S: PrototypeState; D: DungeonState } {
+  const { S, sp } = waveSetup(seed);
+  return { S, D: new DungeonState(sp) };
+}
+
+/** Sahadaki dalgayı öldürür — testlerde kısayol. */
+function clearWave(D: DungeonState): void {
+  for (const m of D.activeMobs) { m.hp = 0; m.ai = 'dead'; }
+}
+
+test('§115 DALGA akışı: doğ → temizle → ilerle', () => {
+  const { D } = dungeonSetup();
+  eq(D.floor, 1, 'başlangıç katı:');
+  eq(D.wave, 1, 'başlangıç dalgası:');
+  ok(!D.waveActive, 'başta dalga olmamalı');
+
+  const w = D.startNextWave();
+  ok(w !== null && w.mobs.length > 0, 'dalga doğmalı');
+  ok(D.waveActive, 'dalga sahada olmalı');
+  /* ÇİFTE DOĞUŞ olmamalı — mob sayısı sessizce ikiye katlanırdı. */
+  eq(D.startNextWave(), null, 'ikinci doğuş reddedilmeli:');
+
+  ok(!D.completeWaveIfCleared(), 'temizlenmeden ilerlememeli');
+  clearWave(D);
+  ok(!D.waveActive, 'ölü dalga aktif sayılmamalı');
+  ok(D.completeWaveIfCleared(), 'temizlenince ilerlemeli');
+  eq(D.wave, 2, 'dalga sayacı:');
+});
+
+test('§115 NEXT dalga ORTASINDA çalışmaz, GERİ her zaman serbest', () => {
+  const { D } = dungeonSetup(6001);
+  D.startNextWave();
+  const blocked = D.nextFloor();
+  ok(!blocked.ok && blocked.fail === 'waveActive', 'dalga sürerken NEXT engellenmeli');
+  eq(D.floor, 1, 'kat değişmemeli:');
+
+  /* GERİ inmek KAÇIŞ yoludur — dalga sürerken de serbest. */
+  D.nextFloor.call(D);                       // hâlâ engelli
+  clearWave(D); D.completeWaveIfCleared();
+  ok(D.nextFloor().ok, 'temiz sahada NEXT çalışmalı');
+  eq(D.floor, 2, 'kat:');
+  D.startNextWave();
+  const back = D.previousFloor();
+  ok(back.ok, 'dalga sürerken GERİ serbest olmalı');
+  eq(D.floor, 1, 'geri inilen kat:');
+});
+
+test('§115 GÜÇ KAPISI YOK — zayıf oyuncu da geçebilir', () => {
+  /* Kullanıcı kararı: yapay duvar yerine risk. */
+  const { D } = dungeonSetup(6002);
+  for (let i = 0; i < 8; i++) {
+    clearWave(D); D.completeWaveIfCleared();
+    ok(D.nextFloor().ok, `kat ${i + 2}'ye geçilemedi`);
+  }
+  eq(D.floor, 9, 'ulaşılan kat:');
+  eq(D.highestFloor, 9, 'açılan tavan:');
+  /* Risk etiketi UI içindir, kapı değil. */
+  eq(floorRisk(1, recommendedPower(9)), 'extreme', 'zayıf oyuncu etiketi:');
+});
+
+test('§115 ÖLÜM bir kat düşürür, TAVAN düşmez', () => {
+  const { D } = dungeonSetup(6003);
+  for (let i = 0; i < 6; i++) { clearWave(D); D.completeWaveIfCleared(); D.nextFloor(); }
+  eq(D.floor, 7, 'ulaşılan kat:');
+  D.startNextWave();
+  eq(D.wave, 1, 'dalga:');
+  clearWave(D); D.completeWaveIfCleared();
+  eq(D.wave, 2, 'ilerleyen dalga:');
+
+  eq(D.onDeath(), 6, 'ölümde bir kat düşmeli:');
+  eq(D.highestFloor, 7, 'tavan korunmalı:');
+  eq(D.wave, 1, 'dalga sıfırlanmalı:');
+  /* Kat 1'de ölmek daha aşağı indirmez. */
+  D.jumpTo(1);
+  eq(D.onDeath(), 1, 'en altta ölüm:');
+});
+
+test('§115 KİLİTLİ kata atlanamaz, AÇILMIŞA atlanır', () => {
+  const { D } = dungeonSetup(6004);
+  for (let i = 0; i < 4; i++) { clearWave(D); D.completeWaveIfCleared(); D.nextFloor(); }
+  eq(D.highestFloor, 5, 'tavan:');
+  ok(D.jumpTo(3).ok, 'açılmış kata atlanmalı');
+  eq(D.floor, 3, 'atlanan kat:');
+  ok(!D.jumpTo(9).ok, 'kilitli kata atlanmamalı');
+  eq(D.floor, 3, 'başarısız atlayış katı değiştirmemeli:');
+  /* En alttan aşağı inilemez. */
+  D.jumpTo(1);
+  ok(!D.previousFloor().ok, 'kat 1\'den aşağı inilmemeli');
+});
+
+test('§115 KAYIT: kat ve tavan korunur, DALGA sıfırlanır', () => {
+  /* Öneri kabul edildi: dalga sayacı kaydedilmez. Çıkıp girince
+     kat aynı, dalga 1'den başlar. */
+  const { D } = dungeonSetup(6005);
+  for (let i = 0; i < 5; i++) { clearWave(D); D.completeWaveIfCleared(); D.nextFloor(); }
+  D.onDeath();
+  for (let i = 0; i < 3; i++) { clearWave(D); D.completeWaveIfCleared(); }
+  const snap = D.serialize();
+  eq(snap.floor, 5, 'kaydedilen kat:');
+  eq(snap.highestFloor, 6, 'kaydedilen tavan:');
+
+  const { D: D2 } = dungeonSetup(6006);
+  D2.restore(snap);
+  eq(D2.floor, 5, 'geri yüklenen kat:');
+  eq(D2.highestFloor, 6, 'geri yüklenen tavan:');
+  eq(D2.wave, 1, 'dalga 1\'den başlamalı:');
+
+  /* BOZUK KAYIT oyunu düşürmemeli ve tavanı AŞMAMALI. */
+  D2.restore({ floor: 999, highestFloor: 3 });
+  eq(D2.floor, 3, 'kat tavanı aşmamalı:');
+  D2.restore(null);
+  eq(D2.floor, 1, 'boş kayıt:');
+  eq(D2.highestFloor, 1, 'boş kayıt tavanı:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
