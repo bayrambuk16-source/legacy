@@ -18,6 +18,7 @@
 
 import type { Rng } from '../../../src/engine/rng.js';
 import type { InventoryState } from '../../../src/game/systems/InventoryState.js';
+import { PLAYER } from '../../../src/game/config.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import type { EquipmentState } from '../../../src/game/systems/EquipmentState.js';
 import { itemDefinition } from '../data/item-catalog.js';
@@ -43,6 +44,12 @@ export class ForgeSystem {
 
   constructor(deps: ForgeDeps) { this.deps = deps; }
 
+  /** Oyuncunun elinde (çantada ya da kuşanılı) YAY var mı? */
+  private hasAnyWeapon(): boolean {
+    return this.deps.inventory.allEntries()
+      .some((e) => itemDefinition(e.itemRef)?.category === 'weapon');
+  }
+
   /** Envanterdeki parşömen adedi. */
   scrollCount(): number {
     return this.deps.inventory.count(SCROLL_ITEM_REF);
@@ -57,6 +64,14 @@ export class ForgeSystem {
     const def = itemDefinition(inst.itemRef);
     if (!def) return { ok: false, reason: 'noDefinition' };
 
+    /* ═══ P3.15 — BAŞLANGIÇ YAYI YÜKSELTİLEMEZ ═══
+       Kullanıcı kararı. Gerekçe oyunun içinden: bu yay, yükseltme
+       başarısız olunca geri verilen GÜVENLİK AĞIDIR. Yükseltilebilir
+       olsaydı oyuncu onu da yakabilir ve yine silahsız kalabilirdi —
+       güvenlik ağı kendi kendini iptal ederdi. */
+    if (inst.itemRef === PLAYER.starterWeaponRef) {
+      return { ok: false, reason: 'starterWeapon' };
+    }
     const from = inst.upgradeLevel;
     if (!canAttempt(from)) return { ok: false, reason: 'maxLevel' };
 
@@ -78,8 +93,27 @@ export class ForgeSystem {
 
     /* BAŞARISIZ → eşya yanar. Kuşanılıysa önce yuva boşalır ki ekipman
        durumu envanterde olmayan bir instance'a işaret etmesin. */
+    const wasWeapon = inst.equippedSlot === 'weapon'
+      || itemDefinition(inst.itemRef)?.category === 'weapon';
     if (inst.equippedSlot !== null) this.deps.equipment.unequip(inst.equippedSlot);
     inv.remove(instanceId, inst.quantity);
+
+    /* ═══ P3.13 — SON YAY YANARSA BAŞLANGIÇ YAYI VERİLİR ═══
+       Oyun testi bulgusu: yay yanınca oyuncu saldıramaz hâle geliyordu.
+       Bu bir ÇIKMAZDI — saldıramayınca farm edemez, farm edemeyince
+       yeni yay bulamazdı.
+
+       Temel saldırı artık silahsız da çalışıyor (bkz. `CombatSystem`),
+       ama SKİLLER kaynak kuralı gereği yay ister (`weaponKinds`) ve
+       Genie skill kullanır. Yani silahsız oyuncu yine de otomatik
+       farm edemezdi.
+
+       Bu yüzden son yay yandığında BAŞLANGIÇ YAYI verilir. Ceza
+       korunur (yükseltilmiş yay gitti, malzeme gitti), çıkmaz kalkar.
+       Elinde başka yay varsa hiçbir şey verilmez. */
+    if (wasWeapon && !this.hasAnyWeapon()) {
+      inv.add(PLAYER.starterWeaponRef, { quantity: 1 });
+    }
     return { ok: true, success: false, burned: true, goldSpent: gold, scrollsSpent: scrolls, chance };
   }
 }

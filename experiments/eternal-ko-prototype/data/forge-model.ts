@@ -77,6 +77,9 @@ export function scrollCost(from: number): number {
 /* ───────────────────────── sonuç ───────────────────────── */
 
 export type ForgeFail =
+  /** P3.15 — başlangıç yayı yükseltilemez: güvenlik ağı olduğu için
+   *  yakılabilir olmamalı (bkz. `ForgeSystem`). */
+  | 'starterWeapon'
   | 'notFound'          // envanterde böyle bir instance yok
   | 'noDefinition'      // katalogda tanım yok
   | 'maxLevel'          // kaynak eğride bu kademe erişilemez

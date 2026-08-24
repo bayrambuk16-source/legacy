@@ -6959,24 +6959,40 @@ test('§22 on iki equipment slotu ve telemetri görünümü', () => {
   for (const f of filled) ok(f.itemClass !== null, 'sınıf telemetride görünmeli');
 });
 
-test('§8/§9 upgradeLevel P1.8\'de STAT DEĞİŞTİRMEZ (yalnız veri hazırlığı)', () => {
+test('P3.14 — upgradeLevel ARTIK STAT DEĞİŞTİRİR (zırh ve takı dahil)', () => {
+  /* P1.8'de yükseltme yalnız VERİ hazırlığıydı ve stata dokunmuyordu.
+     Oyun testinde bu bir kusur olarak çıktı: "takılar upgrade ediliyor
+     ama güçlenmiyor". Altın ve parşömen harcanıyor, karşılığı yoktu.
+     Zırh da aynı durumdaydı. */
   const S = protoState(1944);
-  /* P2.27 — kalite artık bölge etiketi; belirli bir kaliteyi aramak
-     yerine EN GÜÇLÜ zırhı seçeriz. */
   const armor = [...ARCHER_ARMOR].sort((a, b) => b.stats.defense - a.stats.defense)[0]!;
   const id = giveItem(S, armor.definitionRef);
   const inst = S.inventory.get(id)!;
   ok(S.equipService.equip(id).ok, 'equip');
   const def0 = S.stats.build().total.defense;
-  /* instance'ın upgrade seviyesi kaynak adından gelebilir; P1.8 bunu
-     STAT'a UYGULAMAZ — upgrade formülü P1.9 görevidir. */
-  inst.upgradeLevel = 8;
-  eq(S.stats.build().total.defense, def0, 'upgrade seviyesi defense\'i DEĞİŞTİRMEMELİ:');
-  eq(S.stats.build().equipment.defense, armor.stats.defense, 'katkı TABAN stattan:');
-  /* model yine de upgrade'e hazır */
-  eq(armor.baseItemRef, armor.definitionRef, 'baseItemRef:');
-  eq(typeof inst.upgradeLevel, 'number', 'instance upgradeLevel alanı var:');
+
+  /* KAYNAK ID'si yükseltme taşıyabilir (`baseUpgradeLevel`); ölçüm
+     TABANIN ÜSTÜNE çıkılan kadarla yapılır. */
+  const base = Content.item(armor.definitionRef)?.baseUpgradeLevel ?? 0;
+  inst.upgradeLevel = base + 5;
+  const def5 = S.stats.build().total.defense;
+  ok(def5 > def0, `+5 savunmayı artırmalı: ${def0} → ${def5}`);
+  /* Çarpan yayla AYNI olmalı — ikinci bir eğri yok. */
+  const expected = def0 + Math.round(armor.stats.defense * 5 * 0.2);
+  ok(Math.abs(def5 - expected) <= 2, `beklenen ${expected}, gelen ${def5}`);
+
+  /* TAKI da güçlenmeli. */
+  const T = protoState(1945);
+  const acc = ARCHER_ACCESSORIES.find((a) => a.stats.dex > 0)!;
+  const aid = giveItem(T, acc.definitionRef);
+  ok(T.equipService.equip(aid).ok, 'takı equip');
+  const dex0 = T.stats.equipmentResolved().dex;
+  const abase = Content.item(acc.definitionRef)?.baseUpgradeLevel ?? 0;
+  T.inventory.get(aid)!.upgradeLevel = abase + 5;
+  const dex5 = T.stats.equipmentResolved().dex;
+  ok(dex5 > dex0, `takı +5 DEX artırmalı: ${dex0} → ${dex5}`);
 });
+
 
 test('§31 setId veri hazırlığı VAR, set BONUSU YOK', () => {
   const sets = new Set(ARCHER_ARMOR.map((a) => a.setId).filter((x) => x !== null));
@@ -13382,6 +13398,109 @@ test('§124 MOBLAR YUKARIDAN GELİR — etrafta belirmez', () => {
       ok(Math.hypot(dx, dy) > 450, 'mob menzil içinde doğdu — yürümüyor');
     }
   }
+});
+
+/* ================= P3.13 — YAY YANINCA ÇIKMAZ ================= */
+console.log('P3.13 — yay yanınca oyun kilitlenmiyor:');
+
+test('§125 SİLAHSIZ TEMEL SALDIRI mümkün — ama çok zayıf', () => {
+  /* Oyun testi bulgusu: örste yay yanınca oyuncu saldıramaz hâle
+     geliyordu. Saldıramayınca farm edemez, farm edemeyince yeni yay
+     bulamazdı — kapalı bir döngü. */
+  const S = protoState(9600);
+  const w = S.stats.slots().find((v) => v.slotId === 'weapon')!;
+  ok(w.instanceId !== null, 'başlangıçta yay olmalı');
+  S.equipService.unequip('weapon');
+  S.inventory.remove(w.instanceId!, 99);
+
+  const mob = S.mobs.mobs[0]!;
+  S.world.worldX = mob.worldX - 100; S.world.worldY = mob.worldY;
+  S.targets.select(mob.uid);
+  const r = S.performBasic(mob);
+  ok(r.ok, `silahsız saldırı engellendi: ${JSON.stringify(r)}`);
+
+  /* CEZA KORUNUR: KO formülünde `BowAP = 0` → AP taban değere düşer.
+     Test dünyası Sv12'de kurulduğu için taban 3 değil ~10; ölçüt
+     MUTLAK değer değil, yaylı hâlle ARADAKİ FARKTIR. */
+  const bare = S.stats.finalStats().attack;
+  const T = protoState(9601);
+  const armed = T.stats.finalStats().attack;
+  ok(armed > bare * 1.5, `yay fark yaratmıyor: ${bare} → ${armed}`);
+  /* Vuruş gerçekten cılız olmalı. */
+  if (r.ok) ok(r.damage <= 10, `silahsız vuruş sert: ${r.damage}`);
+});
+
+test('§125 SON YAY YANARSA başlangıç yayı verilir', () => {
+  /* Skiller kaynak kuralı gereği yay ister (`weaponKinds`) ve Genie
+     skill kullanır — yani silahsız oyuncu yine otomatik farm edemezdi.
+     Bu yüzden son yay yandığında başlangıç yayı geri gelir. */
+  const S = protoState(9602);
+  S.player.coins = 1_000_000_000;
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 400 });
+  /* Başlangıç yayı artık YÜKSELTİLEMEZ (P3.15); senaryo başka bir yay
+     kuşandırır ve onu yakar. */
+  const other = allDefinitions().find(
+    (d) => d.category === 'weapon' && d.definitionRef !== PLAYER.starterWeaponRef,
+  )!;
+  ok(S.equipService.equip(giveItem(S, other.definitionRef)).ok, 'yedek yay equip');
+  let burned = false;
+  for (let i = 0; i < 200; i++) {
+    const w = S.inventory.allEntries().find((e) => e.equippedSlot === 'weapon');
+    if (!w) break;
+    const r = S.forge.upgrade(w.instanceId);
+    if (!r.ok) break;
+    if (r.success === false) { burned = true; break; }
+  }
+  ok(burned, 'senaryo hiç yay yakmadı');
+  const bows = S.inventory.allEntries()
+    .filter((e) => definitionOf(e.itemRef)?.category === 'weapon');
+  ok(bows.length > 0, 'yay yandıktan sonra elde yay kalmadı — ÇIKMAZ');
+
+  /* ELİNDE BAŞKA YAY VARSA hiçbir şey verilmemeli. */
+  const T = protoState(9603);
+  T.player.coins = 1_000_000_000;
+  T.inventory.add(SCROLL_ITEM_REF, { quantity: 400 });
+  ok(T.equipService.equip(giveItem(T, other.definitionRef)).ok, 'yedek yay equip');
+  const spare = allDefinitions().find(
+    (d) => d.category === 'weapon' && d.definitionRef !== other.definitionRef,
+  )!;
+  T.inventory.add(spare.definitionRef);
+  const beforeCount = T.inventory.allEntries()
+    .filter((e) => definitionOf(e.itemRef)?.category === 'weapon').length;
+  for (let i = 0; i < 200; i++) {
+    const w = T.inventory.allEntries().find((e) => e.equippedSlot === 'weapon');
+    if (!w) break;
+    const r = T.forge.upgrade(w.instanceId);
+    if (!r.ok) break;
+    if (r.success === false) break;
+  }
+  const afterCount = T.inventory.allEntries()
+    .filter((e) => definitionOf(e.itemRef)?.category === 'weapon').length;
+  ok(afterCount < beforeCount, 'yanan yay silinmemiş');
+});
+
+test('§126 BAŞLANGIÇ YAYI YÜKSELTİLEMEZ — güvenlik ağı yakılmasın', () => {
+  /* Kullanıcı kararı. Yükseltilebilir olsaydı oyuncu güvenlik ağını
+     da yakabilir ve yine silahsız kalabilirdi. */
+  const S = protoState(9700);
+  S.player.coins = 1_000_000_000;
+  S.inventory.add(SCROLL_ITEM_REF, { quantity: 100 });
+  const w = S.inventory.allEntries().find((e) => e.equippedSlot === 'weapon')!;
+  eq(w.itemRef, PLAYER.starterWeaponRef, 'başlangıç yayı kuşanılı olmalı:');
+  const r = S.forge.upgrade(w.instanceId);
+  ok(!r.ok, 'başlangıç yayı yükseltilebiliyor');
+  if (!r.ok) eq(r.reason, 'starterWeapon', 'red sebebi:');
+  /* Malzeme HARCANMAMALI. */
+  eq(S.player.coins, 1_000_000_000, 'altın harcanmış:');
+  eq(S.inventory.count(SCROLL_ITEM_REF), 100, 'parşömen harcanmış:');
+
+  /* BAŞKA yaylar yükseltilebilmeye devam etmeli. */
+  const other = allDefinitions().find(
+    (d) => d.category === 'weapon' && d.definitionRef !== PLAYER.starterWeaponRef,
+  )!;
+  const id = giveItem(S, other.definitionRef);
+  const r2 = S.forge.upgrade(id);
+  ok(r2.ok, `normal yay yükseltilemedi: ${JSON.stringify(r2)}`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

@@ -29,6 +29,7 @@ import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import type { EquipmentState } from '../../../src/game/systems/EquipmentState.js';
 import { EQUIP_SLOTS } from '../../../src/game/systems/EquipmentState.js';
 import { itemDefinition } from '../data/item-catalog.js';
+import { Content } from '../../../src/game/data/GameContentRepository.js';
 import { UPGRADE_MODEL } from '../../../src/game/config.js';
 import { ArcherProgression } from '../../../src/game/systems/combat/ArcherProgression.js';
 import {
@@ -65,6 +66,23 @@ export interface BuildBreakdown {
   special: ResolvedItemStats['special'];
 }
 
+/** ═══ P3.14 — ETKİN YÜKSELTME ═══
+ *
+ *  Kaynak item ID'leri yükseltme seviyesini KENDİ İÇİNDE taşır: KO'da
+ *  `241001504` zaten "Rogue Shirt +4" demektir ve `baseUpgradeLevel`
+ *  alanı 4 döner. Kataloğumuzdaki `defense: 26` de O SEVİYENİN
+ *  değeridir.
+ *
+ *  Bu yüzden `instance.upgradeLevel` doğrudan çarpan olarak
+ *  kullanılamaz — taban seviye iki kez sayılır ve stat sessizce şişer
+ *  (ölçüldü: savunma 26 yerine 47).
+ *
+ *  Etkin yükseltme, TABANIN ÜSTÜNE çıkılan kadardır. */
+export function effectiveUpgrade(inst: { itemRef: number; upgradeLevel: number }): number {
+  const base = Content.item(inst.itemRef)?.baseUpgradeLevel ?? 0;
+  return Math.max(0, inst.upgradeLevel - base);
+}
+
 export class ArcherBuildResolver extends CharacterStats {
   /** P2.5A — KO ilerleme durumu (dağıtılan DEX/HP, sınıf aşaması). */
   readonly progression: ArcherProgression;
@@ -90,7 +108,7 @@ export class ArcherBuildResolver extends CharacterStats {
     const def = itemDefinition(inst.itemRef);
     if (!def || def.category !== 'weapon') return 0;
     /* Yükseltme çarpanı ana modelle AYNI: +N başına %20. */
-    return Math.round(def.stats.attack * (1 + inst.upgradeLevel * UPGRADE_MODEL.statPerLevel));
+    return Math.round(def.stats.attack * (1 + effectiveUpgrade(inst) * UPGRADE_MODEL.statPerLevel));
   }
 
   /** Efektif DEX = taban + dağıtılan + ekipman. */
@@ -125,16 +143,38 @@ export class ArcherBuildResolver extends CharacterStats {
       this.progression.stage.sp, this.equipmentResolved().maxMp);
   }
 
-  /** Kuşanılı Project Legacy tanımlarının HAM toplamı — her çağrıda sıfırdan. */
+  /** Kuşanılı Project Legacy tanımlarının toplamı — her çağrıda sıfırdan.
+   *
+   *  ═══ P3.14 — YÜKSELTME ARTIK ZIRH VE TAKIYA DA İŞLİYOR ═══
+   *  Oyun testi bulgusu: "takılar upgrade ediliyor ama güçlenmiyor".
+   *  Sebep buradaydı — bu metot HAM tanımı okuyup `instance.upgradeLevel`
+   *  değerini HİÇ kullanmıyordu. Yalnız yayın AP'si ayrı bir yoldan
+   *  (`bowDamage`) çarpanı alıyordu.
+   *
+   *  Yani sorun takıya özgü değildi: ZIRH yükseltmeleri de savunma,
+   *  DEX ve can bonusuna hiç yansımıyordu. Altın ve parşömen harcanıyor,
+   *  karşılığında hiçbir şey alınmıyordu.
+   *
+   *  Çarpan yayla AYNI (`UPGRADE_MODEL.statPerLevel`, +N başına %20);
+   *  ikinci bir eğri uydurulmadı. Yayın AP'si BURADA ÇARPILMAZ — o
+   *  `bowDamage()` üzerinden gider ve iki kez çarpılırsa saldırı
+   *  sessizce şişerdi. */
   equipmentResolved(): ResolvedItemStats {
     const acc = zeroStats();
     for (const { instance } of this.equip.allEquipped()) {
       const def = itemDefinition(instance.itemRef);
       if (!def) continue;                       // katalog dışı item KATKI VERMEZ
       const s = resolveStats(def);
-      acc.attack += s.attack; acc.defense += s.defense;
-      acc.str += s.str; acc.dex += s.dex; acc.int += s.int; acc.sta += s.sta;
-      acc.maxHp += s.maxHp; acc.maxMp += s.maxMp;
+      const up = 1 + effectiveUpgrade(instance) * UPGRADE_MODEL.statPerLevel;
+      /* Yay AP'si ÇARPILMAZ — `bowDamage()` zaten çarpıyor. */
+      acc.attack += s.attack;
+      acc.defense += Math.round(s.defense * up);
+      acc.str += Math.round(s.str * up);
+      acc.dex += Math.round(s.dex * up);
+      acc.int += Math.round(s.int * up);
+      acc.sta += Math.round(s.sta * up);
+      acc.maxHp += Math.round(s.maxHp * up);
+      acc.maxMp += Math.round(s.maxMp * up);
       acc.elemental = {
         fire: acc.elemental.fire + s.elemental.fire,
         ice: acc.elemental.ice + s.elemental.ice,

@@ -160,6 +160,8 @@ const FORGE_FAIL: Record<string, string> = {
   noGold: 'Altın yetmiyor',
   noScroll: 'Parşömen yetmiyor',
   locked: 'Eşya kilitli',
+  /* P3.15 — başlangıç yayı güvenlik ağıdır, yakılmamalı. */
+  starterWeapon: 'Başlangıç yayı yükseltilemez',
 };
 
 const INV_FAIL: Record<EquipFail, string> = {

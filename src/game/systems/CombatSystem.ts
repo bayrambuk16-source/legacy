@@ -87,7 +87,19 @@ export class CombatSystem {
 
   basicAttack(target: EnemyUnit): AttackOutcome | null {
     if (!this.basicReady || !this.player.alive || target.state === 'dying') return null;
-    if (!this.stats.finalStats().hasWeapon) return null; // silahsız saldırı yok
+    /* ═══ P3.13 — SİLAHSIZ SALDIRI ARTIK MÜMKÜN ═══
+     *
+     *  Oyun testi bulgusu: örste yay yanınca oyuncu SALDIRAMAZ hâle
+     *  geliyordu. Bu bir ÇIKMAZDI: saldıramayınca farm edemez, farm
+     *  edemeyince yeni yay bulamaz.
+     *
+     *  Silahsız saldırı KO formülünün doğal sonucudur:
+     *      AP = trunc(0.005×BowAP×(DEX+40) + coef×BowAP×Lv×DEX) + 3
+     *  Yay yoksa `BowAP = 0` ve AP sabit +3'e düşer — yani vuruş
+     *  vardır ama çok zayıftır. Ceza korunur, çıkmaz kalkar.
+     *
+     *  Kapı SİLİNMEDİ, GEVŞETİLDİ: yayı yanmış oyuncu yeniden farm
+     *  edebilir ama bunu istemeyecek kadar yavaş yapar. */
     this.basicCooldown = PLAYER.basicAttackCooldownSec / this.player.attackSpeedMult;
     const dmg = this.playerDamageRoll(this.playerAttack(), this.effectiveDefense(target));
     target.hp -= dmg;
