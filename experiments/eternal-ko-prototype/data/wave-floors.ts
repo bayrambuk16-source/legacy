@@ -149,3 +149,28 @@ export function recommendedPower(floor: number): number {
      ölçekte durur. */
   return Math.max(1, Math.round(1.35 * Math.sqrt((avgHp / 8) * (avgAtk * 10))));
 }
+
+/* ═══════════════ ZİNDAN DROPLARI ═══════════════ */
+
+/** Zindanda düşen HER ekipman +1 gelir (kullanıcı kararı).
+ *
+ *  Gerekçe oyunun içinden: zindanın amacı yükseltme çabası. +1 ile
+ *  başlamak, oyuncuyu +5/+6 hedefine bir adım yakın başlatır ve
+ *  parşömen/altın toplamayı anlamlı kılar.
+ *
+ *  Normal harita ETKİLENMEZ — orada droplar +0 gelmeye devam eder. */
+export const DUNGEON_DROP_UPGRADE = 1;
+
+/** Zindanda düşen eşyanın KADEMESİ bir bant aşağıdadır.
+ *
+ *  Kullanıcı kararı ödülün yarıya inmesiydi; drop ŞANSINI yarıya
+ *  indirmek yerine kademeyi düşürüyoruz. Sebep ölçüldü: üst bantta
+ *  drop zaten %3; yarıya inerse üst katlarda saatlerce hiçbir şey
+ *  düşmez ve mod ölü hisseder. Böylece oyuncu eşya alır ama en iyisini
+ *  normal haritada aramaya devam eder. */
+export const DUNGEON_TIER_PENALTY = 5;
+
+/** Zindanda bir mobun ganimet havuzu için kullanılacak "sanal seviye". */
+export function dungeonLootLevel(monsterLevel: number): number {
+  return Math.max(1, monsterLevel - DUNGEON_TIER_PENALTY);
+}

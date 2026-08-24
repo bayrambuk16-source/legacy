@@ -21,7 +21,7 @@ import type { EquipFail } from '../world/EquipService.js';
 import { OBSTACLES, ROADS, WORLD_BOUNDS } from '../data/world-map.js';
 import {
   HUD_EXP_BAR, HUD_EXP_FILL, HUD_EXP_TEXT, HUD_GENIE, HUD_JOY_BASE_W, HUD_JOY_KNOB_W, HUD_PAGE_DOTS,
-  HUD_CAMERA_BTN, HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN,
+  HUD_CAMERA_BTN, HUD_DUNGEON_BTN, HUD_PLAYER_CARD, HUD_SETTINGS, HUD_TARGET, HUD_TARGET_BTN,
   HUD_TARGET_CARD, HUD_BARS,
   hudNavBoxes, hudSkillBoxes,
 } from '../ui/hud-layout.js';
@@ -667,6 +667,14 @@ export class WorldPrototypeScene implements Scene {
       this.camMode = nextMode(this.camMode);
       this.host.audio.play('ui');
       this.say(`Kamera: ${CAMERA_MODE_LABEL[this.camMode]}`);
+      return;
+    }
+    /* P3.2 — ZİNDAN GİRİŞİ. Şu an yalnız KAPIYI açar; dalga modu
+       sahnesi Aşama 2'de gelecek. Düğmenin şimdiden durması bilinçli:
+       giriş noktası netleşsin ve yerleşim testi bugünden korunsun. */
+    if (this.hit(p, { id: 'dungeon', ...HUD_DUNGEON_BTN, label: '' })) {
+      this.host.audio.play('ui');
+      this.say('Zindan hazırlanıyor — dalga modu yakında');
       return;
     }
     for (const n of this.navButtons()) {
@@ -1778,6 +1786,13 @@ export class WorldPrototypeScene implements Scene {
     g.text(this.camMode === 'third' ? '3Ş' : 'KB',
       HUD_CAMERA_BTN.x + HUD_CAMERA_BTN.w / 2, HUD_CAMERA_BTN.y + HUD_CAMERA_BTN.h * 0.34,
       { align: 'center', size: 11, bold: true, color: '#e8d9a0' });
+
+    /* ---- zindan girişi ---- */
+    g.image(HUD_DUNGEON_BTN.key, HUD_DUNGEON_BTN.x, HUD_DUNGEON_BTN.y,
+      { w: HUD_DUNGEON_BTN.w, h: HUD_DUNGEON_BTN.h, alpha: A });
+    g.text('ZİN', HUD_DUNGEON_BTN.x + HUD_DUNGEON_BTN.w / 2,
+      HUD_DUNGEON_BTN.y + HUD_DUNGEON_BTN.h * 0.34,
+      { align: 'center', size: 11, bold: true, color: '#c9a05a' });
     /* Varlıkta "GENİE AÇIK" yazısı BOYALIDIR. Kapalı durumu üstüne yazı
        basarak DEĞİL, gri perde + sönük ışıkla gösterilir. */
     if (!tel.enabled) {

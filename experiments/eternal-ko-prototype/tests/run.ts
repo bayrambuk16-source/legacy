@@ -41,7 +41,8 @@ import {
   hitTest as invHitTest, invButtons, invCloseButton, targetSlotFor, type UiRect,
 } from '../ui/inventory-panel.js';
 import {
-  HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_TARGET_BTN, UI_MOCK, UI_SCALE,
+  HUD_CAMERA_BTN, HUD_DUNGEON_BTN, HUD_EXP_BAR, HUD_PLAYER_CARD, HUD_SETTINGS,
+  HUD_TARGET_BTN, UI_MOCK, UI_SCALE,
   hudNavBoxes, hudSkillBoxes, hudSpriteKeys,
 } from '../ui/hud-layout.js';
 import {
@@ -76,7 +77,8 @@ import {
 import type { PowerInput } from '../data/power-score.js';
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
-  WAVE_MAX_COUNT, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE, coinForKill, floorLevelBand,
+  DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
+  WAVE_TROPHY_CHANCE, coinForKill, dungeonLootLevel, floorLevelBand,
   floorMonsters, floorStatMult, planWave, recommendedPower, trophyValue,
 } from '../data/wave-floors.js';
 import {
@@ -12467,6 +12469,61 @@ test('§112 ÖNERİLEN GÜÇ mob verisinden TÜRER ve katla artar', () => {
   });
   ok(p >= recommendedPower(1), `Sv1 oyuncu kat 1'e yetmiyor: ${p} < ${recommendedPower(1)}`);
   ok(p < recommendedPower(3), `Sv1 oyuncu kat 3'e fazla güçlü: ${p}`);
+});
+
+test('§113 ZİNDAN GİRİŞİ ana ekranda ve ÇAKIŞMIYOR', () => {
+  /* Giriş noktası bugünden sabit; sahne Aşama 2'de gelecek. */
+  const boxes = [HUD_SETTINGS, HUD_CAMERA_BTN, HUD_DUNGEON_BTN];
+  for (const b of boxes) {
+    ok(b.x >= 0 && b.x + b.w <= PROTO.screenW, 'düğme yatay taşıyor');
+    ok(b.y >= 0 && b.y + b.h <= PROTO.screenH, 'düğme dikey taşıyor');
+  }
+  /* Üç düğme de birbirinden ayrı olmalı. */
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]!, c = boxes[j]!;
+      const overlap = !(a.x + a.w <= c.x || c.x + c.w <= a.x
+        || a.y + a.h <= c.y || c.y + c.h <= a.y);
+      ok(!overlap, 'sağ üst düğmeler çakışıyor');
+    }
+  }
+  /* Zindan düğmesi skill barına ve alt menüye DEĞMEMELİ. */
+  for (const s of hudSkillBoxes()) {
+    const overlap = !(HUD_DUNGEON_BTN.x + HUD_DUNGEON_BTN.w <= s.x
+      || s.x + s.w <= HUD_DUNGEON_BTN.x
+      || HUD_DUNGEON_BTN.y + HUD_DUNGEON_BTN.h <= s.y
+      || s.y + s.h <= HUD_DUNGEON_BTN.y);
+    ok(!overlap, 'zindan düğmesi skill barıyla çakışıyor');
+  }
+  /* Varlık anahtarı manifestte olmalı. */
+  ok(PROTO_ASSETS[HUD_DUNGEON_BTN.key] !== undefined, 'zindan düğmesi görseli yok');
+});
+
+test('§113 ZİNDAN DROPLARI +1 gelir, normal harita ETKİLENMEZ', () => {
+  eq(DUNGEON_DROP_UPGRADE, 1, 'zindan yükseltmesi:');
+  /* Kademe cezası: eşya düşer ama bir bant aşağıdan. */
+  eq(dungeonLootLevel(30), 30 - DUNGEON_TIER_PENALTY, 'kademe cezası:');
+  eq(dungeonLootLevel(2), 1, 'alt sınır korunmalı:');
+  ok(DUNGEON_TIER_PENALTY > 0, 'zindan kademesi normal haritayla aynı');
+
+  /* NORMAL HARİTA: drop hâlâ +0 gelmeli. Zindan kuralı oraya
+     sızarsa normal ilerleme bozulur. */
+  const S = protoState(4300);
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  let checked = 0;
+  for (let i = 0; i < 600 && checked < 5; i++) {
+    const m = S.mobs.mobs[i % S.mobs.mobs.length]!;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+    S.reapDead();
+    m.ai = 'idle'; m.hp = m.maxHp; m.state = 'walk';
+    for (const inst of S.inventory.allEntries()) {
+      if (!definitionOf(inst.itemRef)) continue;
+      eq(inst.upgradeLevel, 0, 'normal harita dropu +0 olmalı:');
+      checked += 1;
+    }
+  }
+  ok(checked > 0, 'senaryo hiç ekipman düşürmedi');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

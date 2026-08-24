@@ -50,6 +50,11 @@ export const HUD_SETTINGS = sprite('ui_settings', 852, 24, 78, 110 / 112);
  *  Modal panellerin arkasında kalmasın diye üst şeritte durur. */
 export const HUD_CAMERA_BTN = sprite('ui_btn_gear', 858, 116, 66, 110 / 114);
 
+/** P3.2 — ZİNDAN GİRİŞİ. Kamera düğmesinin altında, aynı sütunda.
+ *  Sağ üst sütun (ayar → kamera → zindan) kalıcı eylemler için;
+ *  alt menü sekmeleri panel açar, bu ise MOD DEĞİŞTİRİR. */
+export const HUD_DUNGEON_BTN = sprite('ui_btn_gear', 858, 200, 66, 110 / 114);
+
 /** Bir sprite'ın İÇİNDEKİ oransal bölge → sahne dikdörtgeni.
  *  Oranlar GÖRSELİN KENDİSİNDEN ölçüldü (dolgu piksellerinin sınırları), göz
  *  kararı değil. Varlık yeniden dışa aktarılıp ölçeği değişse bile dolgu
@@ -171,6 +176,7 @@ export function hudSpriteKeys(): string[] {
   return [
     HUD_PLAYER_CARD.key, HUD_TARGET_CARD.key, HUD_GENIE.key, HUD_SETTINGS.key,
     HUD_TARGET_BTN.key, HUD_PAGE_DOTS.key, HUD_EXP_BAR.key, HUD_CAMERA_BTN.key,
+    HUD_DUNGEON_BTN.key,
     'ui_joy_base', 'ui_joy_knob',
     ...hudSkillBoxes().map((s) => s.key),
     ...NAV_ITEMS.map((n) => n.key),
