@@ -14,6 +14,7 @@
 import type { ConsumableSystem } from '../../../src/game/systems/ConsumableSystem.js';
 import type { KoPotionSystem } from './PotionSystem.js';
 import { DEFAULT_HP_POTION_REF, DEFAULT_MP_POTION_REF } from '../data/ko-potions.js';
+import { DEFAULT_STARTER_SKILL } from '../data/archer-skills.js';
 import type { InventoryState } from '../../../src/game/systems/InventoryState.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import type { CharacterStats } from '../../../src/game/systems/CharacterStats.js';
@@ -109,12 +110,20 @@ export const GENIE_DEFAULTS: GenieSettings = {
   mpPotionRef: DEFAULT_MP_POTION_REF,
   mpThresholdPct: 0.3,
   autoBurstRange: 240,
-  sets: [[], [], []],           // PrototypeState kurulumda gerçek ID'lerle doldurur
+  /* P3.9 — SET 1'DE Sv1 SKİLLİ HAZIR GELİR (kullanıcı kararı).
+     Boş set "Genie hiçbir şey yapmıyor" demekti ve zindanda oyuncu
+     ne olduğunu anlamıyordu. Set 2 ve 3 boş kalır: onları oyuncu
+     kendi kurar. */
+  sets: [[DEFAULT_STARTER_SKILL], [], []],
   /* ÜÇ SET DE varsayılan olarak `sequence`: presetler gerçek rotasyonlardır,
      sırayı korumaları beklenir. `priority` modu sistemde KALIR — oyuncu ayar
      ekranından her set için ayrı ayrı seçebilir. */
   modes: ['sequence', 'sequence', 'sequence'],
-  forcedSet: null,
+  /* P3.9 — AKTİF SET VARSAYILAN OLARAK 1 (kullanıcı kararı).
+     Otomatik seçim KALDIRILDI: mesafeye ve mob tipine göre set
+     değiştirmek oyuncuya "neden başka skill attı" dedirtiyordu.
+     `chooseSet` kilidi okur; oyuncu isterse ayar ekranından değiştirir. */
+  forcedSet: 0,
   decisionIntervalSec: 0.10,
 };
 
@@ -364,8 +373,16 @@ export class GenieSystem {
     return pool.reduce((best, m) => (score(m) < score(best) ? m : best), pool[0]);
   }
 
-  /** Aktif set. Kullanıcı bir set sabitlediyse O KULLANILIR (otomatik seçim devre dışı).
-   *  Aksi halde: ELİT → Set 3, mesafe ≤ Auto Burst → Set 1, değilse Set 2. */
+  /** Aktif set.
+   *
+   *  P3.9 — VARSAYILAN SET 1, OTOMATİK SEÇİM KAPALI (kullanıcı kararı).
+   *  Eskiden mesafeye ve mob tipine göre set değişiyordu; oyuncu
+   *  "neden başka skill attı" diye soruyordu. Artık seçilen set
+   *  kullanılır ve bu tahmin edilebilir.
+   *
+   *  Otomatik seçim SİLİNMEDİ: `forcedSet` `null` yapılırsa eski
+   *  davranış geri gelir — ayar ekranından açılabilir bir seçenek
+   *  olarak durur. */
   chooseSet(target: WorldMob, player: PlayerWorldState): SetId {
     if (this.settings.forcedSet !== null) return this.settings.forcedSet;
     if (target.monster.tier === 'elite') return 2;

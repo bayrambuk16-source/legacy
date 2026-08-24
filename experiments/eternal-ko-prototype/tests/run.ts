@@ -279,7 +279,7 @@ import { ProjectileFxSystem } from '../world/Projectiles.js';
 import { registerPrototypeSkills } from '../state.js';
 import {
   ARCHER, ARCHER_SKILL_ORDER, ACTIVE_BAR_SLOTS, DEFAULT_ACTIVE_BAR, DEFAULT_GENIE_SETS,
-  TEST_GENIE_SETS,
+  TEST_GENIE_SETS, DEFAULT_STARTER_SKILL,
   ARROW_SHOWER_REF, MULTI_SHOT_REF, sourceCooldownSec,
 } from '../data/archer-skills.js';
 import { ARCHER_ACTION_TIME, ArcherCombatTimingProfile } from '../data/archer-timing.js';
@@ -919,6 +919,9 @@ test('hedef önceliği: en yakın / en düşük HP / elit', () => {
 });
 test('Auto Burst Range: yakın → Set 1, uzak → Set 2', () => {
   const S = genieRig();
+  /* P3.9 — otomatik seçim artık VARSAYILAN DEĞİL; bu test onu
+     açıkça açarak sınar. Davranış SİLİNMEDİ, kapatıldı. */
+  S.genie.settings.forcedSet = null;
   S.genie.start(S.world);
   const burst = S.genie.settings.autoBurstRange;
   const close = mockMob(S.world.worldX + burst - 40, S.world.worldY, 30);
@@ -928,6 +931,9 @@ test('Auto Burst Range: yakın → Set 1, uzak → Set 2', () => {
 });
 test('ELİT hedef mesafeden BAĞIMSIZ olarak Set 3 seçtirir', () => {
   const S = genieRig();
+  /* P3.9 — otomatik seçim artık VARSAYILAN DEĞİL; bu test onu
+     açıkça açarak sınar. Davranış SİLİNMEDİ, kapatıldı. */
+  S.genie.settings.forcedSet = null;
   S.genie.start(S.world);
   const closeElite = mockMob(S.world.worldX + 10, S.world.worldY, 30, 900, 'elite');
   const farElite = mockMob(S.world.worldX + 600, S.world.worldY, 30, 900, 'elite');
@@ -1303,6 +1309,10 @@ test('set değişince ilgili setin cursor\'u KORUNUR', () => {
   const { genie, calls, targets } = fakeGenie([[11, 22, 33], [44, 55], []], ['sequence', 'sequence', 'priority']);
   const p = fakePlayer();
   const close = closeMob(), far = farMob();
+  /* P3.9 — set seçimi artık VARSAYILAN OLARAK KİLİTLİ. Bu test setler
+     ARASI geçişte cursor'un korunmasını sınıyor, o yüzden otomatik
+     seçimi açıkça açar. */
+  genie.settings.forcedSet = null;
   genie.start(p);
   genie.update(GENIE_TICK, [close as never], p);              // Set 1 → 11, cursor0 = 1
   targets.clear();
@@ -1606,6 +1616,9 @@ test('Genie GERÇEK mobu hedef alır ve SEQUENCE rotasyonunu kesintisiz çalış
 
 test('Genie: GERÇEK mob üzerinde Set 2 → Set 1 geçişi mesafeyle çalışır', () => {
   const S = protoState(66);
+  /* P3.9 — otomatik seçim artık VARSAYILAN DEĞİL; bu test onu
+     açıkça açarak sınar. Davranış SİLİNMEDİ, kapatıldı. */
+  S.genie.settings.forcedSet = null;
   const mob = staticMob(S, { offsetX: 0, hp: 1e12 });
   const burst = S.genie.settings.autoBurstRange;
   S.world.worldY = mob.worldY;
@@ -2061,17 +2074,22 @@ test('yürürken bakış hareket yönünü izler, saldırı bitince serbest kal�
 });
 
 console.log('(4) aktif set kilidi:');
-test('varsayılan OTOMATİK: set mesafe/elite ile seçilir', () => {
-  const S = protoState(81);
-  eq(S.genie.settings.forcedSet, null, 'varsayılan:');
-  const burst = S.genie.settings.autoBurstRange;
-  const close = mockMob(S.world.worldX + burst - 50, S.world.worldY, 30);
-  const far = mockMob(S.world.worldX + burst + 50, S.world.worldY, 30);
-  const elite = mockMob(S.world.worldX + 20, S.world.worldY, 30, 900, 'elite');
-  eq(S.genie.chooseSet(close as never, S.world), 0);
-  eq(S.genie.chooseSet(far as never, S.world), 1);
-  eq(S.genie.chooseSet(elite as never, S.world), 2);
+test('P3.9 — varsayılan AKTİF SET 1, otomatik seçim KAPALI', () => {
+  /* Kullanıcı kararı: mesafeye/mob tipine göre set değişmesi
+     "neden başka skill attı" sorusuna yol açıyordu. Otomatik seçim
+     SİLİNMEDİ, varsayılan olmaktan çıktı. */
+  const S = protoState(4400);
+  eq(S.genie.settings.forcedSet, 0, 'varsayılan set:');
+  /* Kilit açıkken mesafe ve mob tipi set DEĞİŞTİRMEZ. */
+  const mob = mockMob(S.world.worldX + 2000, S.world.worldY, 45, 1000);
+  eq(S.genie.chooseSet(mob as never, S.world), 0, 'uzak mob:');
+  mob.monster = { ...mob.monster, tier: 'elite' } as never;
+  eq(S.genie.chooseSet(mob as never, S.world), 0, 'elit mob:');
+  /* `null` yapılınca ESKİ davranış geri gelir. */
+  S.genie.settings.forcedSet = null;
+  eq(S.genie.chooseSet(mob as never, S.world), 2, 'otomatik açıkken elit:');
 });
+
 
 test('KİLİTLİ set: mesafe ve elit durumu göz ardı edilir', () => {
   const S = protoState(82);
@@ -3331,14 +3349,29 @@ test('zehir skillinde anlık elemental 0, DoT beklenen toplam raporlanıyor', ()
 
 console.log('\n[P1.3] Genie / regresyon:');
 
-test('P2.22 — canlı Genie setleri BOŞ başlar (kullanıcı kendi kurar)', () => {
+test('P3.9 — SET 1 hazır gelir, Set 2 ve 3 BOŞ kalır', () => {
+  /* P2.22'de üç set de boşaltılmıştı. Zindanda bu "Genie hiçbir şey
+     yapmıyor" demek oluyordu ve oyuncu sebebini anlamıyordu.
+     Set 1 artık Sv1 skilliyle gelir; kalan ikisini oyuncu kurar. */
   const live = DEFAULT_GENIE_SETS();
   eq(live.length, 3, 'set sayısı:');
-  for (let i = 0; i < live.length; i++) eq(live[i]!.length, 0, `set ${i + 1} boş olmalı:`);
-  /* Boş set bir HATA DEĞİL: Genie gizli temel saldırıya düşmez, bekler. */
-  const S = new PrototypeState(3400);
-  for (const set of S.genie.settings.sets) eq(set.length, 0, 'canlı set boş:');
+  eq(live[0]!.length, 1, 'set 1 hazır gelmeli:');
+  eq(live[0]![0], DEFAULT_STARTER_SKILL, 'varsayılan skill:');
+  eq(live[1]!.length, 0, 'set 2 boş:');
+  eq(live[2]!.length, 0, 'set 3 boş:');
+
+  /* Varsayılan skill Sv1'DE AÇIK olmalı — kilitli bir skill koymak
+     Genie'yi yine hiçbir şey yapamaz hâle getirirdi. */
+  const def = SkillRegistry.get(DEFAULT_STARTER_SKILL);
+  ok(def !== undefined, 'varsayılan skill kayıtlı değil');
+  eq(def!.requiredLevel, 1, 'varsayılan skill seviyesi:');
+
+  /* CANLI: Sv1 karakterde Genie gerçekten cast edebilmeli. */
+  const S = new PrototypeState(4401);
+  eq(S.genie.settings.sets[0]!.length, 1, 'canlı set 1:');
+  ok(S.stats.progression.isUnlocked(DEFAULT_STARTER_SKILL), 'varsayılan skill kilitli');
 });
+
 
 test('test kurulumundaki Genie setleri KORUNUYOR', () => {
   const sets = TEST_GENIE_SETS();
@@ -13134,6 +13167,43 @@ test('§120 ZİNDAN GİRİŞ/ÇIKIŞ karakterleri KARIŞTIRMAZ', () => {
   eq(over.player.coins, 50_000, 'normal altın değişmemeli:');
   eq(over.player.level, 25, 'normal seviye değişmemeli:');
   eq(D.state.player.level, 3, 'zindan seviyesi:');
+});
+
+test('§121 ZİNDANDA GERÇEKTEN SALDIRI OLUR — mob menzile girer', () => {
+  /* Oyun testi bulgusu: "zindan modu aktif fakat attack yapmıyor".
+     Ölçüldü — mob 668 birim uzakta doğuyordu, Genie menzili 450;
+     mob da gelmiyordu çünkü aggro yarıçapı 220 idi. İki sistem
+     birbirini bekliyordu. */
+  ok(SPAWN_BAND_AHEAD < 450, `doğuş menzil dışında: ${SPAWN_BAND_AHEAD}`);
+
+  const D = new DungeonSession(9200);
+  D.startNextWave();
+  const S = D.state;
+  /* Doğar doğmaz KOVALAMA fazında olmalı — "fark etme" beklenmez. */
+  for (const m of D.dungeon.activeMobs) {
+    const rt = S.mobs.ai.runtimeOf(m.uid);
+    ok(rt !== undefined, 'AI runtime yok');
+    eq(rt!.phase, 'CHASE', 'dalga mobu kovalamada başlamalı:');
+    eq(rt!.aggro, true, 'aggro:');
+  }
+
+  /* CANLI: bir dakikada gerçekten kill olmalı. */
+  S.genie.start(S.world);
+  S.lootPolicy.setMode('auto');
+  let kills = 0;
+  for (let i = 0; i < 3600; i++) {
+    if (!S.player.alive) { D.onDeath(); D.startNextWave(); S.genie.start(S.world); continue; }
+    const ents = S.entities();
+    S.mobs.update(1 / 60, S.world);
+    S.genie.update(1 / 60, ents, S.world);
+    S.combat.update(1 / 60);
+    S.adapter.updateAction(1 / 60);
+    S.stepCombat(1 / 60, ents);
+    kills += S.reapDead().length;
+    if (!D.dungeon.waveActive) { D.sweepCleared(); D.startNextWave(); }
+  }
+  ok(kills > 0, 'bir dakikada hiç mob ölmedi — saldırı çalışmıyor');
+  ok(S.player.coins > 0, 'coin kazanılmadı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

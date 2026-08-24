@@ -118,8 +118,13 @@ export const GENIE_SET_MAX = 6;
  *
  *  Boş set bir HATA DEĞİLDİR: Genie boş sette temel saldırıya düşmez,
  *  yalnız bekler (bkz. "gizli temel saldırı" kuralı). */
+/** P3.9 — SET 1'in varsayılan skilli: Sv1'de açılan tek skill.
+ *  Boş set "Genie hiçbir şey yapmıyor" demekti ve oyuncu sebebini
+ *  anlamıyordu. Set 2 ve 3 boş kalır — onları oyuncu kurar. */
+export const DEFAULT_STARTER_SKILL = ARCHER.STANDART_ATIS;
+
 export function DEFAULT_GENIE_SETS(): [number[], number[], number[]] {
-  return [[], [], []];
+  return [[DEFAULT_STARTER_SKILL], [], []];
 }
 
 /** TEST KURULUMU — farm senaryoları dolu set varsayar. Canlı oyunun

@@ -28,8 +28,18 @@ import type { WorldMob } from './types.js';
 import { hitboxRadius } from './hitbox.js';
 import { floorMonsters, floorStatMult, planWave, type WavePlan } from '../data/wave-floors.js';
 
-/** Dalganın doğduğu şerit: oyuncunun kaç birim ÜSTÜ. */
-export const SPAWN_BAND_AHEAD = 620;
+/** Dalganın doğduğu şerit: oyuncunun kaç birim ÜSTÜ.
+ *
+ *  ═══ P3.10 — 620'DEN 380'E ═══
+ *  Oyun testi bulgusu: "zindanda saldırı yapmıyor". Ölçüldü — moblar
+ *  668 birim uzakta doğuyordu, Genie'nin saldırı menzili ise 450.
+ *  Mob da gelmiyordu: `AGGRESSIVE` aggro yarıçapı 220, yani oyuncuyu
+ *  hiç görmüyordu. İki sistem birbirini bekliyordu.
+ *
+ *  380, mobun aggro yarıçapına (220) girmesi için kısa bir yürüyüş
+ *  bırakır ama Genie menzilinin (450) içinde kalır: mob yaklaşırken
+ *  oyuncu ateş etmeye başlar. Dikey akış hissi korunur. */
+export const SPAWN_BAND_AHEAD = 380;
 /** Şeridin yatay genişliği — moblar buna yayılır. */
 export const SPAWN_BAND_WIDTH = 520;
 /** Şeridin dikey derinliği: hepsi tam aynı hizada belirmesin. */
@@ -115,6 +125,15 @@ export class WaveSpawner {
       };
       /* Dalga mobları AGGRESSIVE: gelip saldırsınlar, dolaşmasınlar. */
       this.deps.ai.register(mob, plan.kind === 'normal' ? 'AGGRESSIVE' : 'ELITE');
+      /* ═══ P3.10 — DALGA MOBU DOĞARKEN AGGRO'DUR ═══
+         Zindanda mob "oyuncuyu fark etme" aşamasını beklememeli:
+         dalga zaten oyuncuya gönderilmiştir. Aggro yarıçapını
+         beklemek moblarn yukarıda öylece durmasına yol açıyordu.
+
+         Normal haritanın aggro kuralı DEĞİŞMEZ — bu yalnız dalga
+         doğuşuna özgüdür. */
+      const rt = this.deps.ai.runtimeOf(mob.uid);
+      if (rt) { rt.phase = 'CHASE'; rt.aggro = true; rt.aggroTimer = 0; }
       mobs.push(mob);
     }
     return { plan, mobs };
