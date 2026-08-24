@@ -29,6 +29,23 @@ export const GROUND_TEXTURE_KEY = 'ground_texture';
    hâlâ `item-icons.ts` içinde; orası tek kaynak olmaya devam eder,
    yalnız YOLLAR çift yazılır ve test ikisinin eşitliğini bağlar. */
 export const UI_ASSETS: Record<string, string> = {
+  /* P2.45 — Sv20-45 bandı ikonları. Yollar `item-icons.ts` ile ÇİFT
+     yazılır; paketleyici yayılımı izleyemediği için düz metin şart. */
+  item_kompozit_yay: 'assets/ui/items/kompozit_yay.webp',
+  item_arbalet: 'assets/ui/items/arbalet.webp',
+  item_boynuz_arbalet: 'assets/ui/items/boynuz_arbalet.webp',
+  item_demir_arbalet: 'assets/ui/items/demir_arbalet.webp',
+  item_demir_yay: 'assets/ui/items/demir_yay.webp',
+  item_plaka_migfer: 'assets/ui/items/plaka_migfer.webp',
+  item_tam_plaka_migfer: 'assets/ui/items/tam_plaka_migfer.webp',
+  item_plaka_omuzluk: 'assets/ui/items/plaka_omuzluk.webp',
+  item_tam_plaka_omuzluk: 'assets/ui/items/tam_plaka_omuzluk.webp',
+  item_plaka_dizlik: 'assets/ui/items/plaka_dizlik.webp',
+  item_tam_plaka_dizlik: 'assets/ui/items/tam_plaka_dizlik.webp',
+  item_plaka_eldiven: 'assets/ui/items/plaka_eldiven.webp',
+  item_tam_plaka_eldiven: 'assets/ui/items/tam_plaka_eldiven.webp',
+  item_plaka_bot: 'assets/ui/items/plaka_bot.webp',
+  item_tam_plaka_bot: 'assets/ui/items/tam_plaka_bot.webp',
   item_kul_agaci_yay: 'assets/ui/items/kul_agaci_yay.webp',
   item_mese_yay: 'assets/ui/items/mese_yay.webp',
   item_kisa_avci_yayi: 'assets/ui/items/kisa_avci_yayi.webp',

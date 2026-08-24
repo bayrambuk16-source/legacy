@@ -130,6 +130,38 @@ export const ARCHER_WEAPONS: readonly WeaponDefinition[] = [
     maxHp: 60, maxMp: 40,
     resist: res({ ice: 10 }),
   }),
+
+  /* ═══════════ P2.45 — SV20-45 BANDI (KAYNAKTAN) ═══════════
+   *
+   *  Sv30'dan sonra yeni yay yoktu; yirmi seviye boyunca ilerleme yalnız
+   *  yükseltmeden geliyordu.
+   *
+   *  Hasar değerleri `items_server` tablosunun **+0** sütunundan —
+   *  yükseltilmemiş taban. Rapordaki "tavan" sütunu AİLE tavanıdır
+   *  (+8 varyantı), tek bir eşyanın değeri DEĞİLDİR; onu kullanmak
+   *  statları sekiz kat şişirirdi.
+   *
+   *  Seviyeler küratörlü `items` tablosundan. `items_server.req_level`
+   *  KULLANILAMAZ: 2506 yayın hepsinde 1.
+   *
+   *  Elemental ve özel alanlar BOŞ: rapordaki bonuslar aile tavanı
+   *  olduğu için tek eşyaya yazılamaz. Varyant başına veri gelince
+   *  doldurulur. */
+  weapon(160610000, 'Kompozit Yay', 'MIDDLE', {
+    attack: 42, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+  weapon(168110000, 'Arbalet', 'MIDDLE', {
+    attack: 63, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+  weapon(168210000, 'Boynuz Arbalet', 'MIDDLE', {
+    attack: 74, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+  weapon(168310000, 'Demir Arbalet', 'MIDDLE', {
+    attack: 84, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
+  weapon(168410000, 'Demir Yay', 'MIDDLE', {
+    attack: 93, elemental: el({}), special: spc({}), maxHp: 0, maxMp: 0, resist: res({}),
+  }),
 ];
 
 /* ═══════════════════════════ ZIRHLAR (§29) ═══════════════════════════
@@ -243,6 +275,45 @@ export const ARCHER_ARMOR: readonly ArmorDefinition[] = [
     { ...A0, defense: 20, sta: 8, dex: 6, maxHp: 80, resist: res({ poison: 8 }) }, 'shadow'),
   armor(241005504, 'Gölge Avcısı Çizmesi', 'MIDDLE', 'boots',
     { ...A0, defense: 11, sta: 6, dex: 5, maxHp: 60, resist: res({ ice: 6 }) }, 'shadow'),
+
+  /* ═══════════ P2.45 — ÜST BANT ROGUE ZIRHI (KAYNAKTAN) ═══════════
+   *
+   *  Savunma değerleri `items_server` **+0** sütunundan — yükseltilmemiş
+   *  taban. Rapordaki "AC tavan" sütunu AİLE tavanıdır (+8 varyantı) ve
+   *  tek eşyaya yazılamaz.
+   *
+   *  Üç kademe: Half Plate → Plate → Full Plate. Kaynakta Chitin
+   *  Armor/Shell de var (AC 94-104) ama onlar `class_code 8` Rogue
+   *  Master ya da çok üst seviye; Sv50 tavanımızın ötesinde kalıyorlar
+   *  ve şimdilik ALINMADI.
+   *
+   *  DEX ve HP bonusları PROJECT LEGACY TUNING'İDİR. Kaynakta bu
+   *  eşyaların bonusları AİLE TAVANI olarak veriliyor (bir aile 141
+   *  varyant taşıyor) ve tek eşyaya yazılamaz. Değerler savunmanın
+   *  kabaca dörtte biri alınarak türetildi; mevcut Zırhlı Avcı hattının
+   *  oranıyla aynı ölçekte durur.
+   *
+   *  Varyant başına gerçek bonus verisi gelirse bunlar DEĞİŞTİRİLİR. */
+  armor(243003000, 'Plaka Miğfer', 'HIGH', 'helmet',
+    { ...A0, defense: 27, dex: 7, maxHp: 40, resist: res({}) }, 'rogue_plate'),
+  armor(244003000, 'Tam Plaka Miğfer', 'HIGH', 'helmet',
+    { ...A0, defense: 39, dex: 10, maxHp: 60, resist: res({}) }, 'rogue_plate'),
+  armor(243001000, 'Plaka Omuzluk', 'HIGH', 'chest',
+    { ...A0, defense: 46, dex: 12, maxHp: 70, resist: res({}) }, 'rogue_plate'),
+  armor(244001000, 'Tam Plaka Omuzluk', 'HIGH', 'chest',
+    { ...A0, defense: 66, dex: 17, maxHp: 100, resist: res({}) }, 'rogue_plate'),
+  armor(243002000, 'Plaka Dizlik', 'HIGH', 'pants',
+    { ...A0, defense: 36, dex: 9, maxHp: 50, resist: res({}) }, 'rogue_plate'),
+  armor(244002000, 'Tam Plaka Dizlik', 'HIGH', 'pants',
+    { ...A0, defense: 52, dex: 13, maxHp: 75, resist: res({}) }, 'rogue_plate'),
+  armor(243004000, 'Plaka Eldiven', 'HIGH', 'gloves',
+    { ...A0, defense: 18, dex: 5, maxHp: 20, resist: res({}) }, 'rogue_plate'),
+  armor(244004000, 'Tam Plaka Eldiven', 'HIGH', 'gloves',
+    { ...A0, defense: 26, dex: 7, maxHp: 30, resist: res({}) }, 'rogue_plate'),
+  armor(243005000, 'Plaka Bot', 'HIGH', 'boots',
+    { ...A0, defense: 18, dex: 5, maxHp: 20, resist: res({}) }, 'rogue_plate'),
+  armor(244005000, 'Tam Plaka Bot', 'HIGH', 'boots',
+    { ...A0, defense: 26, dex: 7, maxHp: 30, resist: res({}) }, 'rogue_plate'),
 ];
 
 /* ═══════════════════════════ AKSESUARLAR (§30) ═══════════════════════════

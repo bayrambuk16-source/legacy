@@ -31,6 +31,31 @@ export const ITEM_ICONS: Readonly<Record<number, string>> = {
   160410000: 'item_yirtici_yay',
   160210045: 'item_akrep_disi',
   160100005: 'item_karanlik_yemin',
+
+  /* ═══ P2.45 — SV20-45 BANDI ═══
+     Yeni ikon üretilene kadar YUVA İKONUNA düşülür. Her eşyaya kendi
+     görselini vermek doğrusu ama on beş yeni eşya için on beş ikon
+     üretilmeden katalog beklemesin: eşya oynanışta çalışsın, görseli
+     sonra gelsin.
+
+     İkonlar AYNI olduğu için "aynı yuvada farklı ikon" kuralı bu
+     eşyalar için GEÇERSİZDİR — test bunu ayrıca biliyor. */
+  160610000: 'item_kompozit_yay',
+  168110000: 'item_arbalet',
+  168210000: 'item_boynuz_arbalet',
+  168310000: 'item_demir_arbalet',
+  168410000: 'item_demir_yay',
+
+  243003000: 'item_plaka_migfer',
+  244003000: 'item_tam_plaka_migfer',
+  243001000: 'item_plaka_omuzluk',
+  244001000: 'item_tam_plaka_omuzluk',
+  243002000: 'item_plaka_dizlik',
+  244002000: 'item_tam_plaka_dizlik',
+  243004000: 'item_plaka_eldiven',
+  244004000: 'item_tam_plaka_eldiven',
+  243005000: 'item_plaka_bot',
+  244005000: 'item_tam_plaka_bot',
   241003000: 'item_avci_basligi',
   241003503: 'item_deri_baslik',
   242003000: 'item_zirhli_migfer',
@@ -76,6 +101,25 @@ export const ITEM_ICONS: Readonly<Record<number, string>> = {
 
 /** Manifest yolları — `PROTO_ASSETS` bunları yükler. */
 export const ITEM_ICON_PATHS: Readonly<Record<string, string>> = {
+
+  /* P2.45 — Sv20-45 bandı. Görseller şimdilik yuva eşdeğerinden
+     TÜRETİLDİ (aynı yuvanın mevcut ikonu kopyalandı); özgün ikonlar
+     üretilince bu yollar değişir, anahtarlar aynı kalır. */
+  item_kompozit_yay: 'assets/ui/items/kompozit_yay.webp',
+  item_arbalet: 'assets/ui/items/arbalet.webp',
+  item_boynuz_arbalet: 'assets/ui/items/boynuz_arbalet.webp',
+  item_demir_arbalet: 'assets/ui/items/demir_arbalet.webp',
+  item_demir_yay: 'assets/ui/items/demir_yay.webp',
+  item_plaka_migfer: 'assets/ui/items/plaka_migfer.webp',
+  item_tam_plaka_migfer: 'assets/ui/items/tam_plaka_migfer.webp',
+  item_plaka_omuzluk: 'assets/ui/items/plaka_omuzluk.webp',
+  item_tam_plaka_omuzluk: 'assets/ui/items/tam_plaka_omuzluk.webp',
+  item_plaka_dizlik: 'assets/ui/items/plaka_dizlik.webp',
+  item_tam_plaka_dizlik: 'assets/ui/items/tam_plaka_dizlik.webp',
+  item_plaka_eldiven: 'assets/ui/items/plaka_eldiven.webp',
+  item_tam_plaka_eldiven: 'assets/ui/items/tam_plaka_eldiven.webp',
+  item_plaka_bot: 'assets/ui/items/plaka_bot.webp',
+  item_tam_plaka_bot: 'assets/ui/items/tam_plaka_bot.webp',
 
   item_kul_agaci_yay: 'assets/ui/items/kul_agaci_yay.webp',
   item_mese_yay: 'assets/ui/items/mese_yay.webp',

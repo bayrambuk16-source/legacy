@@ -6593,7 +6593,8 @@ test('§5/§13 RASTGELE AFFIX YOK — aynı ref her zaman AYNI statlar', () => {
 });
 
 test('§27/§28/§29/§30 katalog kapsamı', () => {
-  eq(ARCHER_WEAPONS.length, 5, 'yay sayısı:');
+  /* P2.45 — beş yay daha eklendi (Sv20-45 bandı, kaynaktan). */
+  eq(ARCHER_WEAPONS.length, 10, 'yay sayısı:');
   /* P2.27 — Moradon kalite tavanı YEŞİL. Beş sınıfın hepsi burada
      TEMSİL EDİLMEZ; mavi/mor/turuncu üst haritalara ayrıldı. */
   const classes = new Set(ARCHER_WEAPONS.map((w) => w.itemClass));
@@ -10514,9 +10515,11 @@ test('§73 EĞRİ: Sv20 dağıtılmış karakter Sv15 mobu MAKUL sürede indirir
   const budget = prog.unspent;
   prog.spend('dex', Math.floor(budget * 0.6));
   prog.spend('hp', prog.unspent);
-  /* En güçlü yayı kuşan. */
-  const best = allDefinitions()
-    .filter((d) => d.category === 'weapon')
+  /* P2.45 — SEVİYESİNE UYGUN en güçlü yayı kuşan. Katalog Sv20-45
+     bandıyla genişledi; en güçlü yay artık Sv45 şartı taşıyor ve Sv20
+     karakter onu kuşanamaz. Eskiden bütün yaylar Sv1'di. */
+  const best = ARCHER_WEAPONS
+    .filter((d) => d.requiredLevel <= S.player.level)
     .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
   const add = S.inventory.add(best.definitionRef, { upgradeLevel: 0 });
   if (add.ok) S.equipService.equip(add.instance.instanceId);
@@ -10889,7 +10892,11 @@ test('§80 kayıt → yükleme: ilerleme AYNEN geri gelir', () => {
   S.stats.progression.spend('dex', 20);
   S.stats.progression.spend('hp', 9);
   /* Bir eşya kuşan ve bir yığın ekle. */
-  const bow = allDefinitions().filter((d) => d.category === 'weapon')
+  /* P2.45 — katalog Sv20-45 bandıyla genişledi ve yeni yaylar SEVİYE
+     ŞARTI taşıyor (Demir Yay Sv45). Sv20 karakter en güçlü yayı
+     kuşanamaz; test KUŞANABİLDİĞİ en iyi yayı seçmeli, yoksa silahsız
+     kalır ve DEX'in çarpacağı bir yay olmaz. */
+  const bow = ARCHER_WEAPONS.filter((d) => d.requiredLevel <= S.player.level)
     .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
   const add = S.inventory.add(bow.definitionRef, { upgradeLevel: 3 });
   if (add.ok) S.equipService.equip(add.instance.instanceId);
@@ -11448,7 +11455,11 @@ test('§89 OKÇU ZIRHI ARTIK DEX VERİYOR — döngü kapandı', () => {
      Test bu yüzden ÖNCE iyi yayı kuşanır. */
   const S = new PrototypeState(3306);
   S.player.level = 20;
-  const bow = allDefinitions().filter((d) => d.category === 'weapon')
+  /* P2.45 — katalog Sv20-45 bandıyla genişledi ve yeni yaylar SEVİYE
+     ŞARTI taşıyor (Demir Yay Sv45). Sv20 karakter en güçlü yayı
+     kuşanamaz; test KUŞANABİLDİĞİ en iyi yayı seçmeli, yoksa silahsız
+     kalır ve DEX'in çarpacağı bir yay olmaz. */
+  const bow = ARCHER_WEAPONS.filter((d) => d.requiredLevel <= S.player.level)
     .sort((a, b) => b.stats.attack - a.stats.attack)[0]!;
   const bowAdd = S.inventory.add(bow.definitionRef, { upgradeLevel: 0 });
   if (bowAdd.ok) S.equipService.equip(bowAdd.instance.instanceId);
@@ -11851,23 +11862,27 @@ test('§97 SEVİYE TAVANI 50 ve eğri buna hazır', () => {
   eq(S.player.level, LEVELING.maxLevel, 'tavan aşılmamalı:');
 });
 
-test('§97 MORADON KALİTE TAVANI YEŞİL — mor/turuncu YOK', () => {
-  /* Kullanıcı kararı: başlangıç bölgesinde eşsiz ekipman düşmemeli. */
+test('§97 MORADON KALİTE TAVANI MAVİ — mor/turuncu YOK', () => {
+  /* P2.27'de tavan YEŞİLDİ. P2.45'te katalog Sv20-45 bandıyla genişledi
+     ve kullanıcı tavanı MAVİYE çıkardı: üst seviye eşyalar mavi
+     çerçeveli. Mor ve turuncu üst haritalar için AYRILDI. */
   const bad: string[] = [];
   for (const d of allDefinitions()) {
-    if (d.itemClass !== 'LOW' && d.itemClass !== 'MIDDLE') {
-      bad.push(`${d.displayName} (${d.itemClass})`);
+    const q = displayQuality(d);
+    if (q !== 'LOW' && q !== 'MIDDLE' && q !== 'HIGH') {
+      bad.push(`${d.displayName} (${q})`);
     }
   }
   eq(bad.length, 0, `Moradon'da izinsiz kalite: ${bad.join(', ')}`);
-  /* İki kalite de TEMSİL EDİLMELİ — hepsi beyaz olursa ilerleme hissi olmaz. */
-  const classes = new Set(allDefinitions().map((d) => d.itemClass));
-  eq(classes.size, 2, 'iki kalite kademesi olmalı:');
-  /* STATLAR düşmedi: en güçlü yay hâlâ 30+ hasar. */
-  const best = allDefinitions().filter((d) => d.category === 'weapon')
-    .reduce((m, d) => Math.max(m, d.stats.attack), 0);
-  ok(best >= 30, `en güçlü yay zayıfladı: ${best}`);
+  /* ÜÇ kalite de TEMSİL EDİLMELİ — biri boşsa renk ayrımı kaybolur. */
+  const classes = new Set(allDefinitions().map((d) => displayQuality(d)));
+  eq(classes.size, 3, 'üç kalite kademesi olmalı:');
+  /* En güçlü yay MAVİ olmalı. */
+  const bows = allDefinitions().filter((d) => d.category === 'weapon')
+    .sort((a, b) => b.stats.attack - a.stats.attack);
+  eq(displayQuality(bows[0]!), 'HIGH', `${bows[0]!.displayName} kalitesi:`);
 });
+
 
 test('§97 ÖLÜM BEDELİ: seviyenin %5\'i EXP, seviye DÜŞMEZ', () => {
   const S = new PrototypeState(3601);
@@ -12224,8 +12239,11 @@ test('§101 HAVUZ SEVİYEYLE BÜYÜR ve yuva kaybetmez', () => {
     ok(slots >= prevSlots, `Sv${lv}'de yuva sayısı düştü: ${prevSlots} → ${slots}`);
     prevSlots = slots;
   }
-  /* En üst seviyede KATALOGUN TAMAMI havuzda olmalı. */
-  eq(poolFor(30).length, allDefinitions().length, 'Sv30 havuzu:');
+  /* P2.45 — kademe tavanı 30'dan 50'ye çıktı (katalog Sv20-45 bandıyla
+     genişledi). Katalogun tamamı artık SEVİYE TAVANINDA havuzda. */
+  eq(poolFor(LEVELING.maxLevel).length, allDefinitions().length, 'Sv50 havuzu:');
+  ok(poolFor(30).length < allDefinitions().length,
+    'Sv30 havuzu kataloğun tamamını içeriyor — üst kademe erken açılıyor');
   /* Sv1 mob üst kademe eşya DÜŞÜREMEZ. */
   const weak = poolFor(1);
   for (const d of weak) ok(itemTierLevel(d) <= 1, `Sv1 havuzunda üst kademe: ${d.displayName}`);

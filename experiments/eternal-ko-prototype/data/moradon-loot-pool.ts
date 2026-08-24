@@ -41,21 +41,42 @@ import type { ItemDefinition } from './item-model.js';
  *  Katalogda `reqLevel` alanı KULLANILAMAZ: kaynakta bütün itemlerin
  *  reqLevel değeri 1 (ölçüldü). Bu yüzden bant, eşyanın GÜCÜNDEN
  *  türetilir — güçlü eşya güçlü mobdan düşer. */
+/** Katalogdaki en zayıf ve en güçlü eşyanın gücü. Bir kez hesaplanır. */
+const POWER_RANGE: { min: number; max: number } = (() => {
+  let min = Infinity, max = -Infinity;
+  for (const d of allDefinitions()) {
+    const p = rawPower(d);
+    if (p < min) min = p;
+    if (p > max) max = p;
+  }
+  return { min, max };
+})();
+
+/** Ham güç — kademe ölçeğinden BAĞIMSIZ, yoksa özyineleme olur. */
+function rawPower(def: ItemDefinition): number {
+  const atk = def.category === 'weapon' ? def.stats.attack : 0;
+  const dfn = def.category === 'armor' ? def.stats.defense : 0;
+  const dex = def.category === 'weapon' ? 0 : def.stats.dex;
+  const hp = def.stats.maxHp;
+  return atk * 2 + dfn + dex * 2 + hp / 8;
+}
+
 export function itemTierLevel(def: ItemDefinition): number {
   /* `stats` bir BİRLEŞİM tipidir: `attack` yalnız silahta, `defense`
      yalnız zırhta var. `category` ile daraltmak tip güvenliğini korur
      — `as` KULLANILMAZ. */
-  const atk = def.category === 'weapon' ? def.stats.attack : 0;
-  const dfn = def.category === 'armor' ? def.stats.defense : 0;
-  const dex = def.category === 'weapon' ? 0 : def.stats.dex;
-  const hp = def.category === 'weapon' ? def.stats.maxHp : def.stats.maxHp;
-  const power = atk * 2 + dfn + dex * 2 + hp / 8;
-  /* Ölçek: en zayıf eşya (Avcı Çizmesi, güç 11) → Sv1
-   *        en güçlü (Karanlık Yemin, güç 76)     → Sv30
-   *  Doğrusal eşleme; kırılma noktası uydurulmadı, uçlardan çözüldü. */
-  const MIN_POWER = 11, MAX_POWER = 76;
-  const t = (power - MIN_POWER) / (MAX_POWER - MIN_POWER);
-  return Math.max(1, Math.min(30, Math.round(1 + t * 29)));
+  const power = rawPower(def);
+  /* ═══ P2.45 — UÇLAR KATALOGDAN TÜRER ═══
+   *  Eskiden sabitti (11 ve 76) ve Karanlık Yemin'i tavan sayıyordu.
+   *  Katalog Sv20-45 bandıyla genişleyince beş yeni yay da kademe 30'a
+   *  SIKIŞTI: Demir Yay (güç 186) ile Karanlık Yemin (76) aynı kademede
+   *  görünüyordu ve Sv30 mobun havuzuna giriyordu.
+   *
+   *  Uçlar artık katalogdan okunur; yeni eşya eklenince ölçek
+   *  kendiliğinden yeniden yayılır. Tavan da 30'dan 50'ye çıktı —
+   *  seviye tavanıyla aynı. */
+  const t = (power - POWER_RANGE.min) / Math.max(1, POWER_RANGE.max - POWER_RANGE.min);
+  return Math.max(1, Math.min(50, Math.round(1 + t * 49)));
 }
 
 /** Mobun düşürebileceği eşyalar: SEVİYESİNİ AŞMAYAN her katalog eşyası.
