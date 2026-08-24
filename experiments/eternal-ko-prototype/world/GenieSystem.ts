@@ -72,6 +72,9 @@ export interface GenieSettings {
    *  Bir set sabitlenirse Genie SADECE o setin skillerini dener — "seçtiğim
    *  skiller yerine başkalarını atıyor" sorununun (gözlem #4) çözümü. */
   forcedSet: SetId | null;
+  /** P3.12 — SABİT KAL. Açıkken Genie karakteri HİÇ hareket ettirmez;
+   *  saldırı ve iksir sürer. Hareket tamamen joystick'e kalır. */
+  holdPosition: boolean;
   /** Karar tiki (sn). ARCHER COMBAT V1'den önce bu, spam koruması olarak 0.25'ti;
    *  artık combat ritmini ACTION LOCK belirlediği için yalnız karar gecikmesidir.
    *  Yüksek tutulursa action time'ın üstüne gecikme biner (0.90s action → 1.07s
@@ -124,6 +127,15 @@ export const GENIE_DEFAULTS: GenieSettings = {
      değiştirmek oyuncuya "neden başka skill attı" dedirtiyordu.
      `chooseSet` kilidi okur; oyuncu isterse ayar ekranından değiştirir. */
   forcedSet: 0,
+  /** P3.12 — SABİT KAL. Açıkken Genie karakteri HİÇ hareket
+   *  ettirmez; yalnız saldırır ve iksir içer. Hareket tamamen
+   *  oyuncunun joystick'ine kalır.
+   *
+   *  Zindanda kullanıcı kararıyla AÇIK: moblar zaten oyuncuya
+   *  geliyor, Genie'nin onlara doğru yürümesi dikey akışı bozuyor
+   *  ve oyuncu kontrolü kaybediyordu. Normal haritada KAPALI —
+   *  oradaki farm davranışı değişmez. */
+  holdPosition: false,
   decisionIntervalSec: 0.10,
 };
 
@@ -454,6 +466,17 @@ export class GenieSystem {
    *  `WorldMovementSystem`'i üzerinden uygular. Genie'ye özel hız YOKTUR. */
   movementIntent(mobs: WorldMob[], player: PlayerWorldState): MoveIntent {
     this.lastPlayer = { x: player.worldX, y: player.worldY };
+    /* P3.12 — SABİT KAL: hareket kararı hiç ALINMAZ. Durum makinesine
+       "kapalı" bildirilir ki farm merkezine dönme gibi kalıntı bir
+       niyet oluşmasın. Saldırı ve iksir ETKİLENMEZ. */
+    if (this.settings.holdPosition) {
+      this.movement.decide({
+        enabled: false, playerX: player.worldX, playerY: player.worldY,
+        target: null, hasEligibleTarget: false, farmCenter: this.farmCenter,
+      });
+      this.lastAutoSpeed = 0;
+      return NO_MOVE;
+    }
     if (!this.enabled) {
       this.movement.decide({
         enabled: false, playerX: player.worldX, playerY: player.worldY,

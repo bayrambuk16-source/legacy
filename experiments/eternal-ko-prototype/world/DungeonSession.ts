@@ -63,6 +63,12 @@ export class DungeonSession {
     this.state.balance.set({
       expMultiplier: this.state.balance.exp * WAVE_REWARD_MULT,
     });
+    /* P3.12 — ZİNDANDA GENIE SABİT KALIR (kullanıcı kararı).
+       Moblar zaten oyuncuya geliyor; Genie'nin onlara doğru yürümesi
+       dikey akışı bozuyor ve oyuncu kontrolü kaybediyordu. Hareket
+       tamamen joystick'e kalır, saldırı ve iksir Genie'de. */
+    this.state.genie.settings.holdPosition = true;
+
     /* NOT: karakter zaten yirmi can iksiriyle doğuyor (`PrototypeState`
        başlangıç envanteri). Zindana AYRICA iksir vermedim — ölçüm,
        asıl sorunun iksir eksikliği değil ERKEN DALGA KALABALIĞI

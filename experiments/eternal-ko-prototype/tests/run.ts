@@ -13178,7 +13178,15 @@ test('§121 ZİNDANDA GERÇEKTEN SALDIRI OLUR — mob menzile girer', () => {
      Ölçüldü — mob 668 birim uzakta doğuyordu, Genie menzili 450;
      mob da gelmiyordu çünkü aggro yarıçapı 220 idi. İki sistem
      birbirini bekliyordu. */
-  ok(SPAWN_BAND_AHEAD < 450, `doğuş menzil dışında: ${SPAWN_BAND_AHEAD}`);
+  /* P3.12 — doğuş artık MENZİL DIŞINDA ve bu DOĞRU: mob yukarıdan
+     yürüyerek gelir. Şart, mobun menzile GİREBİLMESİ — yani doğar
+     doğmaz kovalama fazında olması ve yolun makul sürede bitmesi. */
+  ok(SPAWN_BAND_AHEAD > 450, `doğuş menzil içinde — mob yürümüyor: ${SPAWN_BAND_AHEAD}`);
+  /* Şerit DAR olmalı: yanlardan doğan mob "etrafında beliriyor" gibi
+     görünüyordu (oyun testi bulgusu). */
+  const halfW = SPAWN_BAND_WIDTH / 2;
+  const angleDeg = (Math.atan2(halfW, SPAWN_BAND_AHEAD) * 180) / Math.PI;
+  ok(angleDeg < 20, `şerit çok geniş, mob yandan doğuyor: ${angleDeg.toFixed(0)}°`);
 
   const D = new DungeonSession(9200);
   D.startNextWave();
@@ -13316,6 +13324,64 @@ test('§123 İLK DALGALAR SEYREK — üç mob Sv1\'i öldürüyordu', () => {
   }
   ok(kills > 0, 'hiç mob ölmedi');
   ok(deaths <= 4, `kat 1 hâlâ çok öldürücü: iki dakikada ${deaths} ölüm`);
+});
+
+test('§124 ZİNDANDA GENIE SABİT KALIR — hareket joystick\'te', () => {
+  /* Oyun testi bulgusu: Genie moblara doğru yürüyor, dikey akış
+     bozuluyor ve oyuncu kontrolü kaybediyordu. */
+  const D = new DungeonSession(9500);
+  eq(D.state.genie.settings.holdPosition, true, 'zindanda sabit kal:');
+  /* NORMAL HARİTA etkilenmemeli — oradaki farm davranışı aynı. */
+  const S = new PrototypeState(9501);
+  eq(S.genie.settings.holdPosition, false, 'normal haritada sabit kal:');
+
+  /* Sabit kalırken hareket niyeti SIFIR olmalı. */
+  D.startNextWave();
+  const G = D.state;
+  G.genie.start(G.world);
+  for (let i = 0; i < 300; i++) {
+    const intent = G.genie.movementIntent(G.entities(), G.world);
+    eq(intent.magnitude, 0, 'sabit kalırken hareket niyeti:');
+    G.mobs.update(1 / 60, G.world);
+  }
+  /* SALDIRI ve İKSİR etkilenmemeli. */
+  const before = G.player.coins;
+  G.lootPolicy.setMode('auto');
+  let kills = 0;
+  for (let i = 0; i < 3600; i++) {
+    if (!G.player.alive) { D.onDeath(); D.startNextWave(); }
+    if (!G.genie.enabled) G.genie.start(G.world);
+    const ents = G.entities();
+    G.mobs.update(1 / 60, G.world);
+    G.potions.update(1 / 60);
+    G.genie.update(1 / 60, ents, G.world);
+    G.combat.update(1 / 60);
+    G.adapter.updateAction(1 / 60);
+    G.stepCombat(1 / 60, ents);
+    kills += G.reapDead().length;
+    if (!D.dungeon.waveActive) { D.sweepCleared(); D.startNextWave(); }
+  }
+  ok(kills > 0, 'sabit kalırken saldırı durmuş');
+  ok(G.player.coins > before, 'coin gelmiyor');
+});
+
+test('§124 MOBLAR YUKARIDAN GELİR — etrafta belirmez', () => {
+  const D = new DungeonSession(9502);
+  const S = D.state;
+  const px = S.world.worldX, py = S.world.worldY;
+  for (let w = 1; w <= 12; w++) {
+    const out = D.spawner.spawn(1, w);
+    for (const m of out.mobs) {
+      const dx = Math.abs(m.worldX - px);
+      const dy = py - m.worldY;
+      ok(dy > 0, `mob oyuncunun altında doğdu: ${dy}`);
+      /* Dikeyden sapma dar olmalı — yandan doğmasın. */
+      const deg = (Math.atan2(dx, dy) * 180) / Math.PI;
+      ok(deg < 25, `mob yandan doğdu: ${deg.toFixed(0)}°`);
+      /* Menzilin DIŞINDA doğmalı ki yürüyerek gelsin. */
+      ok(Math.hypot(dx, dy) > 450, 'mob menzil içinde doğdu — yürümüyor');
+    }
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

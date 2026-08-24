@@ -30,20 +30,24 @@ import { floorMonsters, floorStatMult, planWave, type WavePlan } from '../data/w
 
 /** Dalganın doğduğu şerit: oyuncunun kaç birim ÜSTÜ.
  *
- *  ═══ P3.10 — 620'DEN 380'E ═══
- *  Oyun testi bulgusu: "zindanda saldırı yapmıyor". Ölçüldü — moblar
- *  668 birim uzakta doğuyordu, Genie'nin saldırı menzili ise 450.
- *  Mob da gelmiyordu: `AGGRESSIVE` aggro yarıçapı 220, yani oyuncuyu
- *  hiç görmüyordu. İki sistem birbirini bekliyordu.
+ *  ═══ P3.12 — 380'DEN 720'YE, ŞERİT DARALDI ═══
+ *  Oyun testi bulgusu: "karakterin etrafında moblar doğuyor".
+ *  Ölçüldü — şerit 520 birim genişti, yani mob oyuncunun 260 birim
+ *  SAĞINDA veya SOLUNDA belirebiliyordu; 380 birim yukarıdayken bu
+ *  46 derecelik bir açı demek, yani "yandan" görünüyordu.
  *
- *  380, mobun aggro yarıçapına (220) girmesi için kısa bir yürüyüş
- *  bırakır ama Genie menzilinin (450) içinde kalır: mob yaklaşırken
- *  oyuncu ateş etmeye başlar. Dikey akış hissi korunur. */
-export const SPAWN_BAND_AHEAD = 380;
+ *  Artık şerit DAR (320) ve UZAK (720): en uç mob bile dikeyden
+ *  13 derece sapar, yani net biçimde YUKARIDA doğar ve aşağı yürür.
+ *
+ *  Uzaklık artık sorun değil: P3.10'da dalga mobları doğar doğmaz
+ *  KOVALAMA fazına alınıyor, yani aggro yarıçapını beklemiyorlar.
+ *  75 birim/sn kovalama hızıyla 720 birim ≈ 7 saniyelik bir yaklaşma;
+ *  dalga hissi tam da bu. */
+export const SPAWN_BAND_AHEAD = 720;
 /** Şeridin yatay genişliği — moblar buna yayılır. */
-export const SPAWN_BAND_WIDTH = 520;
+export const SPAWN_BAND_WIDTH = 320;
 /** Şeridin dikey derinliği: hepsi tam aynı hizada belirmesin. */
-export const SPAWN_BAND_DEPTH = 180;
+export const SPAWN_BAND_DEPTH = 140;
 
 export interface WaveSpawnDeps {
   rng: () => number;
