@@ -38,6 +38,10 @@ export interface GroundLootSpec {
   kind: 'item' | 'coin';
   itemRef: number;
   quantity: number;
+  /** P3.6 — düşen eşyanın yükseltme seviyesi. Zindanda +1 gelir;
+   *  normal haritada 0 kalır. Yerden toplanınca korunmalı, yoksa
+   *  oto toplama kapalıyken zindan kuralı sessizce kaybolur. */
+  upgradeLevel?: number;
   ownerPlayerId: number;
   worldX: number;
   worldY: number;
@@ -70,6 +74,7 @@ export class WorldLootSystem {
       kind: spec.kind,
       itemRef: spec.itemRef,
       quantity: spec.quantity,
+      upgradeLevel: spec.upgradeLevel ?? 0,
       ownerPlayerId: spec.ownerPlayerId,
       worldX: spec.worldX,
       worldY: spec.worldY,
@@ -131,7 +136,11 @@ export class WorldLootSystem {
     if (loot.kind === 'coin') {
       if (this.player) this.player.coins += loot.quantity;
     } else {
-      const add = this.inventory.add(loot.itemRef, { quantity: loot.quantity });
+      /* P3.6 — yükseltme YERDEN TOPLAYINCA da korunur; yoksa oto
+         toplama kapalıyken zindanın +1 kuralı sessizce kaybolur. */
+      const add = this.inventory.add(loot.itemRef, {
+        quantity: loot.quantity, upgradeLevel: loot.upgradeLevel ?? 0,
+      });
       if (!add.ok) return { ok: false, reason: 'inventoryFull', lootUid };
     }
 

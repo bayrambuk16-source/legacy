@@ -61,6 +61,8 @@ export interface WorldGroundLoot {
   itemRef: number;
   /** item için adet, coin için miktar. */
   quantity: number;
+  /** P3.6 — zindanda +1 gelen ekipmanın yükseltme seviyesi. */
+  upgradeLevel?: number;
   /** SAHİPLİK — pickup doğrulamasında AUTHORITATIVE (§6). */
   ownerPlayerId: number;
   worldX: number;

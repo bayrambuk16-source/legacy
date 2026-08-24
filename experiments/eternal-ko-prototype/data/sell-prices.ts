@@ -61,6 +61,14 @@ export const FIXED_SELL_PRICES: Readonly<Record<number, number>> = {
   389016000: 30,
 };
 
+/** ═══ ZİNDAN GANİMETİ ═══
+ *
+ *  Değeri KATA GÖRE değişir, bu yüzden sabit tabloda DURAMAZ.
+ *  `trophyValue(floor)` hesaplar; burada yalnız referansı tutulur.
+ *
+ *  Kaynak: `items.json` 379107000 "Altın Sikke". Yığılabilir. */
+export const DUNGEON_TROPHY_REF = 379107000;
+
 /** Sabit fiyatlı mı? */
 export function fixedSellPrice(itemRef: number): number | null {
   return FIXED_SELL_PRICES[itemRef] ?? null;

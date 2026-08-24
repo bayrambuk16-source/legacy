@@ -30,6 +30,7 @@ import {
   HIGH_TIER_MONSTER_LEVEL, HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF,
   equipChanceFor, pickFromPool, poolFor,
 } from '../data/moradon-loot-pool.js';
+import { WAVE_REWARD_MULT, coinForKill, dungeonLootLevel } from '../data/wave-floors.js';
 import {
   DROP_TUNING_V1, dropProfile, effectiveCoin,
   type DropTuning, type MonsterDropProfile,
@@ -93,6 +94,23 @@ export interface DropSystemDeps {
   /** P2.13 — envantere yeni eşya girdi. Oto giy kancası; bağlanmazsa
    *  drop davranışı P2.12 ile birebir aynıdır. */
   onItemAcquired?: (instanceId: number) => void;
+  /** ═══ P3.6 — ZİNDAN KİPİ ═══
+   *
+   *  Bağlanmazsa NORMAL HARİTA davranışı birebir korunur; zindan
+   *  kuralları yalnız bu kanca varken devreye girer. Bu, "zindan
+   *  kuralı normal haritaya sızmasın" şartının tek yerde tutulmuş
+   *  hâlidir. */
+  dungeon?: {
+    /** Bulunulan kat — ganimet değeri ve kademe bundan türer. */
+    floor: () => number;
+    /** Ödül çarpanı (EXP ve coin). Kullanıcı kararı: yarısı. */
+    rewardMult: number;
+    /** Düşen ekipmanın başlangıç yükseltmesi. Kullanıcı kararı: +1. */
+    dropUpgrade: number;
+    /** Ganimet eşyası ve şansı. */
+    trophyRef: number;
+    trophyChance: number;
+  };
 }
 
 /** Parşömen düşme şansı (mob başına). PROJECT LEGACY KARARI — kaynaktan
@@ -126,7 +144,10 @@ export class DropSystem {
   /** Toplam sayaçlar (soak/telemetri). */
   readonly totals = { kills: 0, items: 0, coin: 0, toInventory: 0, toGround: 0, blockedFull: 0 };
 
-  constructor(private deps: DropSystemDeps) {}
+  /** `deps` PUBLIC: zindan kancası kurulumdan SONRA bağlanır
+   *  (`DungeonSession`). Kurucuya taşımak `PrototypeState` imzasını
+   *  zindana bulaştırırdı — normal dünya bu kancayı hiç görmemeli. */
+  constructor(readonly deps: DropSystemDeps) {}
 
   profileFor(monsterRef: number): MonsterDropProfile | null { return dropProfile(monsterRef); }
 
@@ -158,6 +179,9 @@ export class DropSystem {
       autoLoot,
     };
 
+    /* Zindan kipi: bağlı değilse NORMAL HARİTA davranışı birebir. */
+    const dg = this.deps.dungeon;
+
     /* ── 2) EKİPMAN — P2.30'DAN İTİBAREN KATALOGDAN TÜRER ──
        Kaynak ganimet tabloları kataloğumuzun ancak yarısını kapsıyordu:
        takıların HİÇBİRİ, A1'de eklenen Avcı/Zırhlı Avcı setlerinin de
@@ -183,13 +207,21 @@ export class DropSystem {
     /* Ekipman şansı seviyeye bağlı: üst seviye moblarda İKİ KAT ZOR
        (kullanıcı kararı) — ganimet daha değerli, daha seyrek. */
     if (this.deps.rng() < equipChanceFor(mob.monster.level, eliteX === 2)) {
-      const pool = poolFor(mob.monster.level);
-      const pick = pickFromPool(pool, mob.monster.level, this.deps.rng());
+      /* Zindanda havuz BİR BANT AŞAĞIDAN gelir: ödül yarıya inerken
+         drop ŞANSINA dokunmamak için kademe düşürülür (ölçüldü: şansı
+         yarıya indirmek üst katlarda modu ölü hissettiriyor). */
+      const lootLv = dg ? dungeonLootLevel(mob.monster.level) : mob.monster.level;
+      const pool = poolFor(lootLv);
+      const pick = pickFromPool(pool, lootLv, this.deps.rng());
       if (pick) {
-        ev.records.push(
-          this.deliverItem(mob, pick.definitionRef, 1, 'group', autoLoot, owner),
-        );
+        ev.records.push(this.deliverItem(
+          mob, pick.definitionRef, 1, 'group', autoLoot, owner, dg?.dropUpgrade ?? 0,
+        ));
       }
+    }
+    /* P3.6 — ZİNDAN GANİMETİ: kata göre değeri artan, yığılabilir eşya. */
+    if (dg && this.deps.rng() < dg.trophyChance) {
+      ev.records.push(this.deliverItem(mob, dg.trophyRef, 1, 'scroll', autoLoot, owner));
     }
 
     /* ── 2b) YÜKSELTME PARŞÖMENİ (P2.8) ──
@@ -212,7 +244,13 @@ export class DropSystem {
     }
 
     /* ── 3) COIN — envanter slotu KAPLAMAZ, tek authority (§14) ── */
-    const coin = profile ? effectiveCoin(profile, this.tuning) : rolled.coin;
+    /* P3.6 — ZİNDANDA COIN mobun SEVİYESİNDEN türer, kaynak tablodan
+       değil: zindan mobu ölçeklenmiş bir kopyadır ve tablodaki sabit
+       coin onun zorluğunu yansıtmaz. Ölçek `K_MONSTER.iMoney`den
+       çıkarıldı (≈17 coin/seviye) — uydurma değil. */
+    const coin = dg
+      ? coinForKill(mob.monster.level, dg.rewardMult / WAVE_REWARD_MULT)
+      : (profile ? effectiveCoin(profile, this.tuning) : rolled.coin);
     if (coin > 0) {
       ev.coin = coin;
       if (autoLoot) {
@@ -240,16 +278,19 @@ export class DropSystem {
   }
 
   /** Tek bir itemin teslimatı. Envanter reddi item'ı YOK ETMEZ (§8/§16). */
+  /** @param upgradeLevel P3.6 — zindanda ekipman +1 gelir. Varsayılan 0
+   *  olduğu için NORMAL HARİTA davranışı değişmez. */
   private deliverItem(
     mob: WorldMob, itemRef: number, quantity: number,
     from: DropRecord['from'], autoLoot: boolean, owner: number,
+    upgradeLevel = 0,
   ): DropRecord {
     const itemName = Content.item(itemRef)?.displayName ?? `#${itemRef}`;
     this.totals.items += quantity;
 
     if (autoLoot) {
       /* MESAFE KONTROLÜ YOKTUR — sahiplik + envanter yeterlidir (§7). */
-      const add = this.deps.inventory.add(itemRef, { quantity });
+      const add = this.deps.inventory.add(itemRef, { quantity, upgradeLevel });
       if (add.ok) {
         this.totals.toInventory += quantity;
         /* P2.13 — OTO GİY. Düşen eşya güç skorunu yükseltiyorsa kuşanılır.
@@ -267,6 +308,7 @@ export class DropSystem {
     /* Yere düş — DAİMA MOBUN ÖLÜM NOKTASI, oyuncunun konumu DEĞİL. */
     const entity = this.deps.ground.spawn({
       kind: 'item', itemRef, quantity, ownerPlayerId: owner,
+      upgradeLevel,
       worldX: mob.worldX, worldY: mob.worldY,
       sourceMobUid: mob.uid, sourceSpawnSlot: mob.slotId,
       sourceGeneration: mob.generation, sourceMonsterRef: mob.monster.sourceRef,

@@ -81,6 +81,7 @@ import {
 import { DungeonState } from '../world/DungeonState.js';
 import { DungeonSession } from '../world/DungeonSession.js';
 import { DUNGEON_SAVE_KEY, PROTO_SAVE_KEY } from '../data/proto-save.js';
+import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
@@ -12851,6 +12852,108 @@ test('§116 KAYIT/YÜKLEME: karakter ve kat BİRLİKTE', () => {
   eq(D2.state.player.coins, 4_321, 'geri yüklenen altın:');
   eq(D2.dungeon.floor, 5, 'geri yüklenen kat:');
   eq(D2.dungeon.wave, 1, 'dalga 1\'den başlamalı:');
+});
+
+/* ================= P3.6 — ZİNDAN ÖDÜLLERİ ================= */
+console.log('P3.6 — zindan ödülleri (aşama 5):');
+
+/** Zindanda bir dalgayı öldürüp ganimeti toplar. */
+function farmDungeonWave(D: DungeonSession): void {
+  D.startNextWave();
+  for (const m of D.state.mobs.mobs) {
+    if (!m.slotId.startsWith('wave_')) continue;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+  }
+  D.state.reapDead();
+  for (const m of D.state.mobs.mobs) { m.hp = 0; m.ai = 'dead'; }
+  D.sweepCleared();
+}
+
+test('§117 ZİNDAN DROPLARI +1 gelir', () => {
+  const D = new DungeonSession(8000);
+  D.state.lootPolicy.setMode('auto');
+  D.state.autoGear.settings.autoEquip = false;
+  /* BAŞLANGIÇ EŞYASI hariç: oyuncu +0 bir yayla doğuyor, o drop değil. */
+  const initial = new Set(D.state.inventory.allEntries().map((e) => e.instanceId));
+  let seen = 0;
+  for (let i = 0; i < 120 && seen < 3; i++) {
+    farmDungeonWave(D);
+    for (const inst of D.state.inventory.allEntries()) {
+      if (initial.has(inst.instanceId) || !definitionOf(inst.itemRef)) continue;
+      eq(inst.upgradeLevel, DUNGEON_DROP_UPGRADE, 'zindan dropu +1 olmalı:');
+      seen += 1;
+    }
+  }
+  ok(seen > 0, 'zindan hiç ekipman düşürmedi');
+});
+
+test('§117 COIN her mobdan düşer ve SEVİYEYLE artar', () => {
+  const D = new DungeonSession(8001);
+  D.state.lootPolicy.setMode('auto');
+  const before = D.state.player.coins;
+  farmDungeonWave(D);
+  ok(D.state.player.coins > before, 'coin düşmedi');
+
+  /* Üst kat daha çok coin vermeli. */
+  const low = new DungeonSession(8002);
+  low.state.lootPolicy.setMode('auto');
+  farmDungeonWave(low);
+  const lowGain = low.state.player.coins;
+
+  const high = new DungeonSession(8003);
+  high.state.lootPolicy.setMode('auto');
+  high.dungeon.jumpTo(1);
+  for (let i = 0; i < 5; i++) { farmDungeonWave(high); high.dungeon.nextFloor(); }
+  const perKillLow = coinForKill(3, 1);
+  const perKillHigh = coinForKill(25, 1);
+  ok(perKillHigh > perKillLow, 'üst kat coin\'i düşük görünüyor');
+  ok(lowGain > 0, 'alt katta coin yok');
+});
+
+test('§117 ÖDÜL YARIYA — EXP çarpanı zindanda düşük', () => {
+  const normal = new PrototypeState(8004);
+  const D = new DungeonSession(8005);
+  ok(D.state.balance.exp < normal.balance.exp, 'zindan EXP çarpanı düşük değil');
+  ok(Math.abs(D.state.balance.exp - normal.balance.exp * WAVE_REWARD_MULT) < 1e-9,
+    'EXP çarpanı yarıya inmemiş');
+});
+
+test('§117 ZİNDAN GANİMETİ: kata göre değeri artar, yığılabilir', () => {
+  eq(fixedSellPrice(DUNGEON_TROPHY_REF), 50_000, 'sabit fiyat (normal harita):');
+  /* Zindanda değer KATA göre: kat 1'de 5 000, kat 10'da 50 000. */
+  eq(trophyValue(1), 5_000, 'kat 1:');
+  eq(trophyValue(10), 50_000, 'kat 10:');
+  /* Yığılabilir olmalı. */
+  const D = new DungeonSession(8006);
+  const a = D.state.inventory.add(DUNGEON_TROPHY_REF, { quantity: 7 });
+  ok(a.ok, 'ganimet envantere girmeli');
+  if (a.ok) eq(a.instance.quantity, 7, 'yığın:');
+});
+
+test('§117 ZİNDAN KURALLARI NORMAL HARİTAYA SIZMAZ', () => {
+  /* En kritik ayrım. Kanca yalnız `DungeonSession` içinde bağlanır. */
+  const S = new PrototypeState(8007);
+  eq(S.drops.deps.dungeon, undefined, 'normal haritada zindan kancası:');
+  const D = new DungeonSession(8008);
+  ok(D.state.drops.deps.dungeon !== undefined, 'zindanda kanca yok');
+
+  /* Normal haritada drop hâlâ +0. */
+  S.lootPolicy.setMode('auto');
+  S.autoGear.settings.autoEquip = false;
+  const start = new Set(S.inventory.allEntries().map((e) => e.instanceId));
+  let checked = 0;
+  for (let i = 0; i < 600 && checked < 3; i++) {
+    const m = S.mobs.mobs[i % S.mobs.mobs.length]!;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+    S.reapDead();
+    m.ai = 'idle'; m.hp = m.maxHp; m.state = 'walk';
+    for (const inst of S.inventory.allEntries()) {
+      if (start.has(inst.instanceId) || !definitionOf(inst.itemRef)) continue;
+      eq(inst.upgradeLevel, 0, 'normal harita dropu +0 kalmalı:');
+      checked += 1;
+    }
+  }
+  ok(checked > 0, 'senaryo ekipman düşürmedi');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

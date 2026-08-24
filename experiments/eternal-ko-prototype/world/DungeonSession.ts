@@ -26,6 +26,10 @@ import { DungeonState } from './DungeonState.js';
 import { WaveSpawner } from './WaveSpawner.js';
 import { mulberry32 } from '../../../src/engine/rng.js';
 import { ACTIVE_WORLD } from '../data/world-map.js';
+import {
+  DUNGEON_DROP_UPGRADE, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE,
+} from '../data/wave-floors.js';
+import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 
 export class DungeonSession {
   /** Zindan karakteri — normal dünyadakinden BAĞIMSIZ. */
@@ -43,6 +47,21 @@ export class DungeonSession {
       playerAt: () => ({ x: this.state.world.worldX, y: this.state.world.worldY }),
     });
     this.dungeon = new DungeonState(this.spawner);
+    /* ═══ ZİNDAN ÖDÜL KURALLARI ═══
+       Kanca burada bağlanır; normal dünyanın `PrototypeState` örneği
+       bunu ASLA görmez, o yüzden zindan kuralı oraya sızamaz. */
+    this.state.drops.deps.dungeon = {
+      floor: () => this.dungeon.floor,
+      rewardMult: WAVE_REWARD_MULT,
+      dropUpgrade: DUNGEON_DROP_UPGRADE,
+      trophyRef: DUNGEON_TROPHY_REF,
+      trophyChance: WAVE_TROPHY_CHANCE,
+    };
+    /* EXP de yarıya iner — kullanıcı kararı. `BalanceProfile` zaten
+       bu iş için var; ayrı bir çarpan katmanı eklemedim. */
+    this.state.balance.set({
+      expMultiplier: this.state.balance.exp * WAVE_REWARD_MULT,
+    });
   }
 
   /** Doğan dalgayı dünyaya bağlar: `MobSlotSystem`in mob listesine
