@@ -13095,5 +13095,46 @@ test('§119 EKONOMİK DÖNGÜ: coin geliri iksir masrafıyla AYNI ÖLÇEKTE', ()
   }
 });
 
+test('§120 SAHNE BAĞLANTISI: zindan kuralları tek yerde dallanır', () => {
+  /* Ayrı sahne yazmadım — HUD/girdi/panel kodu ikiye kopyalanır ve
+     zamanla ayrışırdı. Dallanma yalnız davranışın GERÇEKTEN farklı
+     olduğu yerlerde olmalı; kaynak metni bunu korur. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+
+  /* Zindana girince `S` DEĞİŞİR, normal karakter SAKLANIR. */
+  ok(/this\.overworld = this\.S;/.test(src), 'normal karakter saklanmıyor');
+  ok(/this\.S = d\.state;/.test(src), 'zindan karakterine geçilmiyor');
+  ok(/this\.S\.saveNow\(\);/.test(src), 'girişte normal ilerleme kaydedilmiyor');
+  ok(/d\.save\(\);/.test(src), 'çıkışta zindan ilerlemesi kaydedilmiyor');
+
+  /* Zindanda ölüm ekranı AÇILMAZ — kat düşüşü onun yerine geçer.
+     İkisi birden devreye girerse oyuncu iki kez cezalandırılır. */
+  ok(/!this\.deathOpen && !this\.inDungeon/.test(src), 'zindanda ölüm ekranı açılıyor');
+
+  /* Genie zindanda SÜREKLİ AÇIK (kullanıcı kararı). */
+  ok(/this\.inDungeon && !this\.genieOpen/.test(src), 'zindanda Genie sürekli açık değil');
+
+  /* Mağaza açıkken başka girdi işlenmemeli. */
+  ok(/if \(this\.shopOpen\) \{ this\.handleShopInput\(p\); return; \}/.test(src),
+    'mağaza girdiyi kilitlemiyor');
+});
+
+test('§120 ZİNDAN GİRİŞ/ÇIKIŞ karakterleri KARIŞTIRMAZ', () => {
+  /* Sahne katmanını burada süremiyoruz, ama oturum katmanı aynı
+     sözleşmeyi taşır: iki karakter ayrı örnek, ayrı anahtar. */
+  const over = new PrototypeState(9100);
+  over.player.level = 25; over.player.coins = 50_000;
+  const D = new DungeonSession(9101);
+  D.state.player.level = 3; D.state.player.coins = 200;
+
+  /* Zindanda altın harcamak normal karakteri ETKİLEMEMELİ. */
+  const e = shopCatalog()[0]!;
+  D.state.player.coins = e.unitPrice * 2;
+  ok(D.buyPotion(e.itemRef, 2).ok, 'zindanda alım');
+  eq(over.player.coins, 50_000, 'normal altın değişmemeli:');
+  eq(over.player.level, 25, 'normal seviye değişmemeli:');
+  eq(D.state.player.level, 3, 'zindan seviyesi:');
+});
+
 console.log(`\n${pass} geçti, ${fail} kaldı`);
 if (fail > 0) process.exit(1);

@@ -13,6 +13,14 @@ import { StatCalculator } from '../../../src/game/systems/CharacterStats.js';
 import type { ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import { PLAYER_SPEED_OPTIONS, PROTO, TUNING_DEFAULTS, type TuningValues } from '../config.js';
 import { DEATH_EXP_PENALTY, PrototypeState } from '../state.js';
+import { DungeonSession } from '../world/DungeonSession.js';
+import {
+  DUNGEON_FLOOR_BOX, DUNGEON_INFO, DUNGEON_POWER_ROW, DUNGEON_SHOP_BTN, DUNGEON_WAVE_BOX,
+  SHOP_CLOSE, SHOP_PANEL, dungeonActions, dungeonHitTest, shopBuyButtons, shopRows,
+} from '../ui/dungeon-hud.js';
+import { shopCatalog } from '../ui/potion-shop.js';
+import { RISK_LABEL, combatPower, floorRisk } from '../data/combat-power.js';
+import { recommendedPower } from '../data/wave-floors.js';
 import { nextQuality } from '../data/quality-profile.js';
 import {
   resolveJoystick, type JoystickInput, type MoveVector,
@@ -206,7 +214,22 @@ function skillName(ref: number): string {
 export class WorldPrototypeScene implements Scene {
   readonly key = 'world-proto';
   private bag = new DisposerBag();
+  /* ═══ P3.8 — TEK SAHNE, İKİ DÜNYA ═══
+     Zindan için AYRI SAHNE yazmadım. Sebep: bu dosyadaki HUD, girdi,
+     panel ve kamera kodunun neredeyse tamamı iki modda da aynı; ayrı
+     sahne bunları KOPYALARDI ve iki kopya zamanla ayrışırdı.
+
+     Bunun yerine `S` DEĞİŞTİRİLEBİLİR: zindana girince zindan
+     karakterine, çıkınca normal karaktere işaret eder. Dallanma
+     yalnız DAVRANIŞIN GERÇEKTEN FARKLI olduğu yerlerdedir (dalga
+     akışı, zindan HUD'ı, kayıt anahtarı). */
   private S = new PrototypeState();
+  /** Zindan oturumu — `null` = normal dünyadayız. */
+  private dungeon: DungeonSession | null = null;
+  /** Normal dünya durumu, zindandayken saklanır. */
+  private overworld: PrototypeState | null = null;
+  /** İksir mağazası açık mı. */
+  private shopOpen = false;
 
   /** P2.15 — kayıt erişimi. `main.ts` sahne başlamadan ÖNCE yükler ve
    *  sekme kapanırken yazar; durum nesnesi sahnenin içinde olduğu için
@@ -647,6 +670,12 @@ export class WorldPrototypeScene implements Scene {
 
     /* Genie ayar ekranı MODAL'dır: açıkken alttaki hiçbir kontrol tetiklenmez. */
     if (this.genieOpen) { this.handleGenieSettings(p); return; }
+    /* Zindan mağazası AÇIKKEN başka hiçbir girdi işlenmez. */
+    if (this.shopOpen) { this.handleShopInput(p); return; }
+    /* Zindan eylem düğmeleri panellerden ÖNCE: kat değiştirmek
+       çanta açmaktan daha acil bir eylemdir. */
+    if (this.inDungeon && this.handleDungeonInput(p)) return;
+
     /* Ölüm ekranı AÇIKKEN başka hiçbir girdi işlenmez. */
     if (this.deathOpen) {
       if (this.hit(p, deathOkButton())) {
@@ -674,7 +703,7 @@ export class WorldPrototypeScene implements Scene {
        giriş noktası netleşsin ve yerleşim testi bugünden korunsun. */
     if (this.hit(p, { id: 'dungeon', ...HUD_DUNGEON_BTN, label: '' })) {
       this.host.audio.play('ui');
-      this.say('Zindan hazırlanıyor — dalga modu yakında');
+      this.enterDungeon();
       return;
     }
     for (const n of this.navButtons()) {
@@ -1317,9 +1346,20 @@ export class WorldPrototypeScene implements Scene {
        sonucunu görmek yerine yarı yarıya eski davranışı görürsün.
 
        ÖLÜM EKRANI da durdurur: ölü karakter saldıramaz. */
+    /* P3.8 — ZİNDANDA GENIE SÜREKLİ AÇIK (kullanıcı kararı): modun
+       kendisi otomatik farm üzerine kuruludur. Ayar ekranı yine
+       durdurur — orada set değiştirirken cast etmesi karışıklık
+       yaratır. */
+    if (this.inDungeon && !this.genieOpen && this.S.player.alive) {
+      this.S.genie.start(this.S.world);
+    }
     if (!this.genieOpen && !this.deathOpen) {
       this.applyGenieActions(this.S.genie.update(dt, this.ents(), this.S.world));
     }
+
+    /* P3.8 — ZİNDAN AKIŞI. Normal dünyada `dungeon` null olduğu için
+       bu çağrı hiçbir şey yapmaz; zindan kuralları oraya sızamaz. */
+    this.tickDungeon();
 
     this.reapDead();
 
@@ -1404,7 +1444,10 @@ export class WorldPrototypeScene implements Scene {
        dönüşle geçiştiriliyordu; oyuncu ne olduğunu görmüyordu.
        Artık ekran durur, bildirim çıkar ve TAMAM'a basınca doğuş
        noktasına ışınlanılır. */
-    if (!this.S.player.alive && !this.deathOpen) {
+    /* P3.8 — ZİNDANDA ölüm ekranı AÇILMAZ: kat düşüşü `tickDungeon`
+       tarafından işlenir ve oyuncu akışta kalır. İki sistemin birden
+       devreye girmesi oyuncuyu iki kez cezalandırırdı. */
+    if (!this.S.player.alive && !this.deathOpen && !this.inDungeon) {
       this.deathOpen = true;
       this.deathAt = { x: this.S.world.worldX, y: this.S.world.worldY };
     }
@@ -1430,6 +1473,8 @@ export class WorldPrototypeScene implements Scene {
     if (this.charOpen) this.renderCharacter(g);
     if (this.skillOpen) this.renderSkills(g);
     if (this.forgeOpen) this.renderForge(g);
+    if (this.inDungeon) this.renderDungeonHud(g);
+    if (this.shopOpen) this.renderShop(g);
     if (this.deathOpen) this.renderDeath(g);
     if (this.sellOpen) this.renderSell(g);
   }
@@ -2553,6 +2598,179 @@ export class WorldPrototypeScene implements Scene {
       g.text(right, PROTO.screenW / 2, 58,
         { align: 'center', size: 11, color: '#8d8272' });
     }
+  }
+
+
+  /* ═══════════════ ZİNDAN MODU ═══════════════ */
+
+  get inDungeon(): boolean { return this.dungeon !== null; }
+
+  /** Zindana gir. Normal karakter SAKLANIR, silinmez. */
+  private enterDungeon(): void {
+    if (this.dungeon) return;
+    this.S.saveNow();                       // normal ilerleme kaybolmasın
+    this.overworld = this.S;
+    const d = new DungeonSession();
+    d.load();                               // önceki zindan ilerlemesi varsa
+    this.dungeon = d;
+    this.S = d.state;
+    this.S.targets.clear();
+    this.say(`Zindan — Kat ${d.dungeon.floor}`);
+  }
+
+  /** Zindandan çık. Zindan ilerlemesi KAYDEDİLİR. */
+  private exitDungeon(): void {
+    const d = this.dungeon;
+    if (!d || !this.overworld) return;
+    d.save();
+    this.dungeon = null;
+    this.shopOpen = false;
+    this.S = this.overworld;
+    this.overworld = null;
+    this.S.targets.clear();
+    this.say('Moradon\'a döndün');
+  }
+
+  /** Zindan kare akışı: dalga doğur, temizleneni süpür, ölümü işle.
+   *  Normal dünyanın `update`i BU KODU HİÇ ÇALIŞTIRMAZ. */
+  private tickDungeon(): void {
+    const d = this.dungeon;
+    if (!d) return;
+    if (!this.S.player.alive) {
+      const floor = d.onDeath();
+      this.say(`Öldün — Kat ${floor}`);
+      return;
+    }
+    if (d.sweepCleared()) {
+      this.say(`Dalga ${d.dungeon.wave - 1} temiz`);
+      return;                                // bir kare nefes: art arda doğmasın
+    }
+    if (!d.dungeon.waveActive) d.startNextWave();
+  }
+
+  /** Zindan HUD'ı: üstte bilgi, altta eylem. Savaş alanı BOŞ kalır. */
+  private renderDungeonHud(g: DrawApi): void {
+    const d = this.dungeon;
+    if (!d) return;
+    const A = 0.95;
+    const f = this.S.stats.finalStats();
+    const power = combatPower({
+      attack: f.attack, defense: f.defense, maxHp: f.maxHp, maxMp: f.maxMp,
+      dex: this.S.stats.effectiveDex(), sta: this.S.stats.effectiveSta(),
+    });
+    const rec = recommendedPower(d.dungeon.floor);
+    const risk = floorRisk(power, rec);
+
+    g.rect(DUNGEON_INFO.x, DUNGEON_INFO.y, DUNGEON_INFO.w, DUNGEON_INFO.h, '#100d08', 0.82);
+    g.rect(DUNGEON_INFO.x, DUNGEON_INFO.y, DUNGEON_INFO.w, 2, '#c9a05a', A);
+    g.text(`KAT ${d.dungeon.floor}`, DUNGEON_FLOOR_BOX.x + 8, DUNGEON_FLOOR_BOX.y + 10,
+      { size: 17, bold: true, color: '#e8d9a0' });
+    g.text(`Dalga ${d.dungeon.wave}`,
+      DUNGEON_WAVE_BOX.x + DUNGEON_WAVE_BOX.w - 8, DUNGEON_WAVE_BOX.y + 12,
+      { align: 'right', size: 14, color: '#cfc7b6' });
+    g.text(`Güç ${power}  ·  Önerilen ${rec}`,
+      DUNGEON_POWER_ROW.x + 8, DUNGEON_POWER_ROW.y + 10, { size: 12, color: '#8d8272' });
+    g.text(RISK_LABEL[risk], DUNGEON_POWER_ROW.x + DUNGEON_POWER_ROW.w - 8,
+      DUNGEON_POWER_ROW.y + 8, {
+        align: 'right', size: 14, bold: true,
+        color: risk === 'safe' ? '#7fa85c' : risk === 'fair' ? '#e8d9a0'
+          : risk === 'high' ? '#e08a3c' : '#c96a5a',
+      });
+    /* En yüksek kat — geri dönüş hedefi. */
+    if (d.dungeon.highestFloor > d.dungeon.floor) {
+      g.text(`En yüksek: ${d.dungeon.highestFloor}`,
+        DUNGEON_FLOOR_BOX.x + 8, DUNGEON_FLOOR_BOX.y + 30, { size: 10, color: '#6f655a' });
+    }
+
+    for (const b of dungeonActions()) {
+      /* İLERİ dalga sürerken PASİF — neden pasif olduğu görünsün. */
+      const blocked = b.id === 'dg_next' && d.dungeon.waveActive;
+      const atBottom = b.id === 'dg_prev' && d.dungeon.floor <= 1;
+      const off = blocked || atBottom;
+      g.rect(b.x, b.y, b.w, b.h, off ? '#141009' : '#2c2417', A);
+      g.rect(b.x, b.y, b.w, 2, off ? '#3a3128' : '#e08a3c', A);
+      g.text(b.label, b.x + b.w / 2, b.y + b.h / 2 - 9,
+        { align: 'center', size: 15, bold: true, color: off ? '#6f655a' : '#e8d9a0' });
+    }
+    g.rect(DUNGEON_SHOP_BTN.x, DUNGEON_SHOP_BTN.y,
+      DUNGEON_SHOP_BTN.w, DUNGEON_SHOP_BTN.h, '#241c14', A);
+    g.rect(DUNGEON_SHOP_BTN.x, DUNGEON_SHOP_BTN.y, DUNGEON_SHOP_BTN.w, 2, '#c9a05a', A);
+    g.text('İKSİR', DUNGEON_SHOP_BTN.x + DUNGEON_SHOP_BTN.w / 2,
+      DUNGEON_SHOP_BTN.y + 15, { align: 'center', size: 13, bold: true, color: '#e8d9a0' });
+  }
+
+  /** Zindan eylem düğmeleri. */
+  private handleDungeonInput(p: PointerEventInfo): boolean {
+    const d = this.dungeon;
+    if (!d) return false;
+    const hit = dungeonHitTest(p.x, p.y);
+    if (hit === null) return false;
+    this.host.audio.play('ui');
+    if (hit.kind === 'shop') { this.shopOpen = true; return true; }
+    if (hit.id === 'dg_exit') { this.exitDungeon(); return true; }
+    if (hit.id === 'dg_prev') {
+      const r = d.dungeon.previousFloor();
+      this.say(r.ok ? `Kat ${r.floor}` : 'En alttasın');
+      return true;
+    }
+    const r = d.dungeon.nextFloor(this.S.player.alive);
+    this.say(r.ok ? `Kat ${r.floor}` : 'Önce dalgayı temizle');
+    return true;
+  }
+
+  /** İksir mağazası. */
+  private renderShop(g: DrawApi): void {
+    const d = this.dungeon;
+    if (!d) return;
+    g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.8);
+    g.rect(SHOP_PANEL.x, SHOP_PANEL.y, SHOP_PANEL.w, SHOP_PANEL.h, '#100d08', 0.97);
+    g.rect(SHOP_PANEL.x, SHOP_PANEL.y, SHOP_PANEL.w, 3, '#c9a05a');
+    g.text('İKSİR MAĞAZASI', SHOP_PANEL.x + SHOP_PANEL.w / 2, SHOP_PANEL.y + 18,
+      { align: 'center', size: 15, bold: true, color: '#e8d9a0' });
+    g.text(`${this.S.player.coins} altın`, SHOP_PANEL.x + SHOP_PANEL.w / 2,
+      SHOP_PANEL.y + 40, { align: 'center', size: 12, color: '#c9a05a' });
+    g.rect(SHOP_CLOSE.x, SHOP_CLOSE.y, SHOP_CLOSE.w, SHOP_CLOSE.h, '#241c14');
+    g.text(SHOP_CLOSE.label, SHOP_CLOSE.x + SHOP_CLOSE.w / 2, SHOP_CLOSE.y + 12,
+      { align: 'center', size: 15, color: '#cfc7b6' });
+
+    const cat = shopCatalog();
+    shopRows().forEach((r, i) => {
+      const e = cat[i];
+      if (!e) return;
+      g.rect(r.x, r.y, r.w, r.h, '#1a1610', 0.9);
+      g.rect(r.x, r.y, r.w, 2, e.resource === 'hp' ? '#c96a5a' : '#6f8fd0');
+      g.text(e.displayName, r.x + 10, r.y + 8, { size: 12, bold: true, color: '#e8e0d0' });
+      g.text(`${e.resource === 'hp' ? 'Can' : 'Mana'} +${e.restoreAmount}  ·  ${e.unitPrice} altın`,
+        r.x + 10, r.y + 28, { size: 10, color: '#8d8272' });
+      g.text(`x${this.S.inventory.count(e.itemRef)}`, r.x + r.w - 160, r.y + 18,
+        { align: 'right', size: 11, color: '#cfc7b6' });
+      for (const b of shopBuyButtons(r)) {
+        const can = this.S.player.coins >= e.unitPrice * b.qty;
+        g.rect(b.x, b.y, b.w, b.h, can ? '#2c2417' : '#141009');
+        g.rect(b.x, b.y, b.w, 2, can ? '#7fa85c' : '#3a3128');
+        g.text(`x${b.qty}`, b.x + b.w / 2, b.y + b.h / 2 - 7,
+          { align: 'center', size: 12, bold: true, color: can ? '#e8d9a0' : '#6f655a' });
+      }
+    });
+  }
+
+  private handleShopInput(p: PointerEventInfo): void {
+    const d = this.dungeon;
+    if (!d) return;
+    if (this.hit(p, SHOP_CLOSE)) { this.host.audio.play('ui'); this.shopOpen = false; return; }
+    const cat = shopCatalog();
+    shopRows().forEach((r, i) => {
+      const e = cat[i];
+      if (!e) return;
+      for (const b of shopBuyButtons(r)) {
+        if (!this.hit(p, { id: `buy_${i}_${b.qty}`, ...b, label: '' })) continue;
+        const res = d.buyPotion(e.itemRef, b.qty);
+        this.host.audio.play('ui');
+        this.say(res.ok
+          ? `${e.displayName} x${b.qty} alındı (-${res.cost})`
+          : res.fail === 'noCoins' ? 'Altın yetmiyor' : 'Çanta dolu');
+      }
+    });
   }
 
   /** Panel kabuğu — YEDEK çizim. Görsel yüklüyse çağıranlar bunu
