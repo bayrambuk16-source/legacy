@@ -18,9 +18,9 @@
 
 import type { InventoryState, ItemInstance } from '../../../src/game/systems/InventoryState.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
-import { Content } from '../../../src/game/data/GameContentRepository.js';
 import { ITEM_CLASS_RANK, type ItemClass } from '../data/item-model.js';
 import { itemDefinition } from '../data/item-catalog.js';
+import { SELL_UPGRADE_PER_LEVEL, equipSellPrice, fixedSellPrice } from '../data/sell-prices.js';
 import { powerScore, type PowerInput } from '../data/power-score.js';
 import type { EquipmentState } from '../../../src/game/systems/EquipmentState.js';
 import type { EquipService } from './EquipService.js';
@@ -152,15 +152,29 @@ export class AutoGearSystem {
 
   /* ─────────────────────── satış ─────────────────────── */
 
-  /** Satış fiyatı. Kaynak `vendorSell` çoğu itemde 0 olduğu için
-   *  `vendorBuy`ın dörtte biri kullanılır — PROJECT LEGACY KARARI.
-   *  Yükseltme seviyesi fiyatı da büyütür (stat çarpanıyla aynı oranda). */
+  /** Satış fiyatı.
+   *
+   *  P2.33 — `vendorBuy / 4` YAKLAŞIMI KALDIRILDI. Ölçüm: kaynakta
+   *  satış fiyatı yok (169 kaydın 4'ünde, MYKO'da 14 534'ün 51'inde),
+   *  bizim kataloğumuzda sıfır. Yani "gerçek DB fiyatı" diye bir şey
+   *  yoktu ve `vendorBuy / 4` de bir uydurmaydı — üstelik gizli bir
+   *  uydurma, çünkü kaynaktan geliyormuş gibi duruyordu.
+   *
+   *  Artık fiyat açıkça TUNING'dir ve `data/sell-prices.ts` içinde
+   *  gerekçesiyle durur: ekipman gücünden türer, ekipman dışı eşyalar
+   *  tek tek belirlenmiştir. */
   sellPrice(inst: ItemInstance): number {
-    const src = Content.item(inst.itemRef);
-    if (!src) return 0;
-    const base = src.vendorSell > 0 ? src.vendorSell : Math.floor(src.vendorBuy / 4);
-    const mult = 1 + inst.upgradeLevel * 0.2;
-    return Math.max(0, Math.floor(base * mult * inst.quantity));
+    const fixed = fixedSellPrice(inst.itemRef);
+    if (fixed !== null) return Math.max(0, fixed * inst.quantity);
+    const def = itemDefinition(inst.itemRef);
+    if (!def) {
+      /* Katalog dışı ve sabit fiyatı yok — satılamaz. Uydurma fiyat
+         üretmek yerine sıfır döner; `sell()` bunu 'noPrice' sayar. */
+      return 0;
+    }
+    const base = equipSellPrice(def);
+    const mult = 1 + inst.upgradeLevel * SELL_UPGRADE_PER_LEVEL;
+    return Math.max(1, Math.floor(base * mult * inst.quantity));
   }
 
   /** Bu eşya oto satışa UYGUN mu? Kural sırası açıklamalıdır:

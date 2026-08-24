@@ -84,6 +84,46 @@
   "115": {
    "displayName": "Kecoon Ejderhası",
    "visualKey": "kurt_alfa"
+  },
+  "1100": {
+   "displayName": "İskelet",
+   "visualKey": "kurt"
+  },
+  "505": {
+   "displayName": "Azgın Kurt",
+   "visualKey": "kurt_alfa"
+  },
+  "905": {
+   "displayName": "İğneli Akrep",
+   "visualKey": "kurt"
+  },
+  "1102": {
+   "displayName": "İskelet Şövalye",
+   "visualKey": "kurt_alfa"
+  },
+  "600": {
+   "displayName": "Kılıç Dişli",
+   "visualKey": "kurt"
+  },
+  "1103": {
+   "displayName": "İskelet Kahraman",
+   "visualKey": "kurt_alfa"
+  },
+  "603": {
+   "displayName": "Kılıç Diş",
+   "visualKey": "kurt"
+  },
+  "1111": {
+   "displayName": "Ölüm Şövalyesi",
+   "visualKey": "kurt_alfa"
+  },
+  "1201": {
+   "displayName": "Muhafız",
+   "visualKey": "kurt_alfa"
+  },
+  "512": {
+   "displayName": "Kan Avcısı",
+   "visualKey": "kurt_alfa"
   }
  },
  "zones": {

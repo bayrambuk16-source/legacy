@@ -94,8 +94,9 @@ export const LEVELING = {
    *  haritaya geçmesi ÖNERİLİR — zorunlu değil. Sv10'da da geçebilir,
    *  sadece orada zorlanır. Kapı seviye değil, oyuncunun kararıdır.
    *
-   *  Tavan İÇERİĞE bağlıdır: Moradon'un en güçlü mobu Sv30 (Kecoon
-   *  Ejderhası). Üst harita geldiğinde tavan onunla birlikte artar.
-   *  Kaynak eğrisi Sv80'e kadar hazır (`level_curve.json`). */
-  maxLevel: 30,
+   *  Tavan İÇERİĞE bağlıdır: P2.33'te Moradon'un en güçlü mobu Sv50
+   *  oldu (Kan Avcısı), tavan da 30'dan 50'ye çıktı. Üst harita
+   *  geldiğinde tavan onunla birlikte artar. Kaynak eğrisi Sv80'e
+   *  kadar hazır (`level_curve.json`). */
+  maxLevel: 50,
 } as const;

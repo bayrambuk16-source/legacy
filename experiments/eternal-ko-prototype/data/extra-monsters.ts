@@ -13,7 +13,7 @@
  *  Ayrıştırıcı bu yüzden güvenilir kabul edildi.
  *
  *  ══════════════ SEÇİM ══════════════
- *  P2.17'de Sv16-20, P2.27'de Sv21-30 eklendi. Moradon artık Sv30'a
+ *  P2.17'de Sv16-20, P2.27'de Sv21-30, P2.33'te Sv32-50 eklendi. Moradon artık Sv30'a
  *  kadar içerik taşıyor (kullanıcı kararı: bir üst haritaya önerilen
  *  geçiş Sv30). Ölçüt: makul HP/AC — boss/event kayıtları elendi —
  *  ve kesintisiz bir zorluk merdiveni.
@@ -112,6 +112,76 @@ export const EXTRA_MONSTERS: readonly ExtraMonsterRow[] = [
     sourceRef: 115, sourceName: 'Kecoon dragoon0',
     level: 30, hp: 1108, attack: 83, defense: 204,
     exp: 10503, attackDelayMs: 1500,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 1100, sourceName: 'Skeleton0',
+    level: 32, hp: 1193, attack: 89, defense: 210,
+    exp: 9468, attackDelayMs: 2000,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 505, sourceName: 'Dire wolf0',
+    level: 34, hp: 1373, attack: 104, defense: 224,
+    exp: 11025, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 905, sourceName: 'Stinger0',
+    level: 36, hp: 1286, attack: 111, defense: 346,
+    exp: 11862, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 1102, sourceName: 'Skeleton knight0',
+    level: 38, hp: 1572, attack: 119, defense: 238,
+    exp: 12753, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 600, sourceName: 'Smilodon0',
+    level: 40, hp: 1564, attack: 164, defense: 201,
+    exp: 14652, attackDelayMs: 1500,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 1103, sourceName: 'Skeleton champion0',
+    level: 42, hp: 1787, attack: 137, defense: 251,
+    exp: 14652, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 603, sourceName: 'saber tooth0',
+    level: 44, hp: 1992, attack: 229, defense: 236,
+    exp: 18972, attackDelayMs: 1500,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 1111, sourceName: 'Death knight0',
+    level: 46, hp: 2411, attack: 202, defense: 302,
+    exp: 24201, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 1201, sourceName: 'Sheriff0',
+    level: 48, hp: 3330, attack: 284, defense: 345,
+    exp: 28494, attackDelayMs: 1800,
+    attackRange: 5, searchRange: 3,
+    hitRate: 1, evadeRate: 1,
+  },
+  {
+    sourceRef: 512, sourceName: 'Blood seeker0',
+    level: 50, hp: 3681, attack: 325, defense: 360,
+    exp: 38043, attackDelayMs: 1500,
     attackRange: 5, searchRange: 3,
     hitRate: 1, evadeRate: 1,
   },

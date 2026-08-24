@@ -134,3 +134,37 @@ export function slotCoverage(): Record<string, number[]> {
   for (const k of Object.keys(out)) out[k]!.sort((a, b) => a - b);
   return out;
 }
+
+/* ═══════════════ P2.33 — ÜST SEVİYE MOB DROPLARI ═══════════════ */
+
+/** Sv31'den itibaren mob "üst seviye" sayılır. Kullanıcı kararı:
+ *  bu moblardan düşen üst kademe eşya İKİ KAT ZOR olsun. */
+export const HIGH_TIER_MONSTER_LEVEL = 31;
+
+/** Üst seviye mobda ekipman şansı — KULLANICI KARARI: %2-3.
+ *  Sv1-30 bandındaki %14'ten belirgin biçimde zor; oradaki eşyalar
+ *  bandın en iyileri olduğu için daha seyrek düşer. */
+export const HIGH_TIER_EQUIP_CHANCE = 0.03;
+
+/** Mob seviyesine göre ekipman düşme şansı.
+ *
+ *  ELİT ÇARPANI YALNIZ ALT BANTTA: üst seviye mobların hepsi zaten
+ *  elit (Sv20+ kuralı), çarpan uygulansaydı istenen %3 kendiliğinden
+ *  %6 olurdu. Kullanıcının verdiği sayı NET orandır. */
+export function equipChanceFor(monsterLevel: number, elite: boolean): number {
+  if (monsterLevel >= HIGH_TIER_MONSTER_LEVEL) return HIGH_TIER_EQUIP_CHANCE;
+  return EQUIP_DROP_CHANCE * (elite ? 2 : 1);
+}
+
+/** ═══ SV50 GANİMETİ ═══
+ *
+ *  Kullanıcı kararı: yeni moblardan 50 000 altınlık, YIĞILABİLİR
+ *  (9999) bir eşya düşsün; oranı %0,5.
+ *
+ *  Kaynak: `items.json` 379107000 "Altın Sikke", `vendorBuy` 1 000 000.
+ *  Satış fiyatı bu dosyada DEĞİL, `AutoGearSystem.sellPrice` içindeki
+ *  kuralla belirlenir; oraya özel bir kayıt eklendi. */
+export const HIGH_TIER_TROPHY_REF = 379107000;
+export const HIGH_TIER_TROPHY_CHANCE = 0.005;
+export const HIGH_TIER_TROPHY_VALUE = 50_000;
+export const HIGH_TIER_TROPHY_STACK = 9999;

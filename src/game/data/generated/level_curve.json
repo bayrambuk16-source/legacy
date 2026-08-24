@@ -1,6 +1,6 @@
 {
- "note": "KO Lv1-80 referans eğrisi. MVP cap 30 (P2.27: Moradon Sv30 icerigi); mobil pacing için scale profili ProgressionSystem içinde.",
- "maxLevelMvp": 30,
+ "note": "KO Lv1-80 referans eğrisi. MVP cap 50 (P2.33: Moradon Sv50 icerigi); mobil pacing için scale profili ProgressionSystem içinde.",
+ "maxLevelMvp": 50,
  "rows": [
   {
    "level": 1,

@@ -26,7 +26,10 @@ import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import { Content } from '../../../src/game/data/GameContentRepository.js';
 import type { Rng } from '../../../src/engine/rng.js';
 import { SCROLL_ITEM_REF } from './ForgeSystem.js';
-import { EQUIP_DROP_CHANCE, pickFromPool, poolFor } from '../data/moradon-loot-pool.js';
+import {
+  HIGH_TIER_MONSTER_LEVEL, HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF,
+  equipChanceFor, pickFromPool, poolFor,
+} from '../data/moradon-loot-pool.js';
 import {
   DROP_TUNING_V1, dropProfile, effectiveCoin,
   type DropTuning, type MonsterDropProfile,
@@ -166,7 +169,20 @@ export class DropSystem {
        `ev.sourceChain` ve `source.slots` denetlenebilir kalır; yalnız
        oyuncuya ULAŞAN havuz değişti. */
     const eliteX = mob.monster.tier === 'elite' ? 2 : 1;
-    if (this.deps.rng() < EQUIP_DROP_CHANCE * eliteX) {
+    /* P2.33 — SV50 GANİMETİ. Yalnız üst seviye moblardan, %0,5.
+       Yığılabilir ve 50 000 altın eder; satış kuralı
+       `AutoGearSystem.sellPrice` içindedir. */
+    /* Elit çarpanı UYGULANMAZ: üst seviye mobların hepsi zaten elit,
+       çarpan istenen %0,5'i %1'e çıkarırdı. */
+    if (mob.monster.level >= HIGH_TIER_MONSTER_LEVEL
+      && this.deps.rng() < HIGH_TIER_TROPHY_CHANCE) {
+      ev.records.push(
+        this.deliverItem(mob, HIGH_TIER_TROPHY_REF, 1, 'scroll', autoLoot, owner),
+      );
+    }
+    /* Ekipman şansı seviyeye bağlı: üst seviye moblarda İKİ KAT ZOR
+       (kullanıcı kararı) — ganimet daha değerli, daha seyrek. */
+    if (this.deps.rng() < equipChanceFor(mob.monster.level, eliteX === 2)) {
       const pool = poolFor(mob.monster.level);
       const pick = pickFromPool(pool, mob.monster.level, this.deps.rng());
       if (pick) {

@@ -65,8 +65,11 @@ import { DEATH_EXP_PENALTY } from '../state.js';
 import { POTION_COOLDOWN_SEC } from '../world/PotionSystem.js';
 import { LEVELING } from '../../../src/game/config.js';
 import {
-  EQUIP_DROP_CHANCE, itemTierLevel, pickFromPool, poolFor, slotCoverage,
+  EQUIP_DROP_CHANCE, HIGH_TIER_EQUIP_CHANCE, HIGH_TIER_MONSTER_LEVEL,
+  HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF, equipChanceFor,
+  itemTierLevel, pickFromPool, poolFor, slotCoverage,
 } from '../data/moradon-loot-pool.js';
+import { FIXED_SELL_PRICES, equipSellPrice, fixedSellPrice } from '../data/sell-prices.js';
 import {
   GATE_ALPHA, SKILL_ICONS, gateBadge, skillGate, skillIconKey, skillInitial,
   skillsWithoutIcon,
@@ -5009,7 +5012,7 @@ test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİ
   /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
      Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
   /* P2.17 — Sv16-20 bandı için beş slot eklendi (23 → 28). */
-  eq(FARM_AREA_SLOTS.length, 33, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
   eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, FARM_AREA_SLOTS.length, 'id benzersiz:');
   for (const s of FARM_AREA_SLOTS) {
     ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
@@ -9968,7 +9971,7 @@ console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
 
 test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
   const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
-  eq(S.mobs.slotConfigs().length, 33, 'canlı slot sayısı:');
+  eq(S.mobs.slotConfigs().length, 52, 'canlı slot sayısı:');
   eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
   ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
   /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */
@@ -10467,7 +10470,7 @@ test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () 
 
 test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
   /* Nesne SAYILARI değişmedi; alan dört katına çıktı. Yoğunluk düşmeli. */
-  eq(FARM_AREA_SLOTS.length, 33, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
   const items = buildFoliage();
   ok(items.length > 700, `bitki sayısı düştü: ${items.length}`);
   /* En yakın iki nesne arası mesafe ARTMALI — eskiden 29 birimdi. */
@@ -10488,7 +10491,9 @@ test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
       if (d < closest) closest = d;
     }
   }
-  ok(closest >= 400, `en yakın slot çifti ${Math.round(closest)} birim`);
+  /* P2.33 — 52 slot 5120×5120'ye sığsın diye ayrık mesafe 420'den
+     330'a indi. Slot dikdörtgeni 200 birim; 330 hâlâ çakışmasız. */
+  ok(closest >= 320, `en yakın slot çifti ${Math.round(closest)} birim`);
 });
 
 /* ================= P2.13 — GÜÇ SKORU · OTO GİY · OTO SAT ================= */
@@ -10866,9 +10871,10 @@ test('§81 panel katmanı SAF — mutasyon ve three YOK', () => {
 console.log('P2.17 — Sv16-20 mob bandı:');
 
 test('§82 ek moblar KAYNAKTAN gelir ve DEPOYA tanıtılmış', () => {
-  eq(EXTRA_MONSTERS.length, 10, 'ek mob sayısı:');
+  eq(EXTRA_MONSTERS.length, 20, 'ek mob sayısı:');
   const levels = EXTRA_MONSTERS.map((m) => m.level).sort((a, b) => a - b);
-  eq(levels.join(','), '16,17,18,19,20,21,23,25,27,30', 'seviye merdiveni:');
+  eq(levels.join(','),
+    '16,17,18,19,20,21,23,25,27,30,32,34,36,38,40,42,44,46,48,50', 'seviye merdiveni:');
   for (const m of EXTRA_MONSTERS) {
     /* Depoya tanıtılmış olmalı — yoksa slot tanımı kaynağı bulamaz. */
     const reg = Content.monster(m.sourceRef);
@@ -10877,8 +10883,10 @@ test('§82 ek moblar KAYNAKTAN gelir ve DEPOYA tanıtılmış', () => {
     eq(reg!.hp, m.hp, `${m.sourceName} HP:`);
     eq(reg!.exp, m.exp, `${m.sourceName} EXP:`);
     /* Değerler makul olmalı — bozuk ayrıştırma buradan yakalanır. */
-    ok(m.hp > 0 && m.hp < 5000, `${m.sourceName} HP saçma: ${m.hp}`);
-    ok(m.attack > 0 && m.attack < 200, `${m.sourceName} saldırı saçma: ${m.attack}`);
+    ok(m.hp > 0 && m.hp < 8000, `${m.sourceName} HP saçma: ${m.hp}`);
+    /* Sv50 bandında kaynak saldırı 325'e çıkıyor — üst sınır içeriğe
+       göre genişletildi, uydurma değil. */
+    ok(m.attack > 0 && m.attack < 400, `${m.sourceName} saldırı saçma: ${m.attack}`);
     ok(m.attackDelayMs >= 500 && m.attackDelayMs <= 5000, `${m.sourceName} gecikme saçma`);
   }
 });
@@ -10912,7 +10920,7 @@ test('§82 SEVİYE GRADYANI MONOTON — uzaklaştıkça mob güçlenir', () => {
       + `${Math.round(rows[i]!.d)}→sv${rows[i]!.lv}`);
   }
   eq(rows[0]!.lv, 1, 'en yakın slot Sv1 olmalı:');
-  eq(rows[rows.length - 1]!.lv, 30, 'en uzak slot Sv30 olmalı:');
+  eq(rows[rows.length - 1]!.lv, 50, 'en uzak slot Sv50 olmalı:');
   /* Dikdörtgen köşeleri açık olmalı. */
   for (const s of FARM_AREA_SLOTS) {
     const p = slotPlacement(s);
@@ -11661,8 +11669,8 @@ test('§96 ÖLÜMDE hareket ve Genie kesilir — dünya AKMAYA devam eder', () =
 /* ================= P2.27 — MORADON SV30 GENİŞLEMESİ ================= */
 console.log('P2.27 — Sv30 içeriği, kalite tavanı, ölüm bedeli:');
 
-test('§97 SEVİYE TAVANI 30 ve eğri buna hazır', () => {
-  eq(LEVELING.maxLevel, 30, 'tavan:');
+test('§97 SEVİYE TAVANI 50 ve eğri buna hazır', () => {
+  eq(LEVELING.maxLevel, 50, 'tavan:');
   /* Kaynak eğrisi tavanın ÖTESİNE uzanmalı — üst harita geldiğinde
      yeniden veri üretmek gerekmesin. */
   const rows = Content.levelCurve.rows;
@@ -11724,16 +11732,17 @@ test('§97 ölüm bedeli EXP\'yi SIFIRIN ALTINA indirmez', () => {
   eq(T.lastDeathPenalty, 0, 'ceza raporu:');
 });
 
-test('§97 Sv30 içeriği ULAŞILABİLİR — her banda mob var', () => {
+test('§97 Sv50 içeriği ULAŞILABİLİR — her banda mob var', () => {
   const levels = new Set<number>();
   for (const s of FARM_AREA_SLOTS) {
     const m = Content.monster(s.monsterRef);
     if (m) levels.add(m.level);
   }
-  for (const [lo, hi] of [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30]] as const) {
+  for (const [lo, hi] of [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25],
+    [26, 30], [31, 35], [36, 40], [41, 45], [46, 50]] as const) {
     ok([...levels].some((l) => l >= lo && l <= hi), `Sv${lo}-${hi} bandında mob yok`);
   }
-  eq(Math.max(...levels), 30, 'en yüksek mob:');
+  eq(Math.max(...levels), 50, 'en yüksek mob:');
 });
 
 /* ================= P2.28 — GOBLIN MOB MODELİ ================= */
@@ -12231,6 +12240,98 @@ test('§104 iksir beklemesi PANEL AÇIKKEN de akar', () => {
   for (let i = 0; i < 30; i++) S.potions.update(1 / 60);
   ok(S.potions.cooldownLeft('hp') < start, 'bekleme azalmalı');
   eq(POTION_COOLDOWN_SEC, 1.5, 'bekleme süresi (kullanıcı kararı):');
+});
+
+/* ================= P2.33 — SV50 İÇERİĞİ · FİYATLAR ================= */
+console.log('P2.33 — Sv50 bandı, ganimet ve fiyatlar:');
+
+test('§105 SEVİYE TAVANI 50, içerik Sv50\'ye kadar', () => {
+  eq(LEVELING.maxLevel, 50, 'tavan:');
+  const levels = new Set<number>();
+  for (const s of FARM_AREA_SLOTS) {
+    const m = Content.monster(s.monsterRef);
+    if (m) levels.add(m.level);
+  }
+  eq(Math.max(...levels), 50, 'en yüksek mob:');
+  /* Sv31-50 arası her beş seviyelik bantta mob olmalı. */
+  for (const [lo, hi] of [[31, 35], [36, 40], [41, 45], [46, 50]] as const) {
+    ok([...levels].some((l) => l >= lo && l <= hi), `Sv${lo}-${hi} bandında mob yok`);
+  }
+  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
+});
+
+test('§105 BİTKİ SAYISI DEĞİŞMEDİ — yalnız moblar arttı', () => {
+  /* Kullanıcı kararı: "mevcut bitki sayısını artırma". */
+  const items = buildFoliage();
+  ok(items.length > 700 && items.length < 1000, `bitki sayısı değişmiş: ${items.length}`);
+});
+
+test('§105 ÜST SEVİYE DROPLARI: ganimet %0,5 · ekipman %3', () => {
+  eq(HIGH_TIER_MONSTER_LEVEL, 31, 'üst seviye eşiği:');
+  eq(HIGH_TIER_TROPHY_CHANCE, 0.005, 'ganimet şansı:');
+  eq(HIGH_TIER_EQUIP_CHANCE, 0.03, 'ekipman şansı:');
+  /* Üst seviyede elit çarpanı UYGULANMAZ — hepsi zaten elit,
+     çarpan istenen oranı ikiye katlardı. */
+  eq(equipChanceFor(50, true), HIGH_TIER_EQUIP_CHANCE, 'elit çarpanı üstte yok:');
+  eq(equipChanceFor(50, false), HIGH_TIER_EQUIP_CHANCE, 'elit dışı da aynı:');
+  /* Alt bantta elit çarpanı DEVAM ediyor. */
+  eq(equipChanceFor(10, true), EQUIP_DROP_CHANCE * 2, 'alt bant elit:');
+  eq(equipChanceFor(10, false), EQUIP_DROP_CHANCE, 'alt bant normal:');
+  /* Üst seviye alt banttan BELİRGİN biçimde zor olmalı. */
+  ok(equipChanceFor(50, true) < equipChanceFor(10, false), 'üst seviye daha kolay görünüyor');
+});
+
+test('§105 SV50 GANİMETİ: 50 000 altın, yığılabilir', () => {
+  const src = Content.item(HIGH_TIER_TROPHY_REF);
+  ok(src !== undefined, 'ganimet kaynakta yok');
+  eq(fixedSellPrice(HIGH_TIER_TROPHY_REF), 50_000, 'satış fiyatı:');
+  /* Yığılabilir olmalı — 9999'a kadar birikecek. */
+  const S = protoState(4100);
+  const add = S.inventory.add(HIGH_TIER_TROPHY_REF, { quantity: 5 });
+  ok(add.ok, 'ganimet envantere girmeli');
+  if (add.ok) {
+    eq(S.autoGear.sellPrice(add.instance), 50_000 * 5, 'yığın fiyatı:');
+  }
+  /* YALNIZ üst seviye moblardan düşmeli. */
+  ok(HIGH_TIER_MONSTER_LEVEL > 30, 'ganimet alt bantta da düşüyor');
+});
+
+test('§106 FİYATLAR GÜÇTEN TÜRÜYOR — elle tablo yok', () => {
+  /* Kaynakta satış fiyatı YOK (ölçüldü: kataloğumuzda sıfır). Fiyat
+     açıkça TUNING'dir ve eşyanın gücünden türer. */
+  const defs = allDefinitions();
+  for (const d of defs) {
+    const p = equipSellPrice(d);
+    ok(p >= 1, `${d.displayName} fiyatı geçersiz: ${p}`);
+  }
+  /* Güçlü eşya daha pahalı olmalı — MONOTON. */
+  const sorted = [...defs].sort((a, b) => itemTierLevel(a) - itemTierLevel(b));
+  for (let i = 1; i < sorted.length; i++) {
+    ok(equipSellPrice(sorted[i]!) >= equipSellPrice(sorted[i - 1]!),
+      `fiyat geriye gitti: ${sorted[i - 1]!.displayName} → ${sorted[i]!.displayName}`);
+  }
+  /* Yükseltme fiyatı büyütmeli. */
+  const S = protoState(4101);
+  const a0 = S.inventory.add(defs[0]!.definitionRef, { upgradeLevel: 0 });
+  const a5 = S.inventory.add(defs[0]!.definitionRef, { upgradeLevel: 5 });
+  if (a0.ok && a5.ok) {
+    ok(S.autoGear.sellPrice(a5.instance) > S.autoGear.sellPrice(a0.instance),
+      '+5 daha pahalı olmalı');
+  }
+});
+
+test('§106 SABİT FİYATLI eşyalar tanımlı ve tutarlı', () => {
+  /* Parşömen, ganimetler ve iksirler güçten türetilemez. */
+  for (const ref of [SCROLL_ITEM_REF, TROPHY_ITEM_REF, HIGH_TIER_TROPHY_REF,
+    HP_POTION_REF, MP_POTION_REF]) {
+    const p = fixedSellPrice(ref);
+    ok(p !== null && p > 0, `sabit fiyat yok: ${ref}`);
+  }
+  /* Üst ganimet alt ganimetten pahalı olmalı. */
+  ok(FIXED_SELL_PRICES[HIGH_TIER_TROPHY_REF]! > FIXED_SELL_PRICES[TROPHY_ITEM_REF]!,
+    'Sv50 ganimeti daha ucuz görünüyor');
+  /* Parşömen SATILMAKTANSA kullanılsın — ucuz olmalı. */
+  ok(FIXED_SELL_PRICES[SCROLL_ITEM_REF]! < 500, 'parşömen satmak çok kârlı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

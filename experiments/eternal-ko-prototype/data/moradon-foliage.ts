@@ -23,6 +23,12 @@
  *     savaş sırasında görüşü kapatmasın. Ot ve çiçek girebilir.
  *  4. Nesneler arası en az mesafe var; büyük bitkiler daha seyrek.
  *
+ *  ══════════════ P2.33 — SAYILAR YİNE SABİT ══════════════
+ *  Slot sayısı 33'ten 52'ye çıktı ama BİTKİ SAYISI DEĞİŞMEDİ
+ *  (kullanıcı kararı: "mevcut bitki sayısını artırma, haritada
+ *  orantılı şekilde yay"). 860 nesne aynı 5120×5120'ye yayılmaya
+ *  devam eder; tohum sabit olduğu için dağılım da aynıdır.
+ *
  *  ══════════════ P2.12 — SAYILAR SABİT, ARALIK AÇILDI ══════════════
  *  Oyun testinde bitkiler "ekranı kaplıyor" bulundu. Harita ölçeği iki
  *  katına çıkınca (alan dört katı) aynı 860 nesne kendiliğinden dörtte
