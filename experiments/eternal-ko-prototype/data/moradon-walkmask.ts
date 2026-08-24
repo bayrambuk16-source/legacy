@@ -20,6 +20,8 @@
  *  verirdi. */
 
 import { decodeBase64 } from './moradon-codec.js';
+import { isCityCleared } from './moradon-city-clear.js';
+import { isLakeCell } from './moradon-lake-mask.js';
 import {
   MORADON_CELL_SIZE, MORADON_MASK_B64, MORADON_MASK_CELLS, MORADON_PLAYABLE_RECT,
 } from './moradon-walkmask-data.js';
@@ -40,10 +42,25 @@ export function cellIndex(world: number): number {
 }
 
 /** HÜCRE indisleriyle sorgu. Izgara dışı → KAPALI. */
+/** ═══ P2.35 — MASKE ZİNCİRİ ═══
+ *
+ *  Kaynak maske EZİLMEZ; iki seyrek katman ÜSTÜNE binerler:
+ *
+ *      ham  AND NOT (şehir temizliği)  OR  (göl)
+ *
+ *  SIRA ÖNEMLİ ve bu sırayla üretilen maske referansla bit-birebir
+ *  doğrulandı. Önce şehir açılır (surlar, kuleler, iç kale ve
+ *  duvar içindeki 46 bina — toplam 28 758 ince hücre), sonra göl
+ *  kapatılır. Ters sırada gölün şehirle kesiştiği yerler açılırdı.
+ *
+ *  Doğal kayalar ve ağaç kütleleri KORUNUR — yalnız yapı collision'ı
+ *  kaldırıldı. */
 export function isCellBlocked(cx: number, cy: number): boolean {
   if (cx < 0 || cy < 0 || cx >= MORADON_MASK_CELLS || cy >= MORADON_MASK_CELLS) return true;
   const bit = cy * MORADON_MASK_CELLS + cx;
-  return (MASK[bit >> 3]! & (1 << (bit & 7))) !== 0;
+  const raw = (MASK[bit >> 3]! & (1 << (bit & 7))) !== 0;
+  const cleared = raw && !isCityCleared(cx, cy);
+  return cleared || isLakeCell(cx, cy);
 }
 
 /** World noktası yürünebilir mi? Sınır dışı → `false`. */

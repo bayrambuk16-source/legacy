@@ -30,6 +30,7 @@ import {
   type MutantClipFact, type MutantClipName,
 } from '../data/mutant-model.js';
 import { KECOON_CLIPS } from '../data/kecoon-model.js';
+import { MOB_ASSETS, assetForClips } from '../data/mob-assets.js';
 import type { MobPhase } from '../world/MobAi.js';
 
 /* ───────────────────────────── ayarlar (GÖRSEL) ───────────────────────────── */
@@ -59,6 +60,26 @@ export function clipMapFor(available: readonly string[]): {
   idle: string; idleLong: string; walk: string; run: string;
   roar: string | null; death: string;
 } {
+  /* ═══ P3.25 — ÖNCE KAYITTAN ÇÖZ ═══
+     Beş yeni model klip adlarını `MOB_ASSETS` içinde taşır. Ad tabanlı
+     tahmin (`'02_WALK' varsa goblin`) yalnız İKİ model varken
+     çalışıyordu; yedi modelle çöker.
+
+     Eksik klip UYDURULMAZ: yürüyüşü olmayan varlıkta `walk` boşta
+     klibine düşer (lav örümceği yerinde durur), kükremesi olmayanda
+     `roar` null kalır ve faz atlanır. */
+  const rec = assetForClips(available);
+  if (rec) {
+    return {
+      idle: rec.clips.idle,
+      idleLong: rec.clips.idleLong ?? rec.clips.idle,
+      walk: rec.clips.walk ?? rec.clips.idle,
+      run: rec.clips.run ?? rec.clips.walk ?? rec.clips.idle,
+      roar: rec.clips.roar,
+      death: rec.clips.death ?? rec.clips.idle,
+    };
+  }
+  /* Eski iki model — kayıtta yoklar, tabloları burada. */
   const goblin = available.includes('02_WALK');
   if (goblin) {
     return {
@@ -169,6 +190,21 @@ export function clipFactOf(name: string | null): {
   if (m) return m;
   const k = KECOON_CLIPS.find((c) => c.name === name);
   if (k) return k;
+  /* ═══ P3.25 — YENİ VARLIKLAR ═══
+     Beş yeni modelin klip süreleri ve hızları `MOB_ASSETS` içinde
+     manifestten kayıtlı. Ad tabanlı arama beş tabloya daha bakmak
+     yerine kayıttan çözülür.
+
+     Bulunamazsa `undefined` — çağıran güvenli varsayılana düşer,
+     HATA FIRLATMAZ (P2.29.3'te oyunu donduran hata buydu). */
+  for (const rec of Object.values(MOB_ASSETS)) {
+    if (name === rec.clips.walk && rec.walkSpeed !== null) {
+      return { name, durationSec: 1, sourceSpeedMetersPerSec: rec.walkSpeed / 30.6 };
+    }
+    if (name === rec.clips.run && rec.runSpeed !== null) {
+      return { name, durationSec: 1, sourceSpeedMetersPerSec: rec.runSpeed / 30.6 };
+    }
+  }
   return undefined;
 }
 

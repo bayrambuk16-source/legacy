@@ -59,6 +59,16 @@ export const DUNGEON_WORLD: WorldConfig = {
  *  ~720×1434 dünya birimine çıkar: arenayı boydan boya kaplar, oyuncu
  *  savaşı salonun İÇİNDE yaşar. Yükseklik ölçekle birlikte büyür; kamera
  *  kuşbakışına yakın olduğu için duvar yüksekliği oynanışı kapatmaz. */
+/** ═══ P3.26 — ZİNDAN ZEMİNİ DÜZ ═══
+ *  Zindan Moradon'un arazisini KULLANMAZ. Ölçüldü: arena ayak izi
+ *  altındaki Moradon zemini 101 birim inip çıkıyor (-89 ile +12,5;
+ *  en dip nokta P2.35'te oyduğumuz göl). Salon tek bir yüksekliğe
+ *  konunca tepeler onu yutuyor, oyuncu da altında kalıyordu.
+ *
+ *  Ayrı bir arena ayrı bir zemin ister. Sıfır seçildi: gameplay
+ *  koordinatları zaten 2B (worldX/worldY), yükseklik yalnız görsel. */
+export const DUNGEON_GROUND_Y = 0;
+
 export const DUNGEON_ENV = {
   modelKey: 'dungeon_env_glb',
   /** Salon merkezi ARENA merkezine oturur (doğuşa değil). */

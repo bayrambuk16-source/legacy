@@ -27,12 +27,17 @@ import {
   TEST_MULTI_SLOTS, TEST_SLOT_A, TEST_SLOT_B, TEST_SLOT_RESPAWN_SEC,
 } from '../data/test-mob-slots.js';
 import { profileFor } from '../world/MobAi.js';
-import { heightAt, terrainNodeHeight } from '../data/moradon-terrain.js';
+import { heightAt, terrainNodeHeight, terrainNodeHeightRaw } from '../data/moradon-terrain.js';
 import { MORADON_GRID, MORADON_NODE_STEP } from '../data/moradon-terrain-data.js';
 import {
   MORADON_CELL_SIZE, MORADON_MASK_CELLS, MORADON_PLAYABLE_RECT,
   canTraverse, isCellBlocked, isWalkable,
 } from '../data/moradon-walkmask.js';
+import {
+  MORADON_TERRAIN_OVERRIDE, MORADON_TERRAIN_OVERRIDE_COUNT,
+} from '../data/moradon-terrain-override.js';
+import { MORADON_CITY_CLEAR_CELLS, isCityCleared } from '../data/moradon-city-clear.js';
+import { MORADON_LAKE_CELLS, isLakeCell } from '../data/moradon-lake-mask.js';
 import { MORADON_HEIGHT_FIXTURE } from '../data/moradon-meta-data.js';
 import { MORADON_TERRAIN_SPAN } from '../data/moradon-terrain.js';
 import { buildTerrainGeometry, groundElevationAt } from '../render3d/terrain.js';
@@ -83,6 +88,16 @@ import {
 } from '../world/WaveSpawner.js';
 import { DungeonState } from '../world/DungeonState.js';
 import { DungeonSession } from '../world/DungeonSession.js';
+import {
+  DAMAGE_MULT_FLOOR_LEVEL, DAMAGE_MULT_HIGH, DAMAGE_MULT_LOW,
+  monsterDamageMultiplierFor,
+} from '../data/mob-damage-curve.js';
+import {
+  MIN_MOBS_AFTER_CAP, MOB_COUNT_CAPS, cappedMobCount, mobCountCap,
+} from '../data/mob-count-cap.js';
+import {
+  RISK_COLOR, RISK_MARK, targetLevelText, targetRisk, type TargetRisk,
+} from '../data/target-risk.js';
 import {
   DUNGEON_BOUNDS, DUNGEON_EDGE_MARGIN, DUNGEON_ENV, DUNGEON_SPAWN, DUNGEON_WORLD,
   dungeonStepAllowed,
@@ -167,7 +182,7 @@ import {
 import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
 import {
   KEEP_RADIUS, MORADON_PLAY_SPAWN, MORADON_POPULATION, MORADON_RESPAWN_SEC,
-  MORADON_WALK_DISTANCE, SLOT_RECT,
+  MORADON_WALK_DISTANCE, SLOT_RECT_MAX, SLOT_RECT_MIN,
 } from '../data/moradon-farm-slots.js';
 import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
 import { GROUND_TEXTURE_KEY, PROTO_MODELS, UI_ASSETS } from '../data/proto-assets.js';
@@ -5085,12 +5100,17 @@ test('§3 farm alanı: KANONİK 10 slot, dikdörtgenler ayrık ve YÜRÜNEBİLİ
   /* P2.9 — canlı tablo tekil slotlardan kanonik çok-moblu slotlara geçti.
      Tekil tablo arşivde (`MORADON_LEGACY_SINGLE_SLOTS`) duruyor. */
   /* P2.17 — Sv16-20 bandı için beş slot eklendi (23 → 28). */
-  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 51, 'slot sayısı:');
   eq(new Set(FARM_AREA_SLOTS.map((s) => s.id)).size, FARM_AREA_SLOTS.length, 'id benzersiz:');
   for (const s of FARM_AREA_SLOTS) {
     ok(isCanonicalSlot(s), `${s.id} kanonik olmalı`);
     const p = slotPlacement(s);
-    ok(p.count >= MIN_MOBS_PER_SLOT && p.count <= MAX_MOBS_PER_SLOT, `${s.id} population ${p.count}`);
+    /* P2.37 — `slotPlacement` TAVANLANMIŞ sayı döner; alt sınır artık
+       tavan sonrası değerdir (`MIN_MOBS_AFTER_CAP`). Yerleşimin YAZDIĞI
+       ham sayı hâlâ şema sınırlarına uymak zorunda. */
+    ok(p.count >= MIN_MOBS_AFTER_CAP && p.count <= MAX_MOBS_PER_SLOT,
+      `${s.id} population ${p.count}`);
+    ok((s.count ?? 0) >= MIN_MOBS_PER_SLOT, `${s.id} ham count şema dışı: ${s.count}`);
     ok(Content.monster(s.monsterRef) !== undefined, `${s.id}: monster kaynakta olmalı`);
     /* Dikdörtgenin DÖRT köşesi de yürünebilir olmalı — mob duvara doğmaz. */
     for (const [x, y] of [[p.minX, p.minY], [p.maxX - 1, p.minY],
@@ -9396,14 +9416,42 @@ test('§45 şema katmanı SAF — three yok, gameplay yazımı yok', () => {
 /* ================= P2.4C — MORADON DÜNYA TEMELİ ================= */
 console.log('P2.4C — yükseklik örnekleyicisi + yürünebilirlik maskesi:');
 
-test('§46 heightAt ızgara düğümünde GLB değerine BİREBİR eşit', () => {
+test('§46 HAM TABLO GLB değerine BİREBİR eşit — kaynak sadakati', () => {
   /* Fixture doğrudan kaynak GLB vertekslerinden üretildi (build script) →
-     karşılaştırma DÖNGÜSEL DEĞİLDİR. */
+     karşılaştırma DÖNGÜSEL DEĞİLDİR.
+
+     P2.35 — artık HAM tabloya karşı ölçülür. Arazi üstüne seyrek bir
+     heykel bindi (teras yumuşatma, göl); fixture'ın işi o heykeli
+     değil, KAYNAĞIN bozulmadığını doğrulamak. Kaynak paket yeniden
+     üretilirse bu test yine kaynağı korur. */
   ok(MORADON_HEIGHT_FIXTURE.length >= 8, 'fixture düğümü yetersiz');
+  const step = MORADON_NODE_STEP;
   for (const f of MORADON_HEIGHT_FIXTURE) {
-    ok(Object.is(heightAt(f.worldX, f.worldY), f.height),
-      `düğüm (${f.worldX},${f.worldY}) sapıyor`);
+    const col = Math.round(f.worldX / step), row = Math.round(f.worldY / step);
+    ok(Object.is(terrainNodeHeightRaw(col, row), f.height),
+      `düğüm (${f.worldX},${f.worldY}) ham tabloda sapıyor`);
   }
+});
+
+test('§46 HEYKEL uygulanıyor ve görsel ile örnekleyici AYNI', () => {
+  /* Override yalnız `terrainNodeHeight` içinde binerse görsel zemin
+     yumuşak tepeyi çizerken oyuncu eski dik zemine basardı (ölçüldü:
+     44,8 birim sapma). `heightAt` de aynı kapıdan geçmeli. */
+  ok(MORADON_TERRAIN_OVERRIDE_COUNT > 0, 'heykel boş');
+  eq(MORADON_TERRAIN_OVERRIDE.size, MORADON_TERRAIN_OVERRIDE_COUNT, 'heykel düğümü:');
+
+  let changed = 0;
+  for (const [idx, h] of MORADON_TERRAIN_OVERRIDE) {
+    const col = idx % MORADON_GRID, row = Math.floor(idx / MORADON_GRID);
+    eq(terrainNodeHeight(col, row), h, `düğüm ${idx} heykeli uygulamıyor:`);
+    if (!Object.is(terrainNodeHeightRaw(col, row), h)) changed += 1;
+    /* Düğümün TAM üstünde örnekleyici de aynı değeri vermeli. */
+    const step = MORADON_NODE_STEP;
+    ok(Math.abs(heightAt(col * step, row * step) - h) < 1e-3,
+      `düğüm ${idx}: görsel zemin ile örnekleyici ayrışıyor`);
+    if (changed > 200) break;                // örnekleme yeter
+  }
+  ok(changed > 0, 'heykel hiçbir düğümü değiştirmiyor');
 });
 
 test('§46 heightAt DETERMİNİSTİK ve bilineer', () => {
@@ -9610,7 +9658,14 @@ test('§50 slotlar haritaya YAYILMIŞ ve birbirinden AYRIK', () => {
       }
     }
   }
-  eq(SLOT_RECT, 200, 'slot dikdörtgen kenarı:');
+  /* P2.35 — kenar boyu artık SLOT BAŞINA (160-260). Sabit kenar
+     varsayımı kalktı; test aralığı ve çeşitliliği doğrular. */
+  ok(SLOT_RECT_MIN >= 120 && SLOT_RECT_MAX <= 320, 'kenar aralığı makul değil');
+  const sides = FARM_AREA_SLOTS.map((s) => (s.area ? s.area.maxX - s.area.minX : 0));
+  for (const w of sides) {
+    ok(w >= SLOT_RECT_MIN && w <= SLOT_RECT_MAX, `kenar aralık dışı: ${w}`);
+  }
+  ok(new Set(sides).size >= 5, `kenar boyu çeşitliliği yok: ${new Set(sides).size}`);
 });
 
 
@@ -10060,7 +10115,7 @@ console.log('P2.9 — kanonik slotlar, ceset ömrü, kamera zoom:');
 
 test('§62 canlı oyun KANONİK slotlarla doğuyor — 10 slot, çok mob', () => {
   const S = new PrototypeState(2900);                    // canlı dünya (Moradon)
-  eq(S.mobs.slotConfigs().length, 52, 'canlı slot sayısı:');
+  eq(S.mobs.slotConfigs().length, 51, 'canlı slot sayısı:');
   eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
   ok(MORADON_POPULATION >= 50, `population ${MORADON_POPULATION} — beklenen 50+`);
   /* Her slotta örnekler AYRI yuvalarda ve dikdörtgen İÇİNDE. */
@@ -10500,8 +10555,13 @@ test('§74 BÜYÜK bitkiler mob slotlarının içine girmez', () => {
   for (const it of buildFoliage()) {
     if (!large.has(it.kind)) continue;
     for (const s of FARM_AREA_SLOTS) {
-      const inX = Math.abs(it.x - s.homeX) <= SLOT_RECT / 2 + SLOT_MARGIN;
-      const inY = Math.abs(it.y - s.homeY) <= SLOT_RECT / 2 + SLOT_MARGIN;
+      /* Yasak bölge slotun KENDİ kenarından ölçülür. */
+      const hx = s.area ? (s.area.maxX - s.area.minX) / 2 : 100;
+      const hy = s.area ? (s.area.maxY - s.area.minY) / 2 : 100;
+      const cx = s.area ? (s.area.minX + s.area.maxX) / 2 : s.homeX;
+      const cy = s.area ? (s.area.minY + s.area.maxY) / 2 : s.homeY;
+      const inX = Math.abs(it.x - cx) <= hx + SLOT_MARGIN;
+      const inY = Math.abs(it.y - cy) <= hy + SLOT_MARGIN;
       ok(!(inX && inY), `${it.kind} ${s.id} slotunun içinde`);
     }
   }
@@ -10559,7 +10619,7 @@ test('§75 ÖLÇEK TUTARLI: maske hücresi ile dünya ölçeği AYRIŞAMAZ', () 
 
 test('§75 BÜYÜK haritada slot ve bitki DAĞILIMI seyreldi', () => {
   /* Nesne SAYILARI değişmedi; alan dört katına çıktı. Yoğunluk düşmeli. */
-  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 51, 'slot sayısı:');
   const items = buildFoliage();
   ok(items.length > 700, `bitki sayısı düştü: ${items.length}`);
   /* En yakın iki nesne arası mesafe ARTMALI — eskiden 29 birimdi. */
@@ -12307,21 +12367,27 @@ test('§103 CANLI: Sv1 oyuncuda kullanılabilir skill AYIRT EDİLEBİLİR', () =
   ok(locked >= ARCHER_SKILL_ORDER.length / 2, `Sv1'de yalnız ${locked} skill kilitli`);
 });
 
-test('§104 MOB HASARI YARIYA indi — kaynak değeri DEĞİŞMEDİ', () => {
-  /* Oyun testi bulgusu: "moblar çok fazla vuruyor". P2.5A'da mob CANI
-     8'den 1'e çekilmişti ama HASAR çarpanına dokunulmamıştı. */
-  eq(PROTO.monsterDamageMultiplier, 4, 'hasar çarpanı:');
-  /* Kaynak mob hasarı ETKİLENMEMELİ — çarpan bir denge katmanıdır. */
+test('P2.36 — MOB HASARI SEVİYE EĞRİSİNDEN, kaynak DEĞİŞMEDİ', () => {
+  /* P2.32'de sabit çarpan 8'den 4'e inmişti. Ölçüm gösterdi ki sabit
+     bir sayı iki ucu birden tutamıyor; çarpan eğriye taşındı ve bu
+     sabit GENEL bir el olarak 1'e (nötr) çekildi. */
+  eq(PROTO.monsterDamageMultiplier, 1, 'genel çarpan (nötr):');
+  /* Kaynak mob hasarı ETKİLENMEMELİ. */
+  eq(Content.monster(750)!.attack, 4, 'kaynak solucan hasarı:');
+  /* Düşük seviyede eğri hâlâ TEHDİT üretir — P2.32'nin gerekçesi
+     kaybolmasın. */
   const worm = Content.monster(750)!;
-  eq(worm.attack, 4, 'kaynak solucan hasarı:');
-  /* CANLI: aynı mob artık daha az vurmalı. */
   const S = protoState(4003);
-  const before = S.player.hp;
-  const dmg = S.combat.damageRoll(worm.attack * PROTO.monsterDamageMultiplier, 0, 1);
-  const old = S.combat.damageRoll(worm.attack * 8, 0, 1);
-  ok(dmg < old, `yeni hasar düşük olmalı: ${dmg} vs ${old}`);
-  ok(before > 0, 'oyuncu canlı olmalı');
+  const f = S.stats.finalStats();
+  const hit = S.combat.damageRoll(
+    worm.attack * monsterDamageMultiplierFor(worm.level), f.defense, 1,
+  );
+  ok(hit > 0, 'Sv1 mobu hiç vurmuyor');
+  /* Ama P2.32 öncesi kadar sert OLMAMALI (çarpan 8'di). */
+  const old = S.combat.damageRoll(worm.attack * 8, f.defense, 1);
+  ok(hit < old, `hasar hâlâ eski sertlikte: ${hit} vs ${old}`);
 });
+
 
 test('§104 iksir beklemesi PANEL AÇIKKEN de akar', () => {
   /* Bekleme oyuncunun ilgisine değil GEÇEN SÜREYE bağlıdır. */
@@ -12351,7 +12417,7 @@ test('§105 SEVİYE TAVANI 50, içerik Sv50\'ye kadar', () => {
   for (const [lo, hi] of [[31, 35], [36, 40], [41, 45], [46, 50]] as const) {
     ok([...levels].some((l) => l >= lo && l <= hi), `Sv${lo}-${hi} bandında mob yok`);
   }
-  eq(FARM_AREA_SLOTS.length, 52, 'slot sayısı:');
+  eq(FARM_AREA_SLOTS.length, 51, 'slot sayısı:');
 });
 
 test('§105 BİTKİ SAYISI DEĞİŞMEDİ — yalnız moblar arttı', () => {
@@ -14121,6 +14187,355 @@ test('§139 ARENA GÖRSELDİR — gameplay engel taşımaz', () => {
   ok(!dungeonStepAllowed(0, 0, c.width / 2, 0), 'kuzey sınırı açık');
   /* Ortam modeli manifestte olmalı. */
   ok(PROTO_MODELS[DUNGEON_ENV.modelKey] !== undefined, 'zindan salonu manifestte yok');
+});
+
+/* ================= P2.35 — MASKE ZİNCİRİ VE HEYKEL ================= */
+console.log('P2.35 — şehir temizliği, göl, arazi heykeli:');
+
+test('§140 MASKE ZİNCİRİ: ham AND NOT şehir OR göl', () => {
+  /* SIRA önemli: önce şehir açılır, sonra göl kapatılır. Ters sırada
+     gölün şehirle kesiştiği yerler açık kalırdı. */
+  const src = readFileSync(join(PROTO_ROOT, 'data', 'moradon-walkmask.ts'), 'utf8');
+  const body = src.slice(src.indexOf('export function isCellBlocked'));
+  const clearAt = body.indexOf('isCityCleared');
+  const lakeAt = body.indexOf('isLakeCell');
+  ok(clearAt >= 0 && lakeAt >= 0, 'katmanlar bağlanmamış');
+  ok(clearAt < lakeAt, 'göl şehirden ÖNCE uygulanıyor — sıra ters');
+
+  /* Şehir gerçekten AÇILMIŞ olmalı. */
+  ok(MORADON_CITY_CLEAR_CELLS > 20_000, 'şehir temizliği boş');
+  ok(MORADON_LAKE_CELLS > 0, 'göl boş');
+  /* Göl hücresi KAPALI, temizlenmiş şehir hücresi AÇIK olmalı. */
+  let lakeBlocked = 0, cityOpen = 0, probes = 0;
+  for (let cy = 0; cy < 512 && probes < 400; cy += 3) {
+    for (let cx = 0; cx < 512 && probes < 400; cx += 3) {
+      if (isLakeCell(cx, cy)) { probes += 1; if (isCellBlocked(cx, cy)) lakeBlocked += 1; }
+      else if (isCityCleared(cx, cy)) { probes += 1; if (!isCellBlocked(cx, cy)) cityOpen += 1; }
+    }
+  }
+  ok(lakeBlocked > 0, 'göl engel değil');
+  ok(cityOpen > 0, 'şehir açılmamış');
+});
+
+test('§140 YERLEŞİM maskeyle UYUMLU — duvarda mob yok', () => {
+  /* Bütün mesafe hesabı bu maskeye göre yapıldı; uyumsuzluk hem
+     görsel hem gradyan bozar. */
+  eq(FARM_AREA_SLOTS.length, 51, 'slot sayısı:');
+  eq(KEEP_RADIUS, 1024, 'kale alanı:');
+  let badSlot = 0, badSpawn = 0;
+  for (const s of FARM_AREA_SLOTS) {
+    const a = s.area!;
+    for (let y = a.minY; y <= a.maxY; y += 20) {
+      for (let x = a.minX; x <= a.maxX; x += 20) {
+        if (!isWalkable(x, y)) { badSlot += 1; y = a.maxY + 1; break; }
+      }
+    }
+    for (let i = 0; i < (s.count ?? 1); i += 1) {
+      const p = instanceSpawnPoint(s, i, 1);
+      if (!isWalkable(p.x, p.y)) badSpawn += 1;
+    }
+  }
+  eq(badSlot, 0, 'kapalı hücre içeren slot:');
+  eq(badSpawn, 0, 'duvara denk gelen mob doğuşu:');
+  /* Kale alanı gerçekten boş olmalı. */
+  for (const s of FARM_AREA_SLOTS) {
+    const d = Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y);
+    ok(d >= KEEP_RADIUS, `${s.id} kale alanının içinde: ${Math.round(d)}`);
+  }
+});
+
+/* ================= P3.25 — MODELLER OYUNA BAĞLANDI ================= */
+console.log('P3.25 — mob modelleri renderer\'da:');
+
+test('§141 KLİP HARİTASI KAYITTAN — ad tahmini yok', () => {
+  /* `'02_WALK' varsa goblin` tahmini yalnız İKİ model varken
+     çalışıyordu. Yedi modelle çöker: üçü `03_WALK`, biri `02_WALK`,
+     biri hiç yürüyemiyor. */
+  for (const rec of Object.values(MOB_ASSETS)) {
+    const names = [
+      rec.clips.idle, rec.clips.idleLong, rec.clips.walk, rec.clips.run,
+      ...rec.clips.attacks, rec.clips.death, rec.clips.hitReact, rec.clips.roar,
+    ].filter((n): n is string => n !== null);
+    const map = clipMapFor(names);
+    eq(map.idle, rec.clips.idle, `${rec.displayName} boşta klibi:`);
+    eq(map.death, rec.clips.death ?? rec.clips.idle, `${rec.displayName} ölüm klibi:`);
+    eq(map.roar, rec.clips.roar, `${rec.displayName} kükreme:`);
+    /* Haritadaki HER klip gerçekten varlıkta OLMALI — uydurma yok. */
+    for (const c of [map.idle, map.idleLong, map.walk, map.run, map.death]) {
+      ok(names.includes(c), `${rec.displayName}: olmayan klip seçildi (${c})`);
+    }
+  }
+  /* ESKİ iki model bozulmamalı. */
+  const goblin = clipMapFor(['01_IDLE', '02_WALK', '03_ATTACK_SLAM', '05_DEATH']);
+  eq(goblin.walk, '02_WALK', 'goblin yürüyüşü:');
+  eq(goblin.death, '05_DEATH', 'goblin ölümü:');
+  const mutant = clipMapFor(['01_IDLE', '02_IDLE_BREATHE', '03_WALK', '04_RUN',
+    '07_ROAR', '08_DEATH']);
+  eq(mutant.run, '04_RUN', 'mutant koşusu:');
+  eq(mutant.roar, '07_ROAR', 'mutant kükremesi:');
+});
+
+test('§141 YÜRÜYEMEYEN VARLIK boşta klibine düşer — patlamaz', () => {
+  /* Lav örümceğinin yürüyüşü YOK. Uydurma klip adı üretilirse
+     animatör olmayan klibi arar ve mob donar. */
+  const spider = MOB_ASSETS['lavaspider']!;
+  eq(spider.clips.walk, null, 'örümcek yürüyüşü:');
+  const map = clipMapFor([spider.clips.idle, ...spider.clips.attacks,
+    spider.clips.death!, spider.clips.roar!]);
+  eq(map.walk, spider.clips.idle, 'yürüyüş boştaya düşmeli:');
+  eq(map.run, spider.clips.idle, 'koşu boştaya düşmeli:');
+  /* Klip bilgisi aranınca HATA FIRLATMAMALI (P2.29.3'te oyunu
+     donduran hata buydu). */
+  for (const c of [map.idle, map.walk, map.run, map.death]) {
+    const fact = clipFactOf(c);
+    ok(fact === undefined || fact.durationSec > 0, `${c} klip bilgisi bozuk`);
+  }
+});
+
+test('§141 KADEMELİ YÜKLEME açılışı BLOKLAMAZ', () => {
+  /* Yedi model 3,4 MB; hepsini beklemek mobilde ilk kareyi geciktirir.
+     Yükleme `await` edilmemeli ve her model AYRI `try` içinde olmalı —
+     biri düşerse diğerleri gelmeye devam etsin. */
+  const src = readFileSync(join(PROTO_ROOT, 'main.ts'), 'utf8');
+  const blk = src.slice(src.indexOf('P3.25 — MOB MODELLERİ'), src.indexOf('P3.20 — ZİNDAN ORTAM'));
+  ok(/void \(async \(\) => \{/.test(blk), 'yükleme açılışı blokluyor');
+  ok(/try \{/.test(blk) && /catch/.test(blk), 'model başına try/catch yok');
+  ok(/attachMobAsset/.test(blk), 'fabrika bağlanmıyor');
+  /* Sıra BANT sırası olmalı — oyuncunun karşılaşma sırası. */
+  ok(/MODEL_BANDS/.test(blk), 'yükleme sırası bant sırası değil');
+});
+
+test('§141 MODEL YÜKLENMEDEN mob GÖRÜNMEZ KALMAZ', () => {
+  /* Kademeli yüklemenin şartı bu: model gelene kadar eski ikiliye
+     düşülmeli. Kaynak metin bunu korur. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'ThreeWorldRenderer.ts'), 'utf8');
+  const blk = src.slice(src.indexOf('private fillMobVisual'), src.indexOf('private fillMobVisual') + 1200);
+  ok(/assetFactories\.get/.test(blk), 'varlık fabrikası okunmuyor');
+  ok(/\?\?[\s\S]{0,80}kecoonFactory/.test(blk), 'eski modele düşüş yok');
+  /* Her bandın bir varlığı olmalı, yoksa o bant hiç yüklenmez. */
+  for (const b of MODEL_BANDS) {
+    ok(b.asset !== null && MOB_ASSETS[b.asset] !== undefined,
+      `Sv${b.minLevel}-${b.maxLevel} bandının varlığı yok`);
+  }
+});
+
+test('§142 ZİNDAN ZEMİNİ DÜZ — Moradon tepeleri salonu yutmasın', () => {
+  /* Oyun testi bulgusu: "zindanda kale görseli görünmüyor". Ölçüldü —
+     zindan Moradon arazisini kullanıyordu ve arena ayak izi altındaki
+     zemin 101 birim inip çıkıyordu (-89 ile +12,5). Salon tek bir
+     yüksekliğe konunca tepeler onu yutuyordu. */
+  const env = DUNGEON_ENV;
+  let lo = Infinity, hi = -Infinity;
+  for (let y = 0; y <= DUNGEON_BOUNDS.height; y += 120) {
+    for (let x = 0; x <= DUNGEON_BOUNDS.width; x += 120) {
+      const h = heightAt(x, y);
+      if (h < lo) lo = h;
+      if (h > hi) hi = h;
+    }
+  }
+  /* Moradon zemini gerçekten dalgalı — bu yüzden zindan onu
+     KULLANMAMALI. Test o dalgalanmanın varlığını da doğrular ki
+     düzeltme gerekçesi kaybolmasın. */
+  ok(hi - lo > 40, `arena altındaki Moradon zemini düz görünüyor: ${(hi - lo).toFixed(1)}`);
+
+  /* Renderer zindanda DÜZ zemine geçmeli. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'ThreeWorldRenderer.ts'), 'utf8');
+  ok(/private groundY\(/.test(src), 'tek zemin kapısı yok');
+  ok(/this\.dungeonMode \? DUNGEON_GROUND_Y : groundElevationAt/.test(src),
+    'zindanda düz zemine geçilmiyor');
+  /* Oyuncu, moblar ve ganimet AYNI kapıdan geçmeli. */
+  const uses = (src.match(/this\.groundY\(/g) ?? []).length;
+  ok(uses >= 3, `zemin kapısını kullanan yer az: ${uses}`);
+  /* Moradon arazi mesh'i zindanda gizlenmeli, düz taban görünmeli. */
+  ok(/this\.ground\.visible = !on;/.test(src), 'arazi mesh\'i zindanda gizlenmiyor');
+  ok(/this\.dungeonFloor\.visible = on;/.test(src), 'düz taban görünmüyor');
+  /* Salon düz zemine yeniden oturtulmalı. */
+  ok(/dungeonEnv\.position\.y = on \? DUNGEON_GROUND_Y/.test(src),
+    'salon düz zemine oturtulmuyor');
+  eq(env.modelKey, 'dungeon_env_glb', 'salon modeli:');
+});
+
+/* ================= P2.36 — HASAR EĞRİSİ ================= */
+console.log('P2.36 — mob hasarı seviyeye göre:');
+
+test('§143 HASAR ÇARPANI SEVİYEYE GÖRE 2 → 1', () => {
+  /* Sabit çarpan iki ucu birden tutamıyordu. Ölçüldü:
+       4'te → Sv50 mobu tam donanımlı Sv50 oyuncuyu İKİ vuruşta öldürür
+       1'de → Sv10 oyuncusu 744 vuruş dayanır (orta oyunda risk yok) */
+  eq(monsterDamageMultiplierFor(1), DAMAGE_MULT_LOW, 'Sv1 çarpanı:');
+  eq(monsterDamageMultiplierFor(DAMAGE_MULT_FLOOR_LEVEL), DAMAGE_MULT_HIGH, 'taban seviye:');
+  eq(monsterDamageMultiplierFor(50), DAMAGE_MULT_HIGH, 'Sv50 çarpanı:');
+  ok(DAMAGE_MULT_LOW > DAMAGE_MULT_HIGH, 'eğri ters');
+
+  /* MONOTON İNMELİ — bir yerde yükselirse "seviye atladım, mob
+     sertleşti" gibi ters bir his oluşur. */
+  let prev = Infinity;
+  for (let lv = 1; lv <= 60; lv++) {
+    const m = monsterDamageMultiplierFor(lv);
+    ok(m <= prev + 1e-9, `Sv${lv}'de çarpan yükseldi: ${m}`);
+    ok(m >= DAMAGE_MULT_HIGH && m <= DAMAGE_MULT_LOW, `Sv${lv} aralık dışı: ${m}`);
+    prev = m;
+  }
+  /* Sıfır ve negatif güvenli. */
+  eq(monsterDamageMultiplierFor(0), DAMAGE_MULT_LOW, 'sıfır seviye:');
+  eq(monsterDamageMultiplierFor(-5), DAMAGE_MULT_LOW, 'negatif seviye:');
+});
+
+test('§143 EĞRİ MOBUN seviyesine bağlı, OYUNCUNUN değil', () => {
+  /* Oyuncuya göre ölçeklemek "seviye atladım, mob zayıfladı" gibi
+     ters bir his üretirdi. Kaynak metin bunu korur. */
+  const src = readFileSync(join(PROTO_ROOT, 'world', 'MobAttack.ts'), 'utf8');
+  ok(/monsterDamageMultiplierFor\(mob\.monster\.level\)/.test(src),
+    'çarpan mobun seviyesinden gelmiyor');
+  /* Denge profili KALDIRILMAMALI — zindan ve DEV paneli hâlâ kullanır. */
+  ok(/this\.balance\.monsterDamage/.test(src), 'denge profili elinden alınmış');
+});
+
+test('§143 CANLI: Sv50 tam donanımlı oyuncu üst bantta AYAKTA kalır', () => {
+  /* Ölçüm öncesi: üç dakikada 61 ölüm, kill 3,7/dk.
+     Sonrası: ölüm belirgin düşmeli, kill artmalı. */
+  const slot = FARM_AREA_SLOTS.find((s) => (Content.monster(s.monsterRef)?.level ?? 0) >= 43);
+  ok(slot !== undefined, 'üst bant slotu yok');
+  const S = new PrototypeState(50, [slot!]);
+  S.player.level = 50;
+  const p = S.stats.progression;
+  if (p.unspent > 0) { p.spend('dex', Math.ceil(p.unspent * 0.6)); }
+  if (p.unspent > 0) p.spend('hp', p.unspent);
+  /* En iyi eşyayı +7 kuşan. */
+  const best = new Map<string, ReturnType<typeof allDefinitions>[number]>();
+  for (const d of allDefinitions()) {
+    const v = (d.category === 'weapon' ? d.stats.attack * 3 : 0)
+      + (d.category === 'armor' ? d.stats.defense : 0);
+    const c = best.get(d.equipSlot);
+    const cv = c ? (c.category === 'weapon' ? c.stats.attack * 3 : 0)
+      + (c.category === 'armor' ? c.stats.defense : 0) : -1;
+    if (v > cv) best.set(d.equipSlot, d);
+  }
+  for (const d of best.values()) {
+    if (d.equipSlot === 'shield') continue;
+    const base = Content.item(d.definitionRef)?.baseUpgradeLevel ?? 0;
+    const a = S.inventory.add(d.definitionRef, { upgradeLevel: base + 7 });
+    if (a.ok) S.equipService.equip(a.instance.instanceId);
+  }
+  S.giveTestPotions();
+  S.player.restoreVitals({ hp: Infinity, mp: Infinity });
+  S.lootPolicy.setMode('auto');
+
+  const f = S.stats.finalStats();
+  /* Aynı seviye mob EN AZ sekiz vuruşta öldürebilmeli — iksire zaman
+     kalsın. İki vuruş, ölçülen eski durumdu. */
+  const top = Content.monster(slot!.monsterRef)!;
+  const hit = S.combat.damageRoll(
+    top.attack * monsterDamageMultiplierFor(top.level), f.defense, 1,
+  );
+  const hitsToDie = Math.floor(f.maxHp / Math.max(1, hit));
+  ok(hitsToDie >= 8, `Sv${top.level} mobu ${hitsToDie} vuruşta öldürüyor`);
+  /* Oyuncu da mobu makul sürede indirebilmeli. */
+  const out = S.combat.damageRoll(f.attack, top.defense, 1);
+  ok(Math.ceil(top.hp / Math.max(1, out)) <= 12, 'mobu öldürmek çok uzun');
+});
+
+test('§144 MOB SAYISI TAVANI üst bantta kalabalığı kırar', () => {
+  /* Hasar eğrisi düzeltildikten SONRA bile üst bantta 20 ölüm vardı.
+     Sebep tek tek mobun sertliği değil KALABALIK — aynı slot farklı
+     sayılarla ölçüldü: 8 mob → 31 ölüm, 4 mob → 7 ölüm. */
+  ok(mobCountCap(50) < mobCountCap(10), 'tavan üst bantta inmiyor');
+  eq(mobCountCap(50), MIN_MOBS_AFTER_CAP, 'en üst bant tavanı:');
+
+  /* MONOTON İNMELİ. */
+  let prev = Infinity;
+  for (let lv = 1; lv <= 60; lv++) {
+    const c = mobCountCap(lv);
+    ok(c <= prev, `Sv${lv}'de tavan yükseldi: ${c}`);
+    ok(c >= MIN_MOBS_AFTER_CAP, `Sv${lv} tavanı çok düşük: ${c}`);
+    prev = c;
+  }
+
+  /* KIRPMA, atama değil: daha az isteyen slota dokunulmaz. */
+  eq(cappedMobCount(4, 50), 4, 'az isteyen slot:');
+  eq(cappedMobCount(8, 50), MIN_MOBS_AFTER_CAP, 'çok isteyen slot:');
+  eq(cappedMobCount(8, 10), 8, 'alt bant kırpılmamalı:');
+  /* Sıfır mob = slotun sessizce kaybolması. Olmamalı. */
+  ok(cappedMobCount(0, 50) >= 1, 'sıfır mob üretildi');
+  ok(MOB_COUNT_CAPS.length >= 2, 'tavan tablosu tek kademeli');
+});
+
+test('§144 SAYIM ve DOĞUŞ aynı tavanı görür', () => {
+  /* "Kaç mob var" sorusunun iki farklı cevabı olmamalı: `slotPlacement`
+     tavanlıyor, popülasyon sayımı da oradan geçmeli. */
+  let expected = 0;
+  for (const s of FARM_AREA_SLOTS) {
+    const p = slotPlacement(s);
+    expected += p.count;
+    const lv = Content.monster(s.monsterRef)?.level ?? 1;
+    ok(p.count <= mobCountCap(lv), `${s.id} tavanı aşıyor: ${p.count}`);
+  }
+  eq(MORADON_POPULATION, expected, 'popülasyon sayımı:');
+
+  /* CANLI dünyada da aynı sayı doğmalı — `protoState` test slotlarıyla
+     kurulduğu için KANONİK dünya ayrıca açılır. */
+  const S = new PrototypeState(4500);
+  eq(S.mobs.mobs.length, MORADON_POPULATION, 'canlı mob sayısı:');
+  /* Üst bant slotlarında gerçekten az mob olmalı. */
+  for (const s of FARM_AREA_SLOTS) {
+    const lv = Content.monster(s.monsterRef)?.level ?? 1;
+    if (lv < 43) continue;
+    ok(slotPlacement(s).count <= MIN_MOBS_AFTER_CAP,
+      `${s.id} (Sv${lv}) hâlâ kalabalık`);
+  }
+});
+
+/* ================= P2.38 — HEDEF SEVİYE FARKI ================= */
+console.log('P2.38 — hedef kartında seviye farkı:');
+
+test('§145 EŞİKLER ÖLÇÜMDEN GELİYOR', () => {
+  /* Sv10 oyuncu, üç dakika, ölüm cezası düşülmüş NET kazanç:
+       +1  → +738    +5  → +963    +10 → −1761    +15 → öldüremiyor */
+  eq(targetRisk(11, 10), 'fair', '+1 fark:');
+  eq(targetRisk(15, 10), 'risky', '+5 fark — en verimli bölge:');
+  eq(targetRisk(20, 10), 'deadly', '+10 fark — net kayıp:');
+  eq(targetRisk(25, 10), 'hopeless', '+15 fark — imkânsız:');
+  eq(targetRisk(5, 10), 'easy', 'kendi altı:');
+  eq(targetRisk(10, 10), 'fair', 'aynı seviye:');
+
+  /* MONOTON: fark büyüdükçe risk artmalı, hiçbir yerde geri gitmemeli. */
+  const order: TargetRisk[] = ['easy', 'fair', 'risky', 'deadly', 'hopeless'];
+  let prev = -1;
+  for (let gap = -10; gap <= 30; gap++) {
+    const idx = order.indexOf(targetRisk(20 + gap, 20));
+    ok(idx >= prev, `fark ${gap}: risk geriye gitti`);
+    prev = idx;
+  }
+});
+
+test('§145 METİN OKUNAKLI ve KISA', () => {
+  /* Kart dar; mob adı zaten uzun olabiliyor ("Kecoon Cengaveri"). */
+  eq(targetLevelText(20, 10), 'Sv20 (+10)', 'üstteki mob:');
+  eq(targetLevelText(5, 10), 'Sv5 (-5)', 'alttaki mob:');
+  /* Fark sıfırsa parantez YAZILMAZ — gereksiz gürültü. */
+  eq(targetLevelText(10, 10), 'Sv10', 'aynı seviye:');
+  for (const m of Object.values(RISK_MARK)) {
+    ok(m.length <= 2, `işaret uzun: ${m}`);
+  }
+  /* Güvenli seviyelerde işaret YOK — sürekli uyarı körleştirir. */
+  eq(RISK_MARK.easy, '', 'kolay hedefte işaret:');
+  eq(RISK_MARK.fair, '', 'dengeli hedefte işaret:');
+  ok(RISK_MARK.deadly.length > 0, 'ölümcül hedefte işaret yok');
+  /* Her risk için renk tanımlı olmalı. */
+  for (const k of ['easy', 'fair', 'risky', 'deadly', 'hopeless'] as const) {
+    ok(/^#[0-9a-f]{6}$/i.test(RISK_COLOR[k]), `${k} rengi geçersiz`);
+  }
+});
+
+test('§145 HEDEF KARTI ibareyi ÇİZİYOR ve çakışmıyor', () => {
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  ok(/targetLevelText\(target\.monster\.level, this\.S\.player\.level\)/.test(src),
+    'seviye farkı çizilmiyor');
+  ok(/RISK_COLOR\[risk\]/.test(src), 'risk rengi kullanılmıyor');
+  /* Can değeri ve seviye farkı AYNI çubukta; ikisi de ortaya yazılırsa
+     üst üste biner. Biri sola, biri sağa yaslanmalı. */
+  const blk = src.slice(src.indexOf('P2.38 — SEVİYE FARKI'), src.indexOf('P2.38 — SEVİYE FARKI') + 1400);
+  ok(/align: 'right'/.test(blk), 'seviye farkı sağa yaslanmıyor — çakışır');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

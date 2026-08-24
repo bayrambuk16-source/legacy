@@ -33,10 +33,11 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { facingToYaw } from './coords.js';
+import { assetForLevel } from '../data/mob-assets.js';
 import { usesGoblinModel } from '../data/kecoon-model.js';
 import { MAX_MOB_VISUALS, MOB_DRAW_DISTANCE } from '../data/mob-draw-distance.js';
 import { FOLIAGE_CELL } from '../data/moradon-foliage.js';
-import { DUNGEON_ENV } from '../data/dungeon-world.js';
+import { DUNGEON_ENV, DUNGEON_GROUND_Y } from '../data/dungeon-world.js';
 import {
   QUALITY_PROFILES, effectivePixelRatio,
   type QualityLevel, type QualityProfile,
@@ -311,6 +312,15 @@ export class ThreeWorldRenderer {
     const groundMat = this.keepMat(new MeshLambertMaterial({ color: 0x38472b }));
     this.groundMat = groundMat;
     this.ground = new Mesh(groundGeo, groundMat);
+    /* P3.26 — zindanın DÜZ tabanı. Moradon arazisiyle aynı materyali
+       paylaşır; yalnız biri görünürken diğeri gizlenir. */
+    this.dungeonFloor = new Mesh(new PlaneGeometry(6000, 6000), groundMat);
+    this.dungeonFloor.rotation.x = -Math.PI / 2;
+    this.dungeonFloor.position.y = DUNGEON_GROUND_Y;
+    this.dungeonFloor.receiveShadow = true;
+    this.dungeonFloor.name = 'dungeon_floor';
+    this.dungeonFloor.visible = false;
+    this.scene.add(this.dungeonFloor);
     /* Arazi geometrisi ZATEN dünya düzlemindedir (X/Z); düz plane XY'de üretilir
        ve yatırılması gerekir. */
     if (!TERRAIN_MESH_ACTIVE) this.ground.rotation.x = -Math.PI / 2;
@@ -442,6 +452,27 @@ export class ThreeWorldRenderer {
    *  klip adlarını tablodan okur, model farkı rig'e sızmaz. */
   private kecoonFactory: MutantRigFactory | null = null;
 
+  /** ═══ P3.25 — VARLIK ANAHTARINA GÖRE FABRİKA ═══
+   *  P2.28'de iki model vardı ve seçim `wantGoblin ? kecoon : mutant`
+   *  diye yazılmıştı. Beş model daha eklenince bu dallanma çöker.
+   *
+   *  Fabrikalar artık `MOB_ASSETS` anahtarıyla saklanır. Bir model
+   *  yüklenmemişse mob GÖRÜNMEZ KALMAZ: mutant/goblin'e düşer. Bu,
+   *  KADEMELİ YÜKLEMEYİ mümkün kılan şey — modeller arka planda
+   *  gelirken oyun oynanabilir durumda kalır. */
+  private assetFactories = new Map<string, MutantRigFactory>();
+
+  attachMobAsset(assetKey: string, glb: LoadedGlb): MutantRigFactory {
+    this.assetFactories.get(assetKey)?.dispose();
+    const f = new MutantRigFactory(glb);
+    this.assetFactories.set(assetKey, f);
+    this.rebuildMobVisuals();
+    return f;
+  }
+
+  /** Yüklenmiş varlık anahtarları — denetim ve test için. */
+  get loadedMobAssets(): string[] { return [...this.assetFactories.keys()]; }
+
   attachKecoon(glb: LoadedGlb): MutantRigFactory {
     this.detachKecoon();
     this.kecoonFactory = new MutantRigFactory(glb);
@@ -463,6 +494,14 @@ export class ThreeWorldRenderer {
      yazılmaz, collision'a girmez (§26). Model yüklenemezse zindan yalnız
      renk değişimiyle oynanmaya devam eder — gameplay kaybı YOKTUR. */
   private dungeonEnv: Group | null = null;
+  private dungeonFloor!: Mesh;
+
+  /** P3.26 — zemin yüksekliği. Zindanda DÜZ; Moradon'da arazi.
+   *  Oyuncu, moblar ve yerdeki ganimet AYNI kapıdan geçer, yoksa
+   *  biri havada biri gömülü durur. */
+  private groundY(worldX: number, worldY: number): number {
+    return this.dungeonMode ? DUNGEON_GROUND_Y : groundElevationAt(worldX, worldY);
+  }
   private dungeonMode = false;
 
   attachDungeonEnv(glb: LoadedGlb): void {
@@ -520,6 +559,29 @@ export class ThreeWorldRenderer {
     if (this.dungeonMode === on) return;
     this.dungeonMode = on;
     if (this.dungeonEnv) this.dungeonEnv.visible = on;
+    /* ═══ P3.26 — ZİNDAN ZEMİNİ DÜZDÜR ═══
+       Oyun testi bulgusu: "zindanda kale görseli görünmüyor".
+       Sebep ölçüldü — zindan MORADON'un arazisini kullanıyordu ve
+       arena ayak izi altındaki zemin 101 birim inip çıkıyor
+       (-89 ile +12,5 arası; en dip nokta P2.35'te oyduğumuz göl).
+
+       Salon TEK bir yüksekliğe (5,0) konuyor ama altındaki tepeler
+       onu yutuyor, oyuncu da 17 birim aşağıda kalıyordu.
+
+       Zindan AYRI bir arena: Moradon'un tepeleri orada işi yok.
+       Arazi mesh'i gizlenir, salon ve herkes DÜZ zemine oturur. */
+    /* Moradon arazi mesh'i zindanda GİZLENİR; yerine düz bir taban
+       düzlemi çizilir. İkisi de aynı materyali kullanır, o yüzden
+       zindan rengi ikisinde de geçerlidir. */
+    this.ground.visible = !on;
+    this.dungeonFloor.visible = on;
+    if (this.dungeonEnv) {
+      /* Salon düz zemine yeniden oturtulur — bağlama anındaki
+         Moradon yüksekliği artık geçersiz. */
+      this.dungeonEnv.position.y = on ? DUNGEON_GROUND_Y : groundElevationAt(
+        DUNGEON_ENV.x, DUNGEON_ENV.y,
+      );
+    }
     for (const inst of this.foliage.values()) inst.visible = !on;
     if (this.groundMat) {
       /* Moradon'a dönüşte: doku bağlıysa beyaz çarpan (P2.18 kuralı),
@@ -687,7 +749,7 @@ export class ThreeWorldRenderer {
       inst.frustumCulled = true;
       list.forEach((it, i) => {
         const base = FOLIAGE_BASE_SCALE[it.kind] * it.scale;
-        pos.set(it.x, groundElevationAt(it.x, it.y), it.y);
+        pos.set(it.x, this.groundY(it.x, it.y), it.y);
         q.setFromAxisAngle(new Vector3(0, 1, 0), it.rotation);
         scl.set(base, base, base);
         m4.compose(pos, q, scl);
@@ -838,7 +900,7 @@ export class ThreeWorldRenderer {
        P2.1 — gövde açısı `bodyAngle`'dır (saldırıda hedef, aksi halde hareket);
        böylece nişan alırken yana kaçış YÖNLÜ klipleri tetikleyebilir. */
     const p = frame.player;
-    this.playerRoot.position.set(p.worldX, groundElevationAt(p.worldX, p.worldY), p.worldY);
+    this.playerRoot.position.set(p.worldX, this.groundY(p.worldX, p.worldY), p.worldY);
     this.playerRoot.rotation.y = facingToYaw(p.bodyAngle);
     /* Ölüm klibi oynarken görsel GİZLENMEZ — düşüş animasyonu görünmeli. */
     this.playerRoot.visible = p.alive || this.archer !== null;
@@ -900,7 +962,7 @@ export class ThreeWorldRenderer {
          klon SİLİNMEZ; mob uzaklaşınca yalnız gizlenir. */
       if (g.children.length === 0) this.fillMobVisual(g, m, key);
       this.mobVisualsActive += 1;
-      g.position.set(m.worldX, groundElevationAt(m.worldX, m.worldY), m.worldY);
+      g.position.set(m.worldX, this.groundY(m.worldX, m.worldY), m.worldY);
       this.updateMobVisual(g, m, key, dt, frame.player);
     }
 
@@ -1053,8 +1115,12 @@ export class ThreeWorldRenderer {
        Zayıf moblar (Sv1-10) goblin, güçlüler mutant. Silüet farkı
        seviye bandını uzaktan okutur. İstenen fabrika yoksa diğerine
        düşülür — model yüklenmediği için mob görünmez kalmasın. */
+    /* P3.25 — seviye bandı hangi varlığı istiyor? İstenen model henüz
+       yüklenmediyse eski ikiliye düşülür; mob asla görünmez kalmaz. */
+    const want = assetForLevel(m.level);
     const wantGoblin = usesGoblinModel(m.level);
-    const factory = (wantGoblin ? this.kecoonFactory : this.mutantFactory)
+    const factory = (want ? this.assetFactories.get(want.assetKey) : undefined)
+      ?? (wantGoblin ? this.kecoonFactory : this.mutantFactory)
       ?? this.mutantFactory ?? this.kecoonFactory;
     if (factory) {
       const rig = factory.create(m.aiType);

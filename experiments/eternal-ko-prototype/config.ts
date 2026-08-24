@@ -116,7 +116,11 @@ export const PROTO: ProtoConstants = {
      Kaynak mob hasarı DEĞİŞMEDİ — bu bir denge çarpanıdır. P2.5A'da
      mob CANI 8'den 1'e çekilmişti ama HASAR çarpanına dokunulmamıştı;
      yani mob ölmesi kolaylaşırken vuruşu aynı sert kalmıştı. */
-  monsterDamageMultiplier: 4,
+  /* P2.36 — SEVİYE EĞRİSİNE TAŞINDI. Bu artık GENEL bir el:
+     eğri (`data/mob-damage-curve.ts`) mobun seviyesine göre 2→1
+     arasında değer verir, bu sabit onun ÜSTÜNE biner. 1 = eğri
+     olduğu gibi geçerli. */
+  monsterDamageMultiplier: 1,
   /* P2.14 — EXP ÇARPANI (kullanıcı kararı, kaynaktan gelmez).
      Ölçüm: kaynak eğrisiyle Lv1→20 yalnız 106 kill ≈ 19 dakika sürüyordu.
      KO'nun Lv1-20 bandı zaten hızlıdır (asıl duvar Lv20+), ama Moradon

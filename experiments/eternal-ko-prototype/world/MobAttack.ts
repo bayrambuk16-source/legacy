@@ -11,6 +11,7 @@
  *
  *  Hasar uygulaması TEK YERDEDİR — Scene'e dağıtılmaz. */
 import type { CombatSystem } from '../../../src/game/systems/CombatSystem.js';
+import { monsterDamageMultiplierFor } from '../data/mob-damage-curve.js';
 import type { BalanceProfile } from '../../../src/game/systems/BalanceProfile.js';
 import type { PlayerState } from '../../../src/game/systems/PlayerState.js';
 import type { WorldMob } from './types.js';
@@ -36,8 +37,18 @@ export class MobAttackProfile {
   /** Tek vuruş. Ölü oyuncuya vuruş YOKTUR. */
   strike(mob: WorldMob): MobHitEvent | null {
     if (!this.player.alive) return null;
+    /* ═══ P2.36 — HASAR ÇARPANI SEVİYEYE GÖRE ═══
+       Sabit çarpan iki ucu birden tutamıyordu: 4'te Sv50 mobu tam
+       donanımlı oyuncuyu iki vuruşta öldürüyor, 1'de Sv10 oyuncusu
+       744 vuruş dayanıyordu (ikisi de ölçüldü).
+
+       `balance.monsterDamage` KALDIRILMADI: denge profili hâlâ genel
+       bir el (zindan, DEV panel). Eğri onun ÜSTÜNE biner, yerine
+       geçmez. */
     const damage = this.combat.damageRoll(
-      mob.monster.attack * this.balance.monsterDamage,
+      mob.monster.attack
+        * monsterDamageMultiplierFor(mob.monster.level)
+        * this.balance.monsterDamage,
       this.combat.playerDefense(),
     );
     this.player.takeDamage(damage);

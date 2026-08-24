@@ -119,6 +119,37 @@ async function attachThree(): Promise<void> {
         err instanceof Error ? err.message : err);
     }
 
+    /* ══ P3.25 — MOB MODELLERİ: KADEMELİ, ÖNCELİK SIRASIYLA ══
+       Yedi model 3,4 MB eder; hepsini açılışta beklemek mobilde ilk
+       kareyi geciktirir. Bu yüzden AÇILIŞI BLOKLAMAZ: `await`
+       edilmez, arka planda sırayla iner.
+
+       Sıra OYUNCUNUN GÖRECEĞİ SIRAYLA: doğuş noktasının çevresi Sv1-2,
+       sonra yukarı. Bir model gelene kadar o bandın mobları eski
+       goblin/mutant modeliyle çizilir — görünmez kalmazlar.
+
+       Her model AYRI `try`: biri düşerse diğerleri yüklenmeye devam
+       eder. */
+    void (async () => {
+      const [{ loadGlb }, { modelSrc }, { MODEL_BANDS, MOB_ASSETS }] = await Promise.all([
+        import('./render3d/GlbLoader.js'),
+        import('./data/proto-assets.js'),
+        import('./data/mob-assets.js'),
+      ]);
+      /* Bant sırası = oyuncunun karşılaşma sırası. */
+      for (const band of MODEL_BANDS) {
+        const rec = band.asset === null ? null : MOB_ASSETS[band.asset];
+        if (!rec) continue;
+        try {
+          const url = modelSrc(rec.assetKey);
+          if (url) renderer.attachMobAsset(rec.assetKey, await loadGlb(url));
+        } catch (err) {
+          console.warn(`[P3.25] ${rec.displayName} modeli yüklenemedi:`,
+            err instanceof Error ? err.message : err);
+        }
+      }
+    })();
+
     /* ══ P3.20 — ZİNDAN ORTAM MODELİ (su-taş salon) ══
        Bağımsız `try`: yüklenemezse zindan yalnız koyu zemin/gök renk
        değişimiyle oynanır — görsel kayıp, gameplay kaybı yok. */

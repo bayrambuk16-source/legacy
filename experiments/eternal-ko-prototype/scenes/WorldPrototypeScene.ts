@@ -21,6 +21,9 @@ import {
 import { shopCatalog } from '../ui/potion-shop.js';
 import { RISK_LABEL, combatPower, floorRisk } from '../data/combat-power.js';
 import { recommendedPower } from '../data/wave-floors.js';
+import {
+  RISK_COLOR, RISK_MARK, targetLevelText, targetRisk,
+} from '../data/target-risk.js';
 import { nextQuality } from '../data/quality-profile.js';
 import {
   resolveJoystick, type JoystickInput, type MoveVector,
@@ -1868,11 +1871,28 @@ export class WorldPrototypeScene implements Scene {
         g.rect(HUD_TARGET.bar.x + HUD_TARGET.bar.w * tR, HUD_TARGET.bar.y,
           HUD_TARGET.bar.w * (1 - tR), HUD_TARGET.bar.h, '#120d0a', 0.82);
       }
-      g.text(target.monster.displayName, HUD_TARGET.name.x, HUD_TARGET.name.y,
-        { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
+      /* ═══ P2.38 — SEVİYE FARKI İBARESİ ═══
+         Ölçüldü: Sv10 oyuncu Sv20 bandında üç dakikada GERİYE gidiyor
+         (kazandığından fazlasını ölüm cezasına veriyor), Sv25'te hiç
+         öldüremiyor. Duvar doğru yerde ama görünmüyordu.
+
+         Fark, mutlak seviyeden daha okunaklı: oyuncu kendi seviyesini
+         akılda tutup çıkarma yapmak zorunda kalmıyor. */
+      const risk = targetRisk(target.monster.level, this.S.player.level);
+      const mark = RISK_MARK[risk];
+      g.text(`${target.monster.displayName}${mark ? ` ${mark}` : ''}`,
+        HUD_TARGET.name.x, HUD_TARGET.name.y,
+        { align: 'center', size: 12, bold: true, color: RISK_COLOR[risk] });
+      /* Can çubuğunda: değer solda, seviye farkı SAĞDA. Ortada
+         çakışmasınlar diye ikisi de kendi kenarına yaslanır. */
       g.text(`${Math.round(target.hp)} / ${target.maxHp}`,
-        HUD_TARGET.bar.x + HUD_TARGET.bar.w / 2, HUD_TARGET.bar.y + HUD_TARGET.bar.h * 0.14,
+        HUD_TARGET.bar.x + HUD_TARGET.bar.w * 0.34,
+        HUD_TARGET.bar.y + HUD_TARGET.bar.h * 0.14,
         { align: 'center', size: 10, bold: true, color: '#f4ece0' });
+      g.text(targetLevelText(target.monster.level, this.S.player.level),
+        HUD_TARGET.bar.x + HUD_TARGET.bar.w - 6,
+        HUD_TARGET.bar.y + HUD_TARGET.bar.h * 0.14,
+        { align: 'right', size: 10, bold: true, color: RISK_COLOR[risk] });
     }
 
     /* ---- Genie anahtarı + ayar ---- */

@@ -36,7 +36,7 @@
  *  yalnız en az aralıklar ~1,8 katına çıkarıldı ki büyük alanda
  *  kümelenme olmasın ve dağılım gerçekten yayılsın. */
 
-import { MORADON_FARM_SLOTS, MORADON_PLAY_SPAWN, SLOT_RECT } from './moradon-farm-slots.js';
+import { MORADON_FARM_SLOTS, MORADON_PLAY_SPAWN } from './moradon-farm-slots.js';
 import { MORADON_PLAYABLE_RECT, isWalkable } from './moradon-walkmask.js';
 
 /** Doğuş çevresinde bitkisiz yarıçap (kale meydanı). */
@@ -96,10 +96,21 @@ export const FOLIAGE_SEED = 20260824;
 
 function insideSlotArea(x: number, y: number): boolean {
   for (const s of MORADON_FARM_SLOTS) {
-    const minX = s.homeX - SLOT_RECT / 2 - SLOT_MARGIN;
-    const maxX = s.homeX + SLOT_RECT / 2 + SLOT_MARGIN;
-    const minY = s.homeY - SLOT_RECT / 2 - SLOT_MARGIN;
-    const maxY = s.homeY + SLOT_RECT / 2 + SLOT_MARGIN;
+    /* ═══ P2.35 — YASAK BÖLGE SLOTUN KENDİ BOYUNDAN ═══
+       Kenar boyu artık slot başına değişiyor (160-260). Sabit
+       `SLOT_RECT` kullanmak küçük slotların çevresinde gereğinden
+       geniş, büyüklerinde dar bir yasak bölge üretirdi. */
+    /* `area` isteğe bağlı; yoksa slotun EV noktası çevresinde ortalama
+       kenarla davran — kayıp veri yüzünden yasak bölge kaybolmasın. */
+    const half = s.area
+      ? { x: (s.area.maxX - s.area.minX) / 2, y: (s.area.maxY - s.area.minY) / 2 }
+      : { x: 100, y: 100 };
+    const cx = s.area ? (s.area.minX + s.area.maxX) / 2 : s.homeX;
+    const cy = s.area ? (s.area.minY + s.area.maxY) / 2 : s.homeY;
+    const minX = cx - half.x - SLOT_MARGIN;
+    const maxX = cx + half.x + SLOT_MARGIN;
+    const minY = cy - half.y - SLOT_MARGIN;
+    const maxY = cy + half.y + SLOT_MARGIN;
     if (x >= minX && x <= maxX && y >= minY && y <= maxY) return true;
   }
   return false;

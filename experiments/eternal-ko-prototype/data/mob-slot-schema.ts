@@ -23,6 +23,8 @@
  *
  *  Yeni kanonik slot ASLA count=1 kabul etmez (bkz. `validateMobSlot`). */
 
+import { cappedMobCount } from './mob-count-cap.js';
+import { Content } from '../../../src/game/data/GameContentRepository.js';
 import type { MobAiType } from './mob-ai-profiles.js';
 
 /* ───────────────────────── population sabitleri ───────────────────────── */
@@ -35,7 +37,15 @@ export const MAX_MOBS_PER_SLOT = 8;
 /** Örneklerin hücre içinde bırakacağı kenar payı (hücre genişliğinin oranı).
  *  Jitter yalnız hücrenin İÇ %64'ünde gezinir; komşu hücreler ASLA çakışmaz,
  *  bu yüzden farklı örnekler aynı koordinata düşemez. */
-const CELL_INSET = 0.18;
+/** ═══ P2.35 — HÜCRE İÇİ PAY BÜYÜTÜLDÜ ═══
+ *  Kenar boyu artık slot başına değişiyor (160-260). Küçük bir slotta
+ *  sekiz mob varken hücre ~57 birim kalıyor ve eski pay (0.18) iki
+ *  komşuyu 24 birime kadar yaklaştırabiliyordu.
+ *
+ *  Pay hücrenin ORANI olduğu için büyütmek her slot boyunda çalışır:
+ *  mob kendi hücresinin ortasına daha yakın durur, komşusuna değmez.
+ *  Dağınıklık korunur, yalnız uçlar kırpılır. */
+const CELL_INSET = 0.30;
 
 /* ───────────────────────── slot sözleşmesi ───────────────────────── */
 
@@ -161,7 +171,15 @@ export function defineMobSlot(def: MobSlotDefinition): MobSpawnSlot {
 /** Slotun etkin dikdörtgeni + population'ı. TEK legacy dallanması burasıdır. */
 export function slotPlacement(slot: MobSpawnSlot): MobSpawnArea & { count: number } {
   if (slot.area !== undefined && slot.count !== undefined) {
-    return { ...slot.area, count: slot.count };
+    /* ═══ P2.37 — MOB SAYISI TAVANI ═══
+       Yerleşim dışarıda üretiliyor ve üst bantlarda slot başına sekiz
+       mob koyuyor. Ölçüldü: sekizden dörde inince ölüm dörtte bire
+       düşüyor, kill hızı ikiye katlanıyor.
+
+       Tavan BURADA, tek kapıda uygulanır — hem doğuş hem sayım aynı
+       değeri görsün. Yerleşim tazelendiğinde kaybolmaz. */
+    const level = Content.monster(slot.monsterRef)?.level ?? 1;
+    return { ...slot.area, count: cappedMobCount(slot.count, level) };
   }
   /* Legacy tekil slot: dikdörtgen ev noktasına çöker, population 1. */
   return { minX: slot.homeX, maxX: slot.homeX, minY: slot.homeY, maxY: slot.homeY, count: 1 };
