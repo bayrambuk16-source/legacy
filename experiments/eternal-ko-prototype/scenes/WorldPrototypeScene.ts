@@ -2674,6 +2674,9 @@ export class WorldPrototypeScene implements Scene {
       this.say(`Öldün — Kat ${floor}`);
       return;
     }
+    /* P3.17 — solmuş cesetleri her karede temizle. Dalga bitmemiş olsa
+       bile eski cesetler birikmemeli (zindanda respawn yok). */
+    d.pruneFadedCorpses();
     if (d.sweepCleared()) {
       this.say(`Dalga ${d.dungeon.wave - 1} temiz`);
       return;                                // bir kare nefes: art arda doğmasın

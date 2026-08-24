@@ -85,7 +85,8 @@ import { DungeonSession } from '../world/DungeonSession.js';
 import { DUNGEON_SAVE_KEY, PROTO_SAVE_KEY } from '../data/proto-save.js';
 import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 import {
-  DUNGEON_ACTION_Y, DUNGEON_INFO, DUNGEON_SHOP_BTN, SHOP_PANEL, dungeonActions, dungeonHitTest,
+  DUNGEON_ACTION_H, DUNGEON_ACTION_Y, DUNGEON_INFO, DUNGEON_SHOP_BTN, SHOP_PANEL,
+  dungeonActions, dungeonHitTest,
   shopBuyButtons, shopRows,
 } from '../ui/dungeon-hud.js';
 import { planPurchase, restorePerCoin, shopCatalog } from '../ui/potion-shop.js';
@@ -12859,10 +12860,20 @@ test('§116 TEMİZLENEN dalganın cesetleri SÜPÜRÜLÜR', () => {
   /* Zindanda respawn yok; ceset birikirse çizim yükü büyür. */
   const D = new DungeonSession(7005);
   D.startNextWave();
-  for (const m of D.state.mobs.mobs) { m.hp = 0; m.ai = 'dead'; }
+  /* GERÇEK ölüm yolu kullanılır: `ai = 'dead'` diye elle atamak
+     `notifyDead`i atlar, respawn sayacı 0 kalır ve mob anında
+     dirilir — oyunda olmayan bir durum. */
+  for (const m of D.state.mobs.mobs) { m.hp = 0; m.state = 'dying'; m.ai = 'idle'; }
+  D.state.reapDead();
   ok(D.sweepCleared(), 'temiz dalga süpürülmeli');
-  eq(D.state.mobs.mobs.length, 0, 'ceset kalmamalı:');
   eq(D.dungeon.wave, 2, 'dalga ilerlemeli:');
+  /* P3.17 — ceset ÖLÜM ANİMASYONU süresince listede KALIR; süre
+     dolunca temizlenir. Hemen silmek ölüm efektini yok ediyordu. */
+  for (let i = 0; i < 400; i++) {
+    D.state.mobs.update(1 / 60, D.state.world);
+    D.pruneFadedCorpses();
+  }
+  eq(D.state.mobs.mobs.length, 0, 'ceset süre dolunca kalmamalı:');
   /* Temizlenmemiş dalga süpürülmemeli. */
   D.startNextWave();
   ok(!D.sweepCleared(), 'canlı dalga süpürülmemeli');
@@ -13021,9 +13032,11 @@ test('§118 DİKEY YERLEŞİM: bilgi ÜSTTE, eylem ALTTA, orta BOŞ', () => {
   /* Kullanıcı kararı: oyuncu altta, moblar yukarıdan. Savaş alanı
      ortada kapatılmamalı. */
   ok(DUNGEON_INFO.y + DUNGEON_INFO.h < PROTO.screenH / 3, 'bilgi şeridi çok aşağıda');
-  ok(DUNGEON_ACTION_Y > PROTO.screenH * 0.75, 'eylem şeridi çok yukarıda');
-  const gap = DUNGEON_ACTION_Y - (DUNGEON_INFO.y + DUNGEON_INFO.h);
-  ok(gap > PROTO.screenH / 2, `savaş alanı dar: ${gap}px`);
+  /* P3.19 — eylem şeridi ÜSTE alındı: altta yer yoktu (alt menü,
+     skill barı ve joystick doluydu). Savaş alanı yine de geniş. */
+  ok(DUNGEON_ACTION_Y > DUNGEON_INFO.y + DUNGEON_INFO.h, 'eylem şeridi bilgiyle çakışıyor');
+  const battle = 673 - (DUNGEON_ACTION_Y + DUNGEON_ACTION_H);
+  ok(battle > 300, `savaş alanı dar: ${battle}px`);
 
   /* Her şey ekran içinde ve çakışmasız. */
   const all = [DUNGEON_INFO, DUNGEON_SHOP_BTN, ...dungeonActions()];
@@ -13565,7 +13578,9 @@ test('§127 ÖDÜLÜ VERİLMEMİŞ CESET SÜPÜRÜLMEZ', () => {
   S.reapDead();
   ok(S.player.coins > before, 'reap coin vermedi');
   ok(D.sweepCleared(), 'reap sonrası süpürülemedi');
-  eq(S.mobs.mobs.length, 0, 'ceset kalmamalı:');
+  /* Ceset ölüm animasyonu boyunca kalır (P3.17). */
+  for (let i = 0; i < 400; i++) { S.mobs.update(1 / 60, S.world); D.pruneFadedCorpses(); }
+  eq(S.mobs.mobs.length, 0, 'ceset süre dolunca kalmamalı:');
 });
 
 test('§127 CANLI: zindanda seviye ATLANIR', () => {
@@ -13590,6 +13605,133 @@ test('§127 CANLI: zindanda seviye ATLANIR', () => {
   }
   ok(S.player.level > startLevel,
     `üç dakikada seviye atlamadı: Sv${startLevel} → Sv${S.player.level}`);
+});
+
+test('§128 ZİNDANDA ÖLÜM ANİMASYONU OYNAR — ceset hemen silinmez', () => {
+  /* Oyun testi bulgusu: "zindanda moblarda ölme efekti yok". Dalga
+     temizlenir temizlenmez bütün cesetler listeden siliniyordu;
+     renderer görseli `frame.mobs` üzerinden kurduğu için ölüm klibi
+     (goblin `05_DEATH`, 1,4 sn) hiç oynamıyordu. */
+  const D = new DungeonSession(9900);
+  D.startNextWave();
+  const S = D.state;
+  for (const m of S.mobs.mobs) {
+    if (!m.slotId.startsWith('wave_')) continue;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+  }
+  S.reapDead();
+  ok(D.sweepCleared(), 'dalga temizlenmeli');
+
+  /* Ceset LİSTEDE KALMALI — yoksa görsel hiç kurulamaz. */
+  const corpses = S.mobs.mobs.filter((m) => m.ai === 'dead');
+  ok(corpses.length > 0, 'ceset hemen silinmiş — ölüm animasyonu oynayamaz');
+  /* Dalga sayacı yine de İLERLEMELİ: oyun akışı ceseti beklemez. */
+  eq(D.dungeon.wave, 2, 'dalga sayacı:');
+
+  /* Ölüm klibi süresince cesedin GÖRSELİ üretilmeli. */
+  for (let i = 0; i < 60; i++) { S.mobs.update(1 / 60, S.world); D.pruneFadedCorpses(); }
+  const stillThere = S.mobs.mobs.filter((m) => m.ai === 'dead');
+  ok(stillThere.length > 0, 'ceset bir saniyede yok oldu — klip 1,4 sn');
+  const view = buildWorldFrame(S).mobs.find((v) => v.dead);
+  ok(view !== undefined, 'ölü mob çerçeveye girmiyor');
+  eq(view!.corpseFaded, false, 'ceset erken solmuş:');
+
+  /* Süre dolunca temizlenmeli — zindanda respawn yok, birikmemeli. */
+  for (let i = 0; i < 300; i++) { S.mobs.update(1 / 60, S.world); D.pruneFadedCorpses(); }
+  eq(S.mobs.mobs.filter((m) => m.ai === 'dead').length, 0, 'ceset temizlenmedi:');
+
+  /* Süre RENDERER ile AYNI sabitten gelmeli — iki farklı süre olmasın. */
+  const src = readFileSync(join(PROTO_ROOT, 'world', 'DungeonSession.ts'), 'utf8');
+  ok(/CORPSE_VISIBLE_SEC/.test(src), 'ceset süresi renderer sabitinden gelmiyor');
+});
+
+test('§129 ZİNDANDA ÖLEN MOB YENİDEN DOĞMAZ — hele oyuncunun dibinde', () => {
+  /* Oyun testi bulgusu: "dalga uzun sürerse ölen moblar dibimde
+     spawn oluyor". İki sebep birlikte çalışıyordu:
+
+     1. Ceset budaması `activeMobs` üyelerini "canlı" sayıyordu; dalga
+        sürerken ölen mob listede kalıyordu.
+     2. Dalga mobunun `slotId`'si gerçek bir slot DEĞİL, bu yüzden
+        `respawn()` evi bulamayıp mobu EV NOKTASINDA — yani oyuncunun
+        konumunda — yeniden doğuruyordu. */
+  const D = new DungeonSession(9950);
+  const S = D.state;
+  D.startNextWave();
+  const px = S.world.worldX, py = S.world.worldY;
+
+  const wave = S.mobs.mobs.filter((m) => m.slotId.startsWith('wave_'));
+  ok(wave.length > 0, 'dalga boş');
+  const startUids = new Set(S.mobs.mobs.map((m) => m.uid));
+
+  /* Dalganın BİR üyesini öldür — dalga sürsün. */
+  const victim = wave[0]!;
+  victim.hp = 0; victim.state = 'dying'; victim.ai = 'idle';
+  S.reapDead();
+
+  /* Respawn süresinden (8 sn) çok daha uzun sür. */
+  for (let i = 0; i < 1800; i++) {
+    S.mobs.update(1 / 60, S.world);
+    D.pruneFadedCorpses();
+  }
+
+  /* Ölen mob GERİ GELMEMELİ. */
+  ok(!S.mobs.mobs.some((m) => m.uid === victim.uid), 'ölen mob listede kaldı');
+  /* YENİ uid de üretilmemeli — respawn uid'i artırır. */
+  const newUids = S.mobs.mobs.filter((m) => !startUids.has(m.uid));
+  eq(newUids.length, 0, `respawn olmuş: ${newUids.length} yeni mob`);
+  /* Ceset de birikmemeli. */
+  eq(S.mobs.mobs.filter((m) => m.ai === 'dead').length, 0, 'ceset birikti:');
+
+  /* İKİNCİ SAVUNMA HATTI: respawn sayacı zindanda kapalı olmalı. */
+  ok(!Number.isFinite(S.mobs.ai.respawnOverrideSec ?? 0),
+    'zindanda respawn sayacı açık');
+  /* NORMAL DÜNYA etkilenmemeli — orada respawn ÇALIŞMALI. */
+  const W = new PrototypeState(9951);
+  ok(Number.isFinite(W.mobs.ai.respawnOverrideSec ?? 8),
+    'normal dünyanın respawn\'ı kapatılmış');
+  ok(px === S.world.worldX && py === S.world.worldY, 'oyuncu kaymış (senaryo geçersiz)');
+});
+
+test('§130 ZİNDAN DÜĞMELERİ HUD\'IN HİÇBİR ŞEYİYLE ÇAKIŞMAZ', () => {
+  /* Oyun testi bulgusu: "zindanda skill puanı kullanamıyorum".
+     Sebep skill sistemi DEĞİLDİ — eylem şeridi alt menünün üstünde
+     duruyordu ve zindan girdisi panellerden ÖNCE işlendiği için
+     "Yetenek" düğmesine dokunmak "ÇIK"a basmak oluyordu. Zindanda
+     HİÇBİR panel açılamıyordu. */
+  const ov = (a: UiRect, b: UiRect): boolean =>
+    !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+  const jc = PROTO.joystickCenter, jr = PROTO.joystickRadius;
+  const joy: UiRect = { x: jc.x - jr, y: jc.y - jr, w: jr * 2, h: jr * 2 };
+
+  const dungeonUi: Array<UiRect & { id: string }> = [
+    ...dungeonActions(),
+    { id: 'shop', ...DUNGEON_SHOP_BTN },
+  ];
+  for (const a of dungeonUi) {
+    for (const n of hudNavBoxes()) {
+      ok(!ov(a, n), `${a.id} alt menüyle çakışıyor (${n.key})`);
+    }
+    for (const sk of hudSkillBoxes()) {
+      ok(!ov(a, sk), `${a.id} skill barıyla çakışıyor (${sk.key})`);
+    }
+    ok(!ov(a, HUD_TARGET_BTN), `${a.id} hedef düğmesiyle çakışıyor`);
+    ok(!ov(a, joy), `${a.id} joystick alanıyla çakışıyor`);
+    ok(!ov(a, DUNGEON_INFO), `${a.id} bilgi şeridiyle çakışıyor`);
+  }
+});
+
+test('§130 ZİNDAN GİRDİSİ paneli KAPATMAZ — alt menü erişilebilir', () => {
+  /* Zindan girdisi panellerden önce işlenir; bu yüzden alt menü
+     düğmelerinin ÜZERİNE hiçbir zindan öğesi gelmemeli. */
+  for (const n of hudNavBoxes()) {
+    const hit = dungeonHitTest(n.x + n.w / 2, n.y + n.h / 2);
+    eq(hit, null, `alt menü düğmesi zindan girdisine takılıyor (${n.key}):`);
+  }
+  /* Skill barına dokunmak da zindan eylemi tetiklememeli. */
+  for (const sk of hudSkillBoxes()) {
+    eq(dungeonHitTest(sk.x + sk.w / 2, sk.y + sk.h / 2), null,
+      `skill yuvası zindan girdisine takılıyor (${sk.key}):`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

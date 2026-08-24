@@ -23,6 +23,7 @@
 import { PrototypeState } from '../state.js';
 import { DUNGEON_SAVE_KEY } from '../data/proto-save.js';
 import { DungeonState } from './DungeonState.js';
+import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
 import { WaveSpawner } from './WaveSpawner.js';
 import { mulberry32 } from '../../../src/engine/rng.js';
 import { ACTIVE_WORLD } from '../data/world-map.js';
@@ -48,6 +49,19 @@ export class DungeonSession {
       playerAt: () => ({ x: this.state.world.worldX, y: this.state.world.worldY }),
     });
     this.dungeon = new DungeonState(this.spawner);
+    /* ═══ P3.18 — ZİNDANDA RESPAWN YOK ═══
+       Dalga mobunun `slotId`'si gerçek bir slot DEĞİL (`wave_1_3`),
+       bu yüzden `MobSlotSystem.respawn` evi bulamaz ve mobu EV
+       NOKTASINDA — yani oyuncunun konumunda — yeniden doğurur.
+
+       Ceset budaması bunu genelde önler (4 sn < 8 sn) ama bir kare
+       gecikmesi bile mobun oyuncunun dibinde belirmesine yeter. Bu
+       yüzden sayacın kendisi devre dışı bırakılır: ikinci bir savunma
+       hattı.
+
+       `respawnOverrideSec` bu zindanın KENDİ AI denetleyicisindedir;
+       normal dünya etkilenmez. */
+    this.state.mobs.ai.respawnOverrideSec = Number.POSITIVE_INFINITY;
     /* ═══ ZİNDAN ÖDÜL KURALLARI ═══
        Kanca burada bağlanır; normal dünyanın `PrototypeState` örneği
        bunu ASLA görmez, o yüzden zindan kuralı oraya sızamaz. */
@@ -104,15 +118,47 @@ export class DungeonSession {
     );
     if (pending) return false;
     if (!this.dungeon.completeWaveIfCleared()) return false;
+
+    /* ═══ P3.17 — CESET ÖLÜM ANİMASYONUNU OYNASIN ═══
+       Oyun testi bulgusu: "zindanda moblarda ölme efekti yok". Sebep:
+       dalga temizlenir temizlenmez bütün cesetler listeden siliniyordu.
+       Renderer görseli `frame.mobs` üzerinden kurar; mob listeden
+       çıkınca ölüm klibi (goblin `05_DEATH`, 1,4 sn) hiç oynamıyordu.
+
+       Artık dalga sayacı HEMEN ilerler (oyun akışı durmaz) ama ceset
+       `CORPSE_VISIBLE_SEC` boyunca listede KALIR. Renderer zaten o
+       süre dolunca görseli kendiliğinden söküyor — iki taraf aynı
+       sabiti kullanır, iki farklı süre olmaz. */
+    this.pruneFadedCorpses();
+    return true;
+  }
+
+  /** Görselini tamamlamış cesetleri listeden çıkarır.
+   *
+   *  Her karede çağrılabilir; dalga bitmemiş olsa bile eski cesetler
+   *  temizlenir. Zindanda respawn yok, ceset birikmemeli. */
+  pruneFadedCorpses(): void {
     /* `mobs` salt okunur bir dizi ALANIDIR — yeniden atanamaz, yerinde
        budanır. Referansı koruyan sistemler (AI, hedefleme) bozulmasın. */
-    const live = new Set(this.dungeon.activeMobs.map((m) => m.uid));
-    const keep = this.state.mobs.mobs.filter(
-      (m) => live.has(m.uid) || !m.slotId.startsWith('wave_'),
-    );
+    /* ═══ P3.18 — "CANLI" GERÇEKTEN CANLI DEMEK ═══
+       Önceki hâlde `live`, sahadaki dalganın BÜTÜN üyeleriydi — ölüler
+       dahil. Dalga sürerken ölen mob "canlı" sayılıp listede kalıyor,
+       sekiz saniye sonra respawn sayacı dolunca OYUNCUNUN DİBİNDE
+       yeniden doğuyordu (bulgu: "ölen moblar dibimde spawn oluyor").
+
+       Zindanda respawn YOKTUR; ölü mob yalnız cesedi kadar yaşar. */
+    /* SAHADAKİ dalganın üyeleri — bunun DIŞINDAKİ canlı dalga mobu
+       bir DİRİLİŞ demektir ve kaldırılır. Üçüncü savunma hattı:
+       respawn sayacı herhangi bir yolla sıfırlanırsa mob yine de
+       oyuncunun dibinde kalıcı olamaz. */
+    const inWave = new Set(this.dungeon.activeMobs.map((m) => m.uid));
+    const keep = this.state.mobs.mobs.filter((m) => {
+      if (!m.slotId.startsWith('wave_')) return true;
+      if (m.ai === 'dead') return m.deathTimer <= CORPSE_VISIBLE_SEC;
+      return inWave.has(m.uid);                          // canlı ama dalgada mı
+    });
     this.state.mobs.mobs.length = 0;
     this.state.mobs.mobs.push(...keep);
-    return true;
   }
 
   /** Ölüm: bir kat düş, sahayı temizle, karakteri dirilt. */

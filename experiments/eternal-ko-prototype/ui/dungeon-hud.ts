@@ -30,7 +30,25 @@ export const DUNGEON_POWER_ROW: UiRect = { x: 28, y: 144, w: 564, h: 38 };
  *  Üç düğme: GERİ, ÇIK, NEXT. Ortada ÇIK olması bilinçli — yanlışlıkla
  *  basılması en zararsız olan o. NEXT sağda, çünkü ilerleme sağa
  *  doğrudur ve baskın el başparmağı oraya daha rahat uzanır. */
-export const DUNGEON_ACTION_Y = 946;
+/** ═══ P3.19 — ALT MENÜNÜN ÜSTÜNE ÇEKİLDİ ═══
+ *  Oyun testi bulgusu: "zindanda skill puanı kullanamıyorum".
+ *  Sebep ölçüldü — eylem şeridi y 946-1002'deydi, alt menü (Çanta,
+ *  Karakter, YETENEK, Örs, Menü) ise y 938-1027. Neredeyse tam
+ *  üst üsteydiler ve zindan girdisi panellerden ÖNCE işlendiği için
+ *  "Yetenek" düğmesine dokunmak `ÇIK`a basmak oluyordu.
+ *
+ *  Yani zindanda HİÇBİR panel açılamıyordu; sorun skill sistemine
+ *  özgü değildi.
+ *
+ *  Şerit ALT bölgeden ÜST bölgeye taşındı. Alt bölgede yer yoktu:
+ *      alt menü      938-1027
+ *      skill barı    673-882  (sağ yarı)
+ *      joystick      merkez (122, 838), yarıçap 92 → 746-930 (sol yarı)
+ *  Aradaki 882-938 bandı hem dar hem de skill barıyla kesişiyordu.
+ *
+ *  Üstte, bilgi şeridinin hemen altında geniş ve boş bir bant var.
+ *  Savaş alanı 310'dan aşağısı; hâlâ ekranın yarısından fazlası. */
+export const DUNGEON_ACTION_Y = 254;
 export const DUNGEON_ACTION_H = 56;
 
 export function dungeonActions(): Array<UiRect & { id: string; label: string }> {
@@ -43,7 +61,9 @@ export function dungeonActions(): Array<UiRect & { id: string; label: string }> 
 }
 
 /** İksir mağazası düğmesi — alt şeridin üstünde, sağda. */
-export const DUNGEON_SHOP_BTN: UiRect = { x: 470, y: 876, w: 120, h: 48 };
+/** İksir mağazası — bilgi şeridinin hemen ALTINDA, sağda. Eylem
+ *  şeridiyle de alt menüyle de çakışmaz. */
+export const DUNGEON_SHOP_BTN: UiRect = { x: 470, y: 196, w: 120, h: 50 };
 
 /** ═══ İKSİR MAĞAZASI ═══
  *
