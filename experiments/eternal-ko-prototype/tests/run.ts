@@ -83,6 +83,11 @@ import { DungeonSession } from '../world/DungeonSession.js';
 import { DUNGEON_SAVE_KEY, PROTO_SAVE_KEY } from '../data/proto-save.js';
 import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
 import {
+  DUNGEON_ACTION_Y, DUNGEON_INFO, DUNGEON_SHOP_BTN, SHOP_PANEL, dungeonActions, dungeonHitTest,
+  shopBuyButtons, shopRows,
+} from '../ui/dungeon-hud.js';
+import { planPurchase, restorePerCoin, shopCatalog } from '../ui/potion-shop.js';
+import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
   WAVE_TROPHY_CHANCE, coinForKill, dungeonLootLevel, floorLevelBand,
@@ -12954,6 +12959,140 @@ test('§117 ZİNDAN KURALLARI NORMAL HARİTAYA SIZMAZ', () => {
     }
   }
   ok(checked > 0, 'senaryo ekipman düşürmedi');
+});
+
+/* ================= P3.7 — ZİNDAN HUD VE MAĞAZA ================= */
+console.log('P3.7 — zindan HUD ve iksir mağazası (aşama 6):');
+
+test('§118 DİKEY YERLEŞİM: bilgi ÜSTTE, eylem ALTTA, orta BOŞ', () => {
+  /* Kullanıcı kararı: oyuncu altta, moblar yukarıdan. Savaş alanı
+     ortada kapatılmamalı. */
+  ok(DUNGEON_INFO.y + DUNGEON_INFO.h < PROTO.screenH / 3, 'bilgi şeridi çok aşağıda');
+  ok(DUNGEON_ACTION_Y > PROTO.screenH * 0.75, 'eylem şeridi çok yukarıda');
+  const gap = DUNGEON_ACTION_Y - (DUNGEON_INFO.y + DUNGEON_INFO.h);
+  ok(gap > PROTO.screenH / 2, `savaş alanı dar: ${gap}px`);
+
+  /* Her şey ekran içinde ve çakışmasız. */
+  const all = [DUNGEON_INFO, DUNGEON_SHOP_BTN, ...dungeonActions()];
+  for (const r of all) {
+    ok(r.x >= 0 && r.x + r.w <= PROTO.screenW, 'yatay taşma');
+    ok(r.y >= 0 && r.y + r.h <= PROTO.screenH, 'dikey taşma');
+  }
+  const acts = dungeonActions();
+  for (let i = 1; i < acts.length; i++) {
+    ok(acts[i]!.x >= acts[i - 1]!.x + acts[i - 1]!.w, 'eylem düğmeleri çakışıyor');
+  }
+});
+
+test('§118 EYLEM DÜĞMELERİ parmakla dokunulabilir ve doğru çözülür', () => {
+  for (const b of dungeonActions()) {
+    ok(b.w >= 120 && b.h >= 44, `${b.id} küçük: ${b.w}×${b.h}`);
+    const hit = dungeonHitTest(b.x + b.w / 2, b.y + b.h / 2);
+    ok(hit !== null && hit.kind === 'action' && hit.id === b.id, `${b.id} çözülemedi`);
+  }
+  const shop = dungeonHitTest(
+    DUNGEON_SHOP_BTN.x + DUNGEON_SHOP_BTN.w / 2,
+    DUNGEON_SHOP_BTN.y + DUNGEON_SHOP_BTN.h / 2,
+  );
+  ok(shop !== null && shop.kind === 'shop', 'mağaza düğmesi çözülemedi');
+  eq(dungeonHitTest(5, 500), null, 'boş alan:');
+  /* ÇIK ortada olmalı — yanlışlıkla basılması en zararsız olan. */
+  const ids = dungeonActions().map((b) => b.id);
+  eq(ids[1], 'dg_exit', 'orta düğme:');
+});
+
+test('§119 MAĞAZA FİYATLARI KAYNAKTAN — uydurma yok', () => {
+  const rows = shopCatalog();
+  ok(rows.length > 0, 'mağaza boş');
+  for (const e of rows) {
+    const src = koPotion(e.itemRef);
+    ok(src !== null, `iksir kaynakta yok: ${e.itemRef}`);
+    eq(e.unitPrice, src!.vendorPrice, `${e.displayName} fiyatı kaynaktan değil:`);
+    eq(e.restoreAmount, src!.restoreAmount, `${e.displayName} miktarı:`);
+  }
+  /* Sıralama: önce can, sonra mana; her biri ucuzdan pahalıya. */
+  const hp = rows.filter((r) => r.resource === 'hp');
+  const mp = rows.filter((r) => r.resource === 'mp');
+  ok(hp.length > 0 && mp.length > 0, 'iki kaynak da olmalı');
+  eq(rows.slice(0, hp.length).every((r) => r.resource === 'hp'), true, 'can önce:');
+  for (let i = 1; i < hp.length; i++) {
+    ok(hp[i]!.unitPrice >= hp[i - 1]!.unitPrice, 'can iksirleri sırasız');
+  }
+  /* Üst kademe altın başına DAHA VERİMSİZ (kaynak verisi böyle). */
+  ok(restorePerCoin(hp[0]!) > restorePerCoin(hp[hp.length - 1]!),
+    'kaynak verimlilik eğrisi ters görünüyor');
+});
+
+test('§119 SATIN ALMA: kısmi alım YOK, altın SONRA düşer', () => {
+  const D = new DungeonSession(9000);
+  const e = shopCatalog()[0]!;
+  D.state.player.coins = e.unitPrice * 3;
+
+  /* Parası yetmeyen miktar REDDEDİLİR — sessizce az vermek yok. */
+  const tooMany = D.buyPotion(e.itemRef, 10);
+  ok(!tooMany.ok && tooMany.fail === 'noCoins', 'yetersiz altın reddedilmeli');
+  eq(D.state.player.coins, e.unitPrice * 3, 'başarısız alım altın harcamamalı:');
+
+  /* Geçerli alım. */
+  const before = D.state.inventory.count(e.itemRef);
+  const ok3 = D.buyPotion(e.itemRef, 3);
+  ok(ok3.ok, 'geçerli alım başarılı olmalı');
+  eq(ok3.cost, e.unitPrice * 3, 'maliyet:');
+  eq(D.state.player.coins, 0, 'altın düşmeli:');
+  eq(D.state.inventory.count(e.itemRef), before + 3, 'iksir eklenmeli:');
+
+  /* Geçersiz miktar. */
+  D.state.player.coins = 999_999;
+  ok(!D.buyPotion(e.itemRef, 0).ok, 'sıfır adet reddedilmeli');
+  ok(!D.buyPotion(e.itemRef, -5).ok, 'negatif adet reddedilmeli');
+  ok(!D.buyPotion(123_456_789, 1).ok, 'bilinmeyen eşya reddedilmeli');
+});
+
+test('§119 MAĞAZA SATIRLARI panel İÇİNDE, düğmeler dokunulabilir', () => {
+  const rows = shopRows();
+  ok(rows.length >= shopCatalog().length,
+    `mağaza satırı katalogdan az: ${rows.length} < ${shopCatalog().length}`);
+  for (const r of rows) {
+    ok(r.x >= SHOP_PANEL.x && r.x + r.w <= SHOP_PANEL.x + SHOP_PANEL.w, 'satır yatay taşıyor');
+    ok(r.y >= SHOP_PANEL.y && r.y + r.h <= SHOP_PANEL.y + SHOP_PANEL.h, 'satır dikey taşıyor');
+    /* Alım düğmeleri satırın İÇİNDE ve çakışmasız. */
+    const btns = shopBuyButtons(r);
+    eq(btns.length, 2, 'alım düğmesi:');
+    for (const b of btns) {
+      ok(b.x >= r.x && b.x + b.w <= r.x + r.w, 'düğme satır dışına taşıyor');
+      ok(b.y >= r.y && b.y + b.h <= r.y + r.h, 'düğme dikey taşıyor');
+      ok(b.h >= 30, `düğme küçük: ${b.h}`);
+    }
+    ok(btns[1]!.x >= btns[0]!.x + btns[0]!.w, 'alım düğmeleri çakışıyor');
+  }
+  /* Satırlar üst üste binmemeli. */
+  for (let i = 1; i < rows.length; i++) {
+    ok(rows[i]!.y >= rows[i - 1]!.y + rows[i - 1]!.h, 'mağaza satırları çakışıyor');
+  }
+});
+
+test('§119 SATIN ALMA PLANI saf — mutasyon yok', () => {
+  const e = shopCatalog()[0]!;
+  eq(planPurchase(e, 2, e.unitPrice * 2).ok, true, 'tam para:');
+  eq(planPurchase(e, 2, e.unitPrice * 2 - 1).fail, 'noCoins', 'bir eksik:');
+  eq(planPurchase(e, 0, 999).fail, 'badQuantity', 'sıfır adet:');
+  eq(planPurchase(undefined, 1, 999).fail, 'unknownItem', 'bilinmeyen:');
+  eq(planPurchase(e, 3, 999_999).cost, e.unitPrice * 3, 'maliyet:');
+});
+
+test('§119 EKONOMİK DÖNGÜ: coin geliri iksir masrafıyla AYNI ÖLÇEKTE', () => {
+  /* Modun dengesi bu orandadır. Gelir masrafı çok aşarsa sonsuz
+     büyüme, çok altında kalırsa kat duvara döner. */
+  const cheapest = shopCatalog()[0]!.unitPrice;
+  for (const floor of [1, 5, 10]) {
+    const band = floorLevelBand(floor);
+    const perKill = coinForKill(band.max, floorStatMult(floor));
+    /* Bir kill en az bir ucuz iksirin küçük bir kesrini karşılamalı,
+       ama tek başına birkaç iksir almaya YETMEMELİ. */
+    ok(perKill > 0, `kat ${floor} coin vermiyor`);
+    ok(perKill < cheapest * 20,
+      `kat ${floor} kill başına çok coin veriyor: ${perKill} vs iksir ${cheapest}`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
