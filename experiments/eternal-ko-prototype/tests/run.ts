@@ -12244,9 +12244,20 @@ test('§101 HAVUZ SEVİYEYLE BÜYÜR ve yuva kaybetmez', () => {
   eq(poolFor(LEVELING.maxLevel).length, allDefinitions().length, 'Sv50 havuzu:');
   ok(poolFor(30).length < allDefinitions().length,
     'Sv30 havuzu kataloğun tamamını içeriyor — üst kademe erken açılıyor');
-  /* Sv1 mob üst kademe eşya DÜŞÜREMEZ. */
+  /* P2.46 — HER YUVA TEMSİL EDİLİR. Sv1 havuzu kademe 1'le sınırlı
+     DEĞİL: eksik kalan yuvalar o yuvanın EN ZAYIF eşyasıyla doldurulur.
+     Ölçüldü — sınırlıyken Sv1-2 mobunun havuzunda tek eşya kalıyordu
+     (Tunç Küpe) ve bir saatte 168 küpe, 1 yay düşüyordu. */
   const weak = poolFor(1);
-  for (const d of weak) ok(itemTierLevel(d) <= 1, `Sv1 havuzunda üst kademe: ${d.displayName}`);
+  eq(new Set(weak.map((d) => d.equipSlot)).size, 10, 'Sv1 havuzunda yuva:');
+  /* Doldurma EN ZAYIFI seçmeli — üst kademe erken sızmasın. */
+  for (const slot of new Set(weak.map((d) => d.equipSlot))) {
+    const inPool = weak.filter((d) => d.equipSlot === slot)
+      .sort((a, b) => itemTierLevel(a) - itemTierLevel(b))[0]!;
+    const cheapest = allDefinitions().filter((d) => d.equipSlot === slot)
+      .sort((a, b) => itemTierLevel(a) - itemTierLevel(b))[0]!;
+    eq(inPool.definitionRef, cheapest.definitionRef, `${slot} en zayıfı değil:`);
+  }
 });
 
 test('§101 SEÇİM TOHUMLU ve ağırlık YAKIN KADEMEYİ tercih eder', () => {

@@ -92,13 +92,32 @@ export function itemTierLevel(def: ItemDefinition): number {
  *
  *  Sv1 mob için havuz boş kalmaz: en zayıf eşyaların bandı 1'dir. */
 export function poolFor(monsterLevel: number): ItemDefinition[] {
-  const out = allDefinitions().filter((d) => itemTierLevel(d) <= monsterLevel);
-  if (out.length > 0) return out;
-  /* Güvenlik ağı: hiçbir eşya bu seviyeye uymuyorsa EN ZAYIFLARA düş.
-     Boş havuz "hiç item düşmez" demektir — yaşanan hatanın ta kendisi. */
   const all = allDefinitions();
-  const minTier = Math.min(...all.map(itemTierLevel));
-  return all.filter((d) => itemTierLevel(d) === minTier);
+  const out = all.filter((d) => itemTierLevel(d) <= monsterLevel);
+
+  /* ═══ P2.46 — HER YUVA TEMSİL EDİLİR ═══
+   *
+   *  P2.30'un asıl kuralı buydu ama P2.45'te kademe ölçeği 1-50'ye
+   *  yayılınca alt uç seyreldi ve kural sessizce çiğnendi.
+   *
+   *  Ölçüldü: Sv1-2 mobunun havuzunda TEK eşya kalıyordu (Tunç Küpe,
+   *  kademe 1). Bir saatlik oturumda 168 küpe, 1 yay düştü ve oyuncu
+   *  Sv9'da takıldı — yay bulamadığı için saldırı gücü 9'da sabit
+   *  kaldı.
+   *
+   *  Çözüm: seviye süzgecinden sonra EKSİK KALAN her yuva için o
+   *  yuvanın EN ZAYIF eşyası havuza eklenir. Böylece hiçbir seviyede
+   *  bir yuva tamamen kapanmaz; üst kademe eşya yine seviye şartına
+   *  bağlı kalır. */
+  const present = new Set(out.map((d) => d.equipSlot));
+  for (const slot of new Set(all.map((d) => d.equipSlot))) {
+    if (present.has(slot)) continue;
+    const cheapest = all
+      .filter((d) => d.equipSlot === slot)
+      .sort((a, b) => itemTierLevel(a) - itemTierLevel(b))[0];
+    if (cheapest) out.push(cheapest);
+  }
+  return out;
 }
 
 /** ═══ DÜŞME ORANLARI ═══
