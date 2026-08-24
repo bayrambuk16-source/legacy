@@ -33,6 +33,8 @@ export const TEST_SLOT_A: MobSpawnSlot = defineMobSlot({
   monsterRef: 750,
   area: { minX: 600, maxX: 1000, minY: 600, maxY: 900 },
   count: 5,
+  /* P2.41 — bant tablosu ATLANIR: fixture bilinen sayıyla sınamalı. */
+  exactCount: true,
   aiType: 'NORMAL',
   respawnSec: TEST_SLOT_RESPAWN_SEC,
   visual: FIXTURE_VISUAL,
@@ -45,6 +47,7 @@ export const TEST_SLOT_B: MobSpawnSlot = defineMobSlot({
   monsterRef: 850,
   area: { minX: 1400, maxX: 1900, minY: 1200, maxY: 1700 },
   count: 8,
+  exactCount: true,
   aiType: 'NORMAL',
   respawnSec: TEST_SLOT_RESPAWN_SEC,
   visual: FIXTURE_VISUAL,

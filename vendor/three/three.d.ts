@@ -179,6 +179,9 @@ declare module 'three' {
     emissiveIntensity?: number;
     flatShading?: boolean;
     fog?: boolean;
+    /** P2.36 — geometrinin `color` özniteliğini doku rengiyle ÇARPAR.
+     *  Öznitelik yoksa AÇILMAMALIDIR. */
+    vertexColors?: boolean;
   }
   export class Material {
     color: Color;

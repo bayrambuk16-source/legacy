@@ -309,7 +309,12 @@ export class ThreeWorldRenderer {
     /* P2.11 — zemin dokusu. Doku YOKSA eski düz renk devrede kalır:
        varlık yüklenemezse oyun yine çalışır. `repeat` arazi boyutundan
        türer, elle sayı yazılmaz. */
-    const groundMat = this.keepMat(new MeshLambertMaterial({ color: 0x38472b }));
+    /* P2.36 — `vertexColors` YALNIZ gerçek arazide açılır. Zindanın düz
+       tabanında renk özniteliği yoktur; açık bırakılsaydı three onu
+       eksik öznitelikle çizmeye çalışırdı. */
+    const groundMat = this.keepMat(new MeshLambertMaterial({
+      color: 0x38472b, vertexColors: TERRAIN_MESH_ACTIVE,
+    }));
     this.groundMat = groundMat;
     this.ground = new Mesh(groundGeo, groundMat);
     /* P3.26 — zindanın DÜZ tabanı. Moradon arazisiyle aynı materyali

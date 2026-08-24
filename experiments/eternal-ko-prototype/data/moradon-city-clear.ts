@@ -17,7 +17,6 @@
  *
  *  Bu dosya UYGULANMADAN `moradon-farm-slots.ts` KULLANILAMAZ. */
 
-import { decodeBase64 } from './moradon-codec.js';
 
 /** Silinecek hücreler (1 = AÇ), 512×512, satır-major, LSB-first. */
 export const MORADON_CITY_CLEAR_B64 =
@@ -479,14 +478,3 @@ export const MORADON_CITY_CLEAR_B64 =
   'DwAAAAAAAAA=';
 
 export const MORADON_CITY_CLEAR_CELLS = 28758;
-
-/** 512×512, satır-major, LSB-first. Bir kez çözülür. */
-const BITS = decodeBase64(MORADON_CITY_CLEAR_B64);
-
-/** Bu hücre ŞEHİR TEMİZLİĞİNDE açılmış mı? 1 = AÇ.
- *  Sınır dışı → `false` (katman bir şey söylemez, ham maske karar verir). */
-export function isCityCleared(cx: number, cy: number): boolean {
-  if (cx < 0 || cy < 0 || cx >= 512 || cy >= 512) return false;
-  const bit = cy * 512 + cx;
-  return (BITS[bit >> 3]! & (1 << (bit & 7))) !== 0;
-}

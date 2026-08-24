@@ -94,23 +94,18 @@ function makeRng(seed: number): () => number {
 /** Yerleşim tohumu. Değiştirilirse bütün harita yeniden dizilir. */
 export const FOLIAGE_SEED = 20260824;
 
+/** Slotun yasak bölgesi — P2.35'ten beri kenar boyu SLOT BAŞINA değişiyor
+ *  (160-260). Sabit `SLOT_RECT` varsayımı artık geçersizdi: küçük slotların
+ *  çevresinde gereğinden geniş, büyüklerinde dar bir yasak bölge üretiyordu.
+ *  Slotun KENDİ `area` dikdörtgeni okunur; `area` yoksa (kanonik olmayan
+ *  slot) `homeX/homeY` çevresinde yalnız marj kadar bir alan bırakılır. */
 function insideSlotArea(x: number, y: number): boolean {
   for (const s of MORADON_FARM_SLOTS) {
-    /* ═══ P2.35 — YASAK BÖLGE SLOTUN KENDİ BOYUNDAN ═══
-       Kenar boyu artık slot başına değişiyor (160-260). Sabit
-       `SLOT_RECT` kullanmak küçük slotların çevresinde gereğinden
-       geniş, büyüklerinde dar bir yasak bölge üretirdi. */
-    /* `area` isteğe bağlı; yoksa slotun EV noktası çevresinde ortalama
-       kenarla davran — kayıp veri yüzünden yasak bölge kaybolmasın. */
-    const half = s.area
-      ? { x: (s.area.maxX - s.area.minX) / 2, y: (s.area.maxY - s.area.minY) / 2 }
-      : { x: 100, y: 100 };
-    const cx = s.area ? (s.area.minX + s.area.maxX) / 2 : s.homeX;
-    const cy = s.area ? (s.area.minY + s.area.maxY) / 2 : s.homeY;
-    const minX = cx - half.x - SLOT_MARGIN;
-    const maxX = cx + half.x + SLOT_MARGIN;
-    const minY = cy - half.y - SLOT_MARGIN;
-    const maxY = cy + half.y + SLOT_MARGIN;
+    const a = s.area;
+    const minX = (a ? a.minX : s.homeX) - SLOT_MARGIN;
+    const maxX = (a ? a.maxX : s.homeX) + SLOT_MARGIN;
+    const minY = (a ? a.minY : s.homeY) - SLOT_MARGIN;
+    const maxY = (a ? a.maxY : s.homeY) + SLOT_MARGIN;
     if (x >= minX && x <= maxX && y >= minY && y <= maxY) return true;
   }
   return false;

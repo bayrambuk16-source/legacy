@@ -23,7 +23,6 @@
  *
  *  Göl eklendikten sonra hiçbir bölge İZOLE OLMADI. */
 
-import { decodeBase64 } from './moradon-codec.js';
 
 /** Ek kapalı hücreler (1 = KAPALI), 512×512, satır-major, LSB-first. */
 export const MORADON_LAKE_MASK_B64 =
@@ -485,14 +484,3 @@ export const MORADON_LAKE_MASK_B64 =
   'AAAAAAAAAAA=';
 
 export const MORADON_LAKE_CELLS = 9552;
-
-/** 512×512, satır-major, LSB-first. Bir kez çözülür. */
-const BITS = decodeBase64(MORADON_LAKE_MASK_B64);
-
-/** Bu hücre GÖL mü? 1 = SU (engel).
- *  Sınır dışı → `false` (katman bir şey söylemez, ham maske karar verir). */
-export function isLakeCell(cx: number, cy: number): boolean {
-  if (cx < 0 || cy < 0 || cx >= 512 || cy >= 512) return false;
-  const bit = cy * 512 + cx;
-  return (BITS[bit >> 3]! & (1 << (bit & 7))) !== 0;
-}

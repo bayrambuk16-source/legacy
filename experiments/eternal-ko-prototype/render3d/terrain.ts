@@ -18,6 +18,7 @@
 
 import { BufferAttribute, BufferGeometry } from 'three';
 import { heightAt, terrainNodeHeight } from '../data/moradon-terrain.js';
+import { buildBiomeColors } from '../data/moradon-biome.js';
 import { MORADON_GRID, MORADON_NODE_STEP } from '../data/moradon-terrain-data.js';
 import { ACTIVE_MAP } from '../data/world-map.js';
 
@@ -64,8 +65,17 @@ export function buildTerrainGeometry(): BufferGeometry {
     }
   }
   const geo = new BufferGeometry();
+  /* P2.36 — BİOME VERTEX RENGİ. Zemin dokusu tek ve tüm haritaya
+     döşeniyor; beş bandı ayırmak için düğüm başına bir renk ÇARPANI
+     yazılır ve GPU üçgen içinde interpolasyonla karıştırır. Bant sınırı
+     iki düğüm arasında (40-80 birim) yumuşakça geçer.
+
+     Çarpanlar 1'i AŞABİLİR (zemin dokusu koyu zeytin), bu yüzden
+     `BufferAttribute` normalize EDİLMEZ. */
+  const colors = buildBiomeColors();
   geo.setAttribute('position', new BufferAttribute(positions, 3));
   geo.setAttribute('uv', new BufferAttribute(uvs, 2));
+  geo.setAttribute('color', new BufferAttribute(colors, 3));
   geo.setIndex(new BufferAttribute(indices, 1));
   geo.computeVertexNormals();
   geo.computeBoundingSphere();

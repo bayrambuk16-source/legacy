@@ -73,6 +73,9 @@ export interface MobSpawnSlot {
   readonly area?: MobSpawnArea;
   /** KANONİK POPULATION — yoksa legacy tekil slottur (population 1). */
   readonly count?: number;
+  /** P2.41 — bant tablosunu atlat, `count` OLDUĞU GİBİ kullanılsın.
+   *  Yalnız test fixture'ları içindir. */
+  readonly exactCount?: boolean;
   /** Profil ezmeleri (opsiyonel). */
   readonly respawnSec?: number;
   readonly roamRadius?: number;
@@ -90,6 +93,8 @@ export interface MobSlotDefinition {
   readonly monsterRef: number;
   readonly area: MobSpawnArea;
   readonly count: number;
+  /** P2.41 — bant tablosunu atlat. Yalnız test fixture'ları. */
+  readonly exactCount?: boolean;
   readonly aiType: MobAiType;
   readonly respawnSec?: number;
   readonly roamRadius?: number;
@@ -158,6 +163,7 @@ export function defineMobSlot(def: MobSlotDefinition): MobSpawnSlot {
     aiType: def.aiType,
     area: def.area,
     count: def.count,
+    exactCount: def.exactCount,
     respawnSec: def.respawnSec,
     roamRadius: def.roamRadius,
     aggroRadius: def.aggroRadius,
@@ -178,6 +184,11 @@ export function slotPlacement(slot: MobSpawnSlot): MobSpawnArea & { count: numbe
 
        Tavan BURADA, tek kapıda uygulanır — hem doğuş hem sayım aynı
        değeri görsün. Yerleşim tazelendiğinde kaybolmaz. */
+    /* `exactCount` — bant tablosunu ATLAT. Yalnız TEST FİXTURE'LARI
+       için: fixture'ın işi slot sistemini bilinen sayılarla sınamak,
+       Moradon dengesini taşımak değil. Yerleşim slotları bu bayrağı
+       KULLANMAZ. */
+    if (slot.exactCount === true) return { ...slot.area, count: slot.count };
     const level = Content.monster(slot.monsterRef)?.level ?? 1;
     return { ...slot.area, count: cappedMobCount(slot.count, level) };
   }

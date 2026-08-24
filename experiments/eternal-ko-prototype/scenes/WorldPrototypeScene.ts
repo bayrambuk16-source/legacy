@@ -60,6 +60,7 @@ import {
 import { formatPower, formatPowerDelta } from '../data/power-score.js';
 import { NON_GEAR_COLOR, nonGearInfo } from '../ui/non-gear-info.js';
 import { itemIconKey } from '../data/item-icons.js';
+import { upgradeGlow } from '../data/upgrade-glow.js';
 import {
   GATE_ALPHA, GATE_COLOR, gateBadge, skillGate, skillIconKey, skillInitial,
   type SkillGateState,
@@ -2624,6 +2625,15 @@ export class WorldPrototypeScene implements Scene {
       if (v.definition) {
         this.drawItemIcon(g, v.definition.definitionRef, r.x + r.w / 2, r.y + r.h / 2,
           r.w - 12, ITEM_CLASS_COLOR[v.definition.itemClass]);
+        /* ═══ P2.39 — YÜKSELTME PARILTISI ═══
+           Tam takımı +7 yapmak 114 390 altın ve 110 parşömen istiyor
+           ama kazanılan şey ekranda hiç görünmüyordu. +3'e kadar her
+           deneme garantili; parıltı RİSK ALINAN yerden başlar. */
+        const glowEq = upgradeGlow(v.upgradeLevel);
+        if (glowEq) {
+          g.rect(r.x, r.y, r.w, 3, glowEq.css, 0.95);
+          g.rect(r.x, r.y + r.h - 3, r.w, 3, glowEq.css, 0.95);
+        }
         if (v.upgradeLevel > 0) {
           g.text(`+${v.upgradeLevel}`, r.x + r.w - 5, r.y + r.h - 16,
             { align: 'right', size: 11, bold: true, color: '#e8d9a0' });
@@ -2647,12 +2657,35 @@ export class WorldPrototypeScene implements Scene {
       g.rect(c.x, c.y, c.w, 2, col);
       /* P2.24 — GERÇEK İKON. Yoksa eski renkli daireye düşülür;
          katalog büyüdükçe ikonlar sonradan eklenebilsin diye. */
-      this.drawItemIcon(g, e.itemRef, c.x + c.w / 2, c.y + c.h / 2, c.w - 8, col);
+      /* P2.40 — İKON HÜCREYİ DOLDURUR. Eskiden `c.w - 8` çiziliyordu:
+         44'lük hücrede 36 px, telefonda 22,6 CSS px kalıyordu ve eşya
+         seçilemeyecek kadar küçük görünüyordu. İki piksellik pay
+         kalite şeridinin altında kalmaması içindir. */
+      this.drawItemIcon(g, e.itemRef, c.x + c.w / 2, c.y + c.h / 2, c.w - 2, col);
       if (e.quantity > 1) {
         g.text(String(e.quantity), c.x + c.w - 4, c.y + c.h - 15, { align: 'right', size: 10, color: '#cfc7b6' });
       }
-      if (e.upgradeLevel > 0) g.text(`+${e.upgradeLevel}`, c.x + 4, c.y + 5, { size: 9, color: '#e8d9a0' });
-      if (on) g.rect(c.x, c.y + c.h - 2, c.w, 2, '#e08a3c');
+      const glowBag = upgradeGlow(e.upgradeLevel);
+      if (glowBag) {
+        g.rect(c.x, c.y, c.w, 2, glowBag.css, 0.95);
+        g.rect(c.x, c.y + c.h - 2, c.w, 2, glowBag.css, 0.95);
+      }
+      if (e.upgradeLevel > 0) {
+        g.text(`+${e.upgradeLevel}`, c.x + 4, c.y + 5,
+          { size: 9, color: glowBag ? glowBag.css : '#e8d9a0' });
+      }
+      /* P2.40 — SEÇİM DÖRT KENARDAN. Eskiden yalnız alta 2 px çizgi
+         çiziliyordu; 27,7 CSS px'lik bir hücrede bu 1,26 CSS px ediyor
+         ve hangi eşyanın seçili olduğu okunmuyordu. Artık tam çerçeve
+         ve renk eşyanın KENDİ kademesinden geliyor — seçim aynı anda
+         kaliteyi de söylüyor. */
+      if (on) {
+        const t = 3;
+        g.rect(c.x, c.y, c.w, t, col);
+        g.rect(c.x, c.y + c.h - t, c.w, t, col);
+        g.rect(c.x, c.y, t, c.h, col);
+        g.rect(c.x + c.w - t, c.y, t, c.h, col);
+      }
     }
 
     /* ---- detay + karşılaştırma ---- */

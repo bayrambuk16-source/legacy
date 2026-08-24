@@ -35,34 +35,56 @@
  *  ══════════════ SAF ══════════════
  *  canvas, three, `Math.random()`, mutasyon YOKTUR. */
 
-/** Seviye bandı → slot başına EN ÇOK mob.
+/** ═══ P2.41 — TAVAN DEĞİL, HEDEF ═══
  *
- *  Alt bantlar kalabalık kalır: zayıf moblar kalabalıkken eğlenceli ve
- *  oyuncu onları tek vuruşta indiriyor. Tehdit yukarıda birikiyor,
- *  tavan da orada iniyor. */
-export const MOB_COUNT_CAPS: ReadonlyArray<{ maxLevel: number; cap: number }> = [
-  { maxLevel: 18, cap: 8 },
-  { maxLevel: 30, cap: 6 },
-  { maxLevel: 42, cap: 5 },
-  { maxLevel: Number.POSITIVE_INFINITY, cap: 4 },
+ *  Önce yalnız bir ÜST SINIR'dı: yerleşim daha az yazmışsa dokunulmuyordu.
+ *  Sonuç, ölçüldü: alt bantlarda slot başına 5 mob kalıyordu, oysa oyuncu
+ *  onları tek vuruşta indiriyor ve çoğu zaman respawn bekliyordu.
+ *
+ *  Artık sayıyı SEVİYE BANDI belirler; yerleşimin yazdığı değer
+ *  kullanılmaz. Yerleşim dışarıda üretiliyor ve bir sonraki tazelemede
+ *  yine 5 ya da 8 yazacak — sayı burada, tek yerde durmalı.
+ *
+ *  ══════════════ SAYILAR ÖLÇÜMDEN ══════════════
+ *  Sv50 tam donanımlı oyuncuyla üç dakika farm, slot başına mob sayısı
+ *  değiştirilerek:
+ *
+ *      8 mob → 31 ölüm · 3,0 kill/dk
+ *      6 mob → 22 ölüm · 3,7
+ *      5 mob → 15 ölüm · 5,0
+ *      4 mob →  7 ölüm · 6,0
+ *
+ *  Tehdit yukarıda birikiyor, kalabalık da orada iniyor. Alt bantlarda
+ *  tersi: zayıf mob kalabalıkken hem eğlenceli hem hızlı. */
+export const MOB_COUNT_TIERS: ReadonlyArray<{ maxLevel: number; count: number }> = [
+  /* Sv1-18 — tek vuruşta ölüyorlar; kalabalık akışı canlı tutar. */
+  { maxLevel: 18, count: 8 },
+  /* Sv19-30 — orta. Hâlâ hızlı ama vuruş sayısı artıyor. */
+  { maxLevel: 30, count: 6 },
+  /* Sv31-42 — ölçümde 5 mobla sıfır ölüm. */
+  { maxLevel: 42, count: 5 },
+  /* Sv43-50 — ölçümde 4 mobla 7 ölüm; 8 mobla 31'di. */
+  { maxLevel: Number.POSITIVE_INFINITY, count: 4 },
 ];
 
+/** Bu seviyedeki bir slotta KAÇ mob olmalı. */
 export function mobCountCap(monsterLevel: number): number {
-  for (const c of MOB_COUNT_CAPS) {
-    if (monsterLevel <= c.maxLevel) return c.cap;
+  for (const c of MOB_COUNT_TIERS) {
+    if (monsterLevel <= c.maxLevel) return c.count;
   }
-  return MOB_COUNT_CAPS[MOB_COUNT_CAPS.length - 1]!.cap;
+  return MOB_COUNT_TIERS[MOB_COUNT_TIERS.length - 1]!.count;
 }
 
-/** Yerleşimin istediği sayıyı tavanla kırpar. En az bir mob KALIR —
- *  sıfır mob demek slotun sessizce kaybolması demektir. */
-export function cappedMobCount(requested: number, monsterLevel: number): number {
-  return Math.max(MIN_MOBS_AFTER_CAP, Math.min(requested, mobCountCap(monsterLevel)));
+/** Slotun mob sayısı. `requested` YOK SAYILIR — imzada duruyor çünkü
+ *  çağıranlar yerleşimin değerini geçiriyor ve bir gün geri dönmek
+ *  gerekirse yol açık kalsın. */
+export function cappedMobCount(_requested: number, monsterLevel: number): number {
+  return mobCountCap(monsterLevel);
 }
 
-/** Tavan uygulandıktan sonra bir slotta kalabilecek EN AZ mob.
+/** Bir slotta bulunabilecek EN AZ mob — üst bant değeri.
  *
  *  Şema alt sınırı (`MIN_MOBS_PER_SLOT`) yerleşimin YAZDIĞI değere
- *  bakar; bu ise tavandan SONRAKİ değeri korur. İkisi ayrı olmalı:
- *  yerleşim beşten az yazamaz, ama tavan dörde indirebilir. */
+ *  bakar; bu ise uygulanan değeri korur. İkisi ayrı olmalı: yerleşim
+ *  beşten az yazamaz, ama bant dörde indirebilir. */
 export const MIN_MOBS_AFTER_CAP = 4;

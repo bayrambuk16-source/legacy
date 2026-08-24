@@ -140,8 +140,27 @@ export function hitTest(x: number, y: number): InvHit {
   if (inside(close, x, y)) return { kind: 'button', id: close.id };
   for (const b of invButtons()) if (inside(b, x, y)) return { kind: 'button', id: b.id };
   for (const s of equipSlotRects()) if (inside(s, x, y)) return { kind: 'equip', slotId: s.slotId };
-  const cells = bagCellRects();
-  for (let i = 0; i < cells.length; i++) if (inside(cells[i]!, x, y)) return { kind: 'bag', index: i };
+  /* ═══ ÇANTA — EN YAKIN HÜCRE (P2.40) ═══
+     Hücre 44, adım 49,4 → aralarda 5,4 px ÖLÜ ŞERİT vardı ve oraya
+     dokunmak `null` dönüyordu.
+
+     Ölçek bunu ciddi yapıyor: 390 px genişliğinde bir telefonda maket
+     941 px'ten ölçekleniyor, yani hücre 27,7 CSS px'e iniyor. Ölü şerit
+     de 3,4 CSS px. Parmak ucu yaklaşık 40 CSS px; iki hücrenin arasına
+     denk gelmek çok kolay.
+
+     Artık ızgara DİKDÖRTGENİNE düşen her dokunma en yakın hücreye
+     gider. Etkin hedef 44'ten 49,4'e çıkar ve boşluk kaybolur.
+     Izgara DIŞINA taşma yok — sınırlar kelepçeleniyor, panelin başka
+     bölgesi çalınmıyor. */
+  const b = INV_LAYOUT.bag;
+  const gridW = b.cols * b.pitch;
+  const gridH = b.rows * b.pitch;
+  if (x >= b.x && x < b.x + gridW && y >= b.y && y < b.y + gridH) {
+    const col = Math.min(b.cols - 1, Math.max(0, Math.floor((x - b.x) / b.pitch)));
+    const row = Math.min(b.rows - 1, Math.max(0, Math.floor((y - b.y) / b.pitch)));
+    return { kind: 'bag', index: row * b.cols + col };
+  }
   return null;
 }
 

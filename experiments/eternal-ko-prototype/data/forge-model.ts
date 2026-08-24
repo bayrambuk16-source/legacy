@@ -30,11 +30,44 @@ import { UPGRADE_MODEL } from '../../../src/game/config.js';
 
 interface CurveRow { mode: string; display_level: number; probability_percent: number }
 
-/** Hedef kademe (`+n`) → başarı olasılığı [0,1]. Kaynak BUS_ONLY satırı. */
-const BUS_CURVE: ReadonlyMap<number, number> = new Map(
+/** Kaynak BUS_ONLY eğrisi — DEĞİŞTİRİLMEDEN saklanır, denetlenebilir. */
+export const FORGE_SOURCE_CURVE: ReadonlyMap<number, number> = new Map(
   (upgradeCurve.source as CurveRow[])
     .filter((r) => r.mode === 'BUS_ONLY')
     .map((r) => [r.display_level, r.probability_percent / 100]),
+);
+
+/** ═══ P2.39 — ORANLAR YÜKSELTİLDİ (KULLANICI KARARI) ═══
+ *
+ *  Kaynak eğri +9 ve +10'u %0 veriyordu; oyun tavanı fiilen +8'de
+ *  kalıyordu. Kullanıcı kararı: +9 %6 olsun, diğerleri buna oranla
+ *  artsın.
+ *
+ *  Yeni eğri kaynağın ŞEKLİNİ korur — hâlâ +3'e kadar garanti, sonra
+ *  hızla düşen bir kuyruk. Yalnız kuyruk yukarı çekildi ve bir kademe
+ *  daha açıldı:
+ *
+ *      kademe   kaynak   yeni
+ *        +4      %70     %78
+ *        +5      %50     %58
+ *        +6      %30     %38
+ *        +7       %9     %16
+ *        +8       %5     %10
+ *        +9       %0      %6
+ *       +10       %0      %3   ← tavan (kullanıcı kararı)
+ *
+ *  +10 AÇILDI ama %3'te tutuldu: kaynak eğrinin bittiği yer burası,
+ *  yani merdiven yine SONLU. +3'ten +10'a tek seferde çıkma şansı
+ *  yaklaşık %0,0005 — pratikte bir ömür boyu hedefi.
+ *
+ *  Kaynak eğri `FORGE_SOURCE_CURVE` olarak DURUYOR — bu bir ezme
+ *  değil, üstüne binen bir tuning. */
+const CHANCE_OVERRIDE: ReadonlyMap<number, number> = new Map([
+  [4, 0.78], [5, 0.58], [6, 0.38], [7, 0.16], [8, 0.10], [9, 0.06], [10, 0.03],
+]);
+
+const BUS_CURVE: ReadonlyMap<number, number> = new Map(
+  [...FORGE_SOURCE_CURVE].map(([lvl, p]) => [lvl, CHANCE_OVERRIDE.get(lvl) ?? p]),
 );
 
 /** `from` seviyesinden bir üste geçme olasılığı. Tavanda 0 döner. */

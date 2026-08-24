@@ -194,6 +194,7 @@ export const PROTO_MODELS: Record<string, string> = {
      `data/mob-assets.ts` içinde manifestten birebir kayıtlı.
      LİSANS: hepsi CC-BY-4.0, GÖRÜNÜR künye zorunlu. */
   crab_glb: 'assets/models/crab_mobile_v1.glb',
+  goblin_glb: 'assets/models/goblin_mobile_v1.glb',
   monsterx_glb: 'assets/models/monsterx_mobile_v1.glb',
   rhinobeast_glb: 'assets/models/rhinobeast_mobile_v1.glb',
   spikebeast_glb: 'assets/models/spikebeast_mobile_v1.glb',

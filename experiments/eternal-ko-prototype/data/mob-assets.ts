@@ -65,7 +65,7 @@ export interface MobAssetRecord {
 export const MOB_ASSETS: Readonly<Record<string, MobAssetRecord>> = {
   crab: {
     assetKey: 'crab_glb', displayName: 'Yengeç',
-    heightMeters: 0.95, walkSpeed: 30.1, runSpeed: 51.1,
+    heightMeters: 0.95, walkSpeed: 29.6, runSpeed: 50.2,
     clips: {
       idle: '01_IDLE', idleLong: '02_IDLE_FIDGET',
       walk: '03_WALK', run: '04_RUN',
@@ -77,7 +77,7 @@ export const MOB_ASSETS: Readonly<Record<string, MobAssetRecord>> = {
   },
   monsterx: {
     assetKey: 'monsterx_glb', displayName: 'Bataklık Avcısı',
-    heightMeters: 1.15, walkSpeed: 14.9, runSpeed: 54.0,
+    heightMeters: 1.15, walkSpeed: 14.5, runSpeed: 52.7,
     clips: {
       idle: '01_IDLE', idleLong: '02_IDLE_FIDGET',
       walk: '03_WALK', run: '04_RUN',
@@ -110,6 +110,32 @@ export const MOB_ASSETS: Readonly<Record<string, MobAssetRecord>> = {
     },
     canChase: true,
     attribution: 'Spike Beast — CC-BY-4.0',
+  },
+  /* ═══ P3.27 — YENİ GOBLİN ═══
+     Gövde spec'e üretildi, İSKELET VE ON KLİBİN TAMAMI monsterx'ten
+     geliyor. Klip adları bu yüzden monsterx ile BİREBİR AYNI —
+     `assetForClips` ikisini ayırt EDEMEZ. Bu sorun değil: klip
+     tabloları da aynı, hangisine çözülürse çözülsün doğru süre ve
+     hız gelir. Model seçimi zaten `assetForLevel` ile yapılır.
+
+     YÜRÜYÜŞ AYAK KAYMASI %30,7 (referans %8,7) — otomatik rig'in
+     bilinen zayıflığı. Koşusu ise %0,5 ile kusursuz. Bu yüzden
+     kovalamada koşu kullanılır (`pickLocomotion` zaten oranı 1'e
+     yakın tutanı seçiyor: 90,8 birim/sn → 75 için 0,83×). */
+  goblin: {
+    assetKey: 'goblin_glb', displayName: 'Goblin',
+    heightMeters: 0.923, walkSpeed: 20.5, runSpeed: 90.8,
+    clips: {
+      idle: '01_IDLE', idleLong: '02_IDLE_FIDGET',
+      walk: '03_WALK', run: '04_RUN',
+      attacks: ['05_ATTACK_1', '06_ATTACK_2'], death: '12_DEATH',
+      hitReact: '11_HIT_REACT', roar: '10_SHOUT',
+    },
+    canChase: true,
+    /* Lisans ZİNCİRİ iki parçalı: gövde yeni, ama iskelet ve bütün
+       klipler Monsters X varlığından. Gövdeyi değiştirmek CC-BY
+       yükümlülüğünü kaldırmaz. */
+    attribution: 'Goblin (rig: Monsters X) — CC-BY-4.0',
   },
   lavaspider: {
     assetKey: 'lavaspider_glb', displayName: 'Lav Örümceği',
@@ -228,10 +254,22 @@ export const MODEL_BANDS: readonly ModelBand[] = [
   /* Sv1-2 — açık dünyanın ilk yaratığı. Yerinde durur; oyuncu ona
      gider. Kullanıcı kararı. */
   { minLevel: 1, maxLevel: 2, asset: 'lavaspider' },
-  /* Sv3-10 — küçük, hızlı, kalabalık. Goblin bandının yerini alır. */
-  { minLevel: 3, maxLevel: 10, asset: 'crab' },
-  /* Sv11-20 — bataklık bandı. Orta boy, iki saldırı klibi. */
-  { minLevel: 11, maxLevel: 20, asset: 'monsterx' },
+  /* ═══ P3.27 — GOBLİN İLK İNSANSI DÜŞMAN ═══
+     Kecoon goblini (P2.28) bu bandı taşıyordu; yeni goblin onun
+     yerine geçer ve Sv3'e çekildi.
+
+     İki sebep: (1) boyu 0,923 m, yengeçten (0,95) KISA — merdivenin
+     başında durması gerekiyor, yoksa sıra kırılır. (2) On klibi var
+     (yengeçte sekiz): tepki, kükreme, iki saldırı. Oyuncunun en çok
+     vakit geçirdiği bant en zengin animasyonu hak ediyor.
+
+     Kecoon goblini SİLİNMEDİ: model yüklenemezse eski ikiliye düşüş
+     hâlâ oradan geçiyor. */
+  { minLevel: 3, maxLevel: 8, asset: 'goblin' },
+  /* Sv9-16 — yengeç. Kabuklu silüet insansıdan sonra belirgin fark. */
+  { minLevel: 9, maxLevel: 16, asset: 'crab' },
+  /* Sv17-20 — bataklık bandı. Orta boy, iki saldırı klibi. */
+  { minLevel: 17, maxLevel: 20, asset: 'monsterx' },
   /* Sv21-32 — dikenli. Koşusu çok hızlı (132 birim/sn), oynatma
      oranıyla dizginlenir. */
   { minLevel: 21, maxLevel: 32, asset: 'spikebeast' },

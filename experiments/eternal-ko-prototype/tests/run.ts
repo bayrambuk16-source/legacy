@@ -31,13 +31,13 @@ import { heightAt, terrainNodeHeight, terrainNodeHeightRaw } from '../data/morad
 import { MORADON_GRID, MORADON_NODE_STEP } from '../data/moradon-terrain-data.js';
 import {
   MORADON_CELL_SIZE, MORADON_MASK_CELLS, MORADON_PLAYABLE_RECT,
-  canTraverse, isCellBlocked, isWalkable,
+  canTraverse, isCellBlocked, isCellBlockedRaw, isWalkable,
 } from '../data/moradon-walkmask.js';
 import {
   MORADON_TERRAIN_OVERRIDE, MORADON_TERRAIN_OVERRIDE_COUNT,
 } from '../data/moradon-terrain-override.js';
-import { MORADON_CITY_CLEAR_CELLS, isCityCleared } from '../data/moradon-city-clear.js';
-import { MORADON_LAKE_CELLS, isLakeCell } from '../data/moradon-lake-mask.js';
+import { MORADON_CITY_CLEAR_CELLS } from '../data/moradon-city-clear.js';
+import { MORADON_LAKE_CELLS } from '../data/moradon-lake-mask.js';
 import { MORADON_HEIGHT_FIXTURE } from '../data/moradon-meta-data.js';
 import { MORADON_TERRAIN_SPAN } from '../data/moradon-terrain.js';
 import { buildTerrainGeometry, groundElevationAt } from '../render3d/terrain.js';
@@ -88,12 +88,20 @@ import {
 } from '../world/WaveSpawner.js';
 import { DungeonState } from '../world/DungeonState.js';
 import { DungeonSession } from '../world/DungeonSession.js';
+import { BIOME_TINT, buildBiomeColors } from '../data/moradon-biome.js';
+import {
+  SUPPORT_BAR_SLOTS, SUPPORT_SKILLS, defenseUptime, unlockedSupport,
+} from '../data/support-skills.js';
+import {
+  GLOW_MIN_LEVEL, glowIntensityAt, upgradeGlow,
+} from '../data/upgrade-glow.js';
+import { FORGE_SOURCE_CURVE } from '../data/forge-model.js';
 import {
   DAMAGE_MULT_FLOOR_LEVEL, DAMAGE_MULT_HIGH, DAMAGE_MULT_LOW,
   monsterDamageMultiplierFor,
 } from '../data/mob-damage-curve.js';
 import {
-  MIN_MOBS_AFTER_CAP, MOB_COUNT_CAPS, cappedMobCount, mobCountCap,
+  MIN_MOBS_AFTER_CAP, MOB_COUNT_TIERS, cappedMobCount, mobCountCap,
 } from '../data/mob-count-cap.js';
 import {
   RISK_COLOR, RISK_MARK, targetLevelText, targetRisk, type TargetRisk,
@@ -9561,6 +9569,11 @@ test('§49 IMPORT SINIRI: gameplay yüksekliği GÖREMEZ', () => {
     for (const entry of readdirSync(join(PROTO_ROOT, dir), { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
       if (entry.name.startsWith('moradon-terrain')) continue;    // dosyanın kendisi
+      /* P2.36 — `moradon-biome.ts` GÖRSELDİR: yalnız `MORADON_GRID`
+         sabitini okur (ızgara boyutu), yükseklik DEĞERİ okumaz.
+         `world/` altındaki hiçbir modül onu import etmez; bant sınırı
+         bir gameplay authority'si değildir. */
+      if (entry.name === 'moradon-biome.ts') continue;
       const src = readFileSync(join(PROTO_ROOT, dir, entry.name), 'utf8');
       for (const line of src.split('\n')) {
         if (/^\s*import\b/.test(line) && banned.test(line)) offenders.push(`${dir}/${entry.name}`);
@@ -13926,7 +13939,22 @@ test('§132 KLİP LİSTESİNDEN VARLIK ÇÖZÜLÜR', () => {
     ].filter((n): n is string => n !== null);
     const found = assetForClips(names);
     ok(found !== null, `${key} klip listesinden çözülemedi`);
-    eq(found!.assetKey, rec.assetKey, `${key} yanlış varlığa çözüldü:`);
+    /* P3.27 — GOBLİN ve MONSTERX aynı iskeleti ve AYNI klipleri
+       paylaşıyor (goblin'in gövdesi yeni, rig'i monsterx'ten). Klip
+       adından ayırt edilemezler ve buna GEREK YOK: klip süreleri de
+       aynı, hangisine çözülürse doğru bilgi gelir. Model seçimi zaten
+       `assetForLevel` ile yapılır.
+
+       Ayrım gerekseydi klip adlarını değiştirmek gerekirdi; bu da
+       "ad tabanlı tahmin yapma" kuralına geri dönmek olurdu. */
+    const twins = new Set(['goblin_glb', 'monsterx_glb']);
+    if (twins.has(rec.assetKey)) {
+      ok(twins.has(found!.assetKey), `${key} ikizler dışına çözüldü`);
+      eq(found!.clips.walk, rec.clips.walk, `${key} yürüyüş klibi:`);
+      eq(found!.clips.death, rec.clips.death, `${key} ölüm klibi:`);
+    } else {
+      eq(found!.assetKey, rec.assetKey, `${key} yanlış varlığa çözüldü:`);
+    }
   }
   /* Bilinmeyen klip kümesi `null` döner — patlamaz. */
   eq(assetForClips(['YOK_BOYLE_KLIP']), null, 'bilinmeyen küme:');
@@ -14195,26 +14223,31 @@ console.log('P2.35 — şehir temizliği, göl, arazi heykeli:');
 test('§140 MASKE ZİNCİRİ: ham AND NOT şehir OR göl', () => {
   /* SIRA önemli: önce şehir açılır, sonra göl kapatılır. Ters sırada
      gölün şehirle kesiştiği yerler açık kalırdı. */
+  /* P2.35 — zincir modül yüklenirken BİR KEZ uygulanır; `isCellBlocked`
+     sıcak yolda tek bit okumaya devam eder. Sıra kaynak metinde
+     korunur: şehir açılır, sonra göl kapatılır. */
   const src = readFileSync(join(PROTO_ROOT, 'data', 'moradon-walkmask.ts'), 'utf8');
-  const body = src.slice(src.indexOf('export function isCellBlocked'));
-  const clearAt = body.indexOf('isCityCleared');
-  const lakeAt = body.indexOf('isLakeCell');
+  const clearAt = src.indexOf('MORADON_CITY_CLEAR_B64');
+  const lakeAt = src.indexOf('MORADON_LAKE_MASK_B64');
   ok(clearAt >= 0 && lakeAt >= 0, 'katmanlar bağlanmamış');
   ok(clearAt < lakeAt, 'göl şehirden ÖNCE uygulanıyor — sıra ters');
 
   /* Şehir gerçekten AÇILMIŞ olmalı. */
   ok(MORADON_CITY_CLEAR_CELLS > 20_000, 'şehir temizliği boş');
   ok(MORADON_LAKE_CELLS > 0, 'göl boş');
-  /* Göl hücresi KAPALI, temizlenmiş şehir hücresi AÇIK olmalı. */
-  let lakeBlocked = 0, cityOpen = 0, probes = 0;
-  for (let cy = 0; cy < 512 && probes < 400; cy += 3) {
-    for (let cx = 0; cx < 512 && probes < 400; cx += 3) {
-      if (isLakeCell(cx, cy)) { probes += 1; if (isCellBlocked(cx, cy)) lakeBlocked += 1; }
-      else if (isCityCleared(cx, cy)) { probes += 1; if (!isCellBlocked(cx, cy)) cityOpen += 1; }
+  /* HAM maske ile ZİNCİRLİ maske farklı olmalı: şehir açılmış,
+     göl kapanmış. `isCellBlockedRaw` ham tabloyu okur. */
+  let opened = 0, closed = 0;
+  for (let cy = 0; cy < 512; cy += 3) {
+    for (let cx = 0; cx < 512; cx += 3) {
+      const raw = isCellBlockedRaw(cx, cy);
+      const now = isCellBlocked(cx, cy);
+      if (raw && !now) opened += 1;          // şehir temizliği
+      if (!raw && now) closed += 1;          // göl
     }
   }
-  ok(lakeBlocked > 0, 'göl engel değil');
-  ok(cityOpen > 0, 'şehir açılmamış');
+  ok(opened > 0, 'şehir açılmamış');
+  ok(closed > 0, 'göl engel değil');
 });
 
 test('§140 YERLEŞİM maskeyle UYUMLU — duvarda mob yok', () => {
@@ -14451,13 +14484,16 @@ test('§144 MOB SAYISI TAVANI üst bantta kalabalığı kırar', () => {
     prev = c;
   }
 
-  /* KIRPMA, atama değil: daha az isteyen slota dokunulmaz. */
-  eq(cappedMobCount(4, 50), 4, 'az isteyen slot:');
-  eq(cappedMobCount(8, 50), MIN_MOBS_AFTER_CAP, 'çok isteyen slot:');
-  eq(cappedMobCount(8, 10), 8, 'alt bant kırpılmamalı:');
+  /* P2.41 — ARTIK ATAMA. Yerleşimin yazdığı sayı yok sayılır; sayıyı
+     seviye bandı belirler. Yerleşim dışarıda üretiliyor ve bir sonraki
+     tazelemede yine kendi değerini yazacak. */
+  eq(cappedMobCount(4, 50), MIN_MOBS_AFTER_CAP, 'üst bant az isteyen:');
+  eq(cappedMobCount(8, 50), MIN_MOBS_AFTER_CAP, 'üst bant çok isteyen:');
+  eq(cappedMobCount(5, 10), 8, 'alt bant az isteyen YÜKSELTİLMELİ:');
+  eq(cappedMobCount(8, 10), 8, 'alt bant çok isteyen:');
   /* Sıfır mob = slotun sessizce kaybolması. Olmamalı. */
   ok(cappedMobCount(0, 50) >= 1, 'sıfır mob üretildi');
-  ok(MOB_COUNT_CAPS.length >= 2, 'tavan tablosu tek kademeli');
+  ok(MOB_COUNT_TIERS.length >= 2, 'bant tablosu tek kademeli');
 });
 
 test('§144 SAYIM ve DOĞUŞ aynı tavanı görür', () => {
@@ -14468,7 +14504,7 @@ test('§144 SAYIM ve DOĞUŞ aynı tavanı görür', () => {
     const p = slotPlacement(s);
     expected += p.count;
     const lv = Content.monster(s.monsterRef)?.level ?? 1;
-    ok(p.count <= mobCountCap(lv), `${s.id} tavanı aşıyor: ${p.count}`);
+    eq(p.count, mobCountCap(lv), `${s.id} bant sayısını taşımıyor:`);
   }
   eq(MORADON_POPULATION, expected, 'popülasyon sayımı:');
 
@@ -14536,6 +14572,362 @@ test('§145 HEDEF KARTI ibareyi ÇİZİYOR ve çakışmıyor', () => {
      üst üste biner. Biri sola, biri sağa yaslanmalı. */
   const blk = src.slice(src.indexOf('P2.38 — SEVİYE FARKI'), src.indexOf('P2.38 — SEVİYE FARKI') + 1400);
   ok(/align: 'right'/.test(blk), 'seviye farkı sağa yaslanmıyor — çakışır');
+});
+
+test('§146 GOBLİN: gövde yeni, RİG ve KLİPLER monsterx\'ten', () => {
+  /* Lisans zinciri İKİ PARÇALI: gövde spec'e üretildi ama iskelet ve
+     on klibin tamamı Monsters X varlığından geliyor. Gövdeyi
+     değiştirmek CC-BY yükümlülüğünü KALDIRMAZ. */
+  const g = MOB_ASSETS['goblin']!;
+  const mx = MOB_ASSETS['monsterx']!;
+  ok(g.attribution.includes('CC-BY'), 'goblin lisansı eksik');
+  ok(/rig|Monsters X/i.test(g.attribution), 'rig kaynağı künyede yok');
+
+  /* Klipler BİREBİR aynı olmalı — aynı rig, aynı animasyon. */
+  eq(g.clips.idle, mx.clips.idle, 'boşta klibi:');
+  eq(g.clips.walk, mx.clips.walk, 'yürüyüş klibi:');
+  eq(g.clips.run, mx.clips.run, 'koşu klibi:');
+  eq(g.clips.death, mx.clips.death, 'ölüm klibi:');
+  eq(g.clips.roar, mx.clips.roar, 'kükreme klibi:');
+
+  /* Hızlar FARKLI — aynı klip, farklı gövde ölçeği. */
+  ok(g.runSpeed !== mx.runSpeed, 'hızlar aynı — ölçek farkı yansımamış');
+  ok(PROTO_MODELS[g.assetKey] !== undefined, 'goblin modeli manifestte yok');
+});
+
+test('§146 GOBLİN KOVALAMADA KOŞUYU kullanır — yürüyüşü kayıyor', () => {
+  /* Ölçüm: yürüyüş ayak kayması %30,7 (elle riglenmiş referans %8,7),
+     koşu %0,5. Otomatik rig'in bilinen zayıflığı. Kovalama hızında
+     (75) koşu seçilmeli. */
+  const g = MOB_ASSETS['goblin']!;
+  const pick = pickLocomotion(g, 75);
+  eq(pick.clip, g.clips.run, 'kovalamada koşu seçilmeli:');
+  /* Oran makul aralıkta olmalı — 90,8 birim/sn için 0,83×. */
+  ok(pick.rate > 0.6 && pick.rate < 1.2, `oran zorlanıyor: ${pick.rate.toFixed(2)}`);
+
+  /* Yavaş hedefte yürüyüş seçilebilir — o zaman kayma görünür ama
+     mob zaten yavaş hareket ediyor. */
+  const slow = pickLocomotion(g, 22);
+  eq(slow.clip, g.clips.walk, 'yavaş hedefte yürüyüş:');
+});
+
+test('§146 HIZLAR KAYITTAN TAZELENDİ', () => {
+  /* monsterx'ten 90 uçan vertex çıkarıldı; gövde hedef boyu kendisi
+     doldurunca ölçek değişti ve kök-hareketli ikizden gelen hızlar
+     yeniden türetildi. */
+  eq(MOB_ASSETS['crab']!.walkSpeed, 29.6, 'yengeç yürüyüş:');
+  eq(MOB_ASSETS['crab']!.runSpeed, 50.2, 'yengeç koşu:');
+  eq(MOB_ASSETS['monsterx']!.walkSpeed, 14.5, 'Monster X yürüyüş:');
+  eq(MOB_ASSETS['monsterx']!.runSpeed, 52.7, 'Monster X koşu:');
+});
+
+/* ================= P2.39 — ÖRS ORANLARI VE PARILTI ================= */
+console.log('P2.39 — yükseltme oranları ve +3 üstü parıltı:');
+
+test('§147 ORANLAR YÜKSELDİ, +9 AÇILDI', () => {
+  /* Kullanıcı kararı: +9 %6 olsun, diğerleri buna oranla artsın. */
+  ok(Math.abs(successChance(8) - 0.06) < 1e-9, `+9 şansı: ${successChance(8)}`);
+  ok(Math.abs(successChance(9) - 0.03) < 1e-9, `+10 şansı: ${successChance(9)}`);
+  /* Her kademe kaynaktan YÜKSEK ya da eşit olmalı — hiçbiri düşmemeli. */
+  for (let from = 0; from < 10; from++) {
+    const src = FORGE_SOURCE_CURVE.get(from + 1) ?? 0;
+    ok(successChance(from) >= src - 1e-9,
+      `+${from + 1} kaynaktan düşük: ${successChance(from)} < ${src}`);
+  }
+  /* Eğrinin ŞEKLİ korunmalı: +3'e kadar garanti, sonra MONOTON düşüş. */
+  for (let from = 0; from < 3; from++) eq(successChance(from), 1, `+${from + 1} garanti:`);
+  let prev = 1;
+  for (let from = 3; from < 10; from++) {
+    const c = successChance(from);
+    ok(c < prev, `+${from + 1} şansı yükseldi: ${c}`);
+    ok(c > 0, `+${from + 1} kapalı`);
+    prev = c;
+  }
+  /* +11 KAPALI — merdiven SONLU kalmalı; kaynak eğri de burada bitiyor. */
+  eq(successChance(10), 0, '+11 şansı:');
+  eq(canAttempt(10), false, '+11 denenebiliyor:');
+  eq(FORGE_EFFECTIVE_MAX, 10, 'fiilî tavan:');
+});
+
+test('§147 KAYNAK EĞRİ SİLİNMEDİ — denetlenebilir', () => {
+  /* Tuning kaynağın ÜSTÜNE biner, yerine geçmez. */
+  eq(FORGE_SOURCE_CURVE.get(9), 0, 'kaynakta +9:');
+  eq(FORGE_SOURCE_CURVE.get(7), 0.09, 'kaynakta +7:');
+  ok(FORGE_SOURCE_CURVE.size >= 8, 'kaynak eğri eksik');
+});
+
+test('§148 PARILTI +3\'TEN SONRA başlar ve KADEMELİ', () => {
+  /* +3'e kadar her deneme garantili — orası ödül sayılmaz. */
+  eq(GLOW_MIN_LEVEL, 4, 'parıltı eşiği:');
+  for (let lv = 0; lv < GLOW_MIN_LEVEL; lv++) {
+    eq(upgradeGlow(lv), null, `+${lv} parlıyor:`);
+  }
+  /* Eşikten sonra HER kademede parıltı olmalı. */
+  for (let lv = GLOW_MIN_LEVEL; lv <= 10; lv++) {
+    ok(upgradeGlow(lv) !== null, `+${lv} parlamıyor`);
+  }
+  /* Şiddet kademeyle ARTMALI — tek bir "parlıyor/parlamıyor" ayrımı
+     +4 ile +9 farkını yutardı. */
+  let prev = 0;
+  for (const lv of [4, 6, 8, 9, 10]) {
+    const g = upgradeGlow(lv)!;
+    ok(g.intensity > prev, `+${lv} şiddeti artmadı: ${g.intensity}`);
+    ok(/^#[0-9a-f]{6}$/i.test(g.css), `+${lv} rengi geçersiz`);
+    prev = g.intensity;
+  }
+  /* NABIZ yalnız tavanda — sürekli hareket ekranı yorar. */
+  eq(upgradeGlow(4)!.pulse, false, '+4 nabız:');
+  eq(upgradeGlow(8)!.pulse, false, '+8 nabız:');
+  eq(upgradeGlow(9)!.pulse, true, '+9 nabız:');
+  eq(upgradeGlow(10)!.pulse, true, '+10 nabız:');
+  /* TAVAN kendi rengini hak ediyor — +9'un tonu olsaydı ayırt
+     edilemezdi. */
+  ok(upgradeGlow(10)!.css !== upgradeGlow(9)!.css, '+10 rengi +9 ile aynı');
+});
+
+test('§148 NABIZ SAF — zaman dışarıdan gelir', () => {
+  const top = upgradeGlow(10)!;
+  const a = glowIntensityAt(top, 0);
+  const b = glowIntensityAt(top, 0.45);
+  ok(a !== b, 'nabız salınmıyor');
+  /* Aynı zaman → aynı değer. */
+  eq(glowIntensityAt(top, 1.23), glowIntensityAt(top, 1.23), 'deterministik:');
+  /* Şiddet hiçbir zaman tavanı aşmamalı ya da sıfıra düşmemeli. */
+  for (let t = 0; t < 4; t += 0.07) {
+    const v = glowIntensityAt(top, t);
+    ok(v > 0 && v <= top.intensity + 1e-9, `t=${t.toFixed(2)} şiddet aralık dışı: ${v}`);
+  }
+  /* Nabızsız parıltı zamandan ETKİLENMEMELİ. */
+  const calm = upgradeGlow(6)!;
+  eq(glowIntensityAt(calm, 0), glowIntensityAt(calm, 2.7), 'nabızsız sabit:');
+});
+
+test('§148 ENVANTER ve ÇANTA aynı tablodan okur', () => {
+  /* İki farklı görsel dil oluşmasın. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  const uses = (src.match(/upgradeGlow\(/g) ?? []).length;
+  ok(uses >= 2, `parıltı tek yerde kullanılıyor: ${uses}`);
+  ok(/glowEq\.css/.test(src) && /glowBag\.css/.test(src), 'renk tablodan gelmiyor');
+});
+
+test('§149 ÇANTADA ÖLÜ ŞERİT YOK — en yakın hücre çözülür', () => {
+  /* Hücre 44, adım 49,4 → aralarda 5,4 px ölü şerit vardı ve oraya
+     dokunmak null dönüyordu. 390 px'lik telefonda hücre 27,7 CSS px;
+     parmak ucu ~40 CSS px, arayı bulmak çok kolaydı. */
+  const b = INV_LAYOUT.bag;
+  const gap = b.pitch - b.cell;
+  ok(gap > 1, `ızgarada boşluk olmalı, ölçülen ${gap}`);
+
+  const cells = bagCellRects();
+  const c0 = cells[0]!;
+  const stripX = c0.x + b.cell + gap / 2;        // 0 ile 1 arasındaki şerit
+  const h = invHitTest(stripX, c0.y + b.cell / 2);
+  /* Şeridin ortası iki hücreye eşit uzaklıkta; hangisine gittiği
+     önemli değil, ÖNEMLİ OLAN null dönmemesi. */
+  ok(h !== null && h.kind === 'bag' && (h.index === 0 || h.index === 1),
+    `ölü şerit çözülmedi: ${JSON.stringify(h)}`);
+
+  /* Izgaranın HER noktası bir hücreye düşmeli — delik kalmamalı. */
+  let holes = 0;
+  for (let r = 0; r < b.rows; r++) {
+    for (let c = 0; c < b.cols; c++) {
+      const hit = invHitTest(
+        b.x + c * b.pitch + b.pitch - 0.5,
+        b.y + r * b.pitch + b.pitch - 0.5,
+      );
+      if (hit === null || hit.kind !== 'bag') holes += 1;
+    }
+  }
+  eq(holes, 0, 'ızgarada çözülemeyen nokta:');
+
+  /* Izgara DIŞINA taşmamalı — panelin başka bölgesi çalınmasın. */
+  const right = invHitTest(b.x + b.cols * b.pitch + 2, b.y + 10);
+  ok(right === null || right.kind !== 'bag', 'ızgara sağına taştı');
+  const below = invHitTest(b.x + 10, b.y + b.rows * b.pitch + 2);
+  ok(below === null || below.kind !== 'bag', 'ızgara altına taştı');
+
+  /* İndeks kapasiteyi aşmamalı. */
+  const last = invHitTest(b.x + b.cols * b.pitch - 1, b.y + b.rows * b.pitch - 1);
+  ok(last !== null && last.kind === 'bag' && last.index === b.cols * b.rows - 1,
+    'son hücre yanlış');
+
+  /* Her hücrenin MERKEZİ kendi indeksini vermeli — en yakın hücre
+     çözümü sıralamayı bozmamalı. */
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i]!;
+    const hit = invHitTest(c.x + c.w / 2, c.y + c.h / 2);
+    ok(hit !== null && hit.kind === 'bag' && hit.index === i,
+      `hücre ${i} merkezi ${JSON.stringify(hit)} veriyor`);
+  }
+});
+
+test('§149 EKİPMAN YUVALARI çantadan ÖNCE çözülür', () => {
+  /* Izgara dikdörtgeni artık daha geniş; bir ekipman yuvası onunla
+     kesişirse çanta onu yutabilirdi. Sıra korunmalı. */
+  for (const s of equipSlotRects()) {
+    const hit = invHitTest(s.x + s.w / 2, s.y + s.h / 2);
+    ok(hit !== null && hit.kind === 'equip' && hit.slotId === s.slotId,
+      `${s.slotId} çantaya kaydı: ${JSON.stringify(hit)}`);
+  }
+  /* Düğmeler de. */
+  for (const btn of invButtons()) {
+    const hit = invHitTest(btn.x + btn.w / 2, btn.y + btn.h / 2);
+    ok(hit !== null && hit.kind === 'button' && hit.id === btn.id,
+      `${btn.id} düğmesi çözülemedi`);
+  }
+});
+
+test('§149 SEÇİM ÇERÇEVESİ dört kenardan ve KALİTE renginde', () => {
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  const at = src.indexOf('P2.40 — SEÇİM DÖRT KENARDAN');
+  const blk = src.slice(at, src.indexOf('}', src.indexOf('if (on) {', at)) + 1);
+  /* Dört kenar da çizilmeli — tek çizgi 1,26 CSS px'e iniyordu. */
+  eq((blk.match(/g\.rect\(/g) ?? []).length, 4, 'çerçeve kenar sayısı:');
+  /* Sabit turuncu DEĞİL, eşyanın kalite rengi. */
+  ok(!/'#e08a3c'/.test(blk), 'seçim hâlâ sabit renkte');
+  ok(/, col\)/.test(blk), 'kalite rengi kullanılmıyor');
+  /* İkon hücreyi doldurmalı. */
+  ok(/c\.w - 2, col\)/.test(src), 'ikon hâlâ küçük çiziliyor');
+});
+
+test('§150 BİOME GÖRSELDİR — gameplay onu görmez', () => {
+  /* Bant sınırı bir gameplay authority'si DEĞİL. `world/` altındaki
+     hiçbir modül biome'u import etmemeli; ederse zemin rengi
+     davranışa sızmış olur. */
+  const offenders: string[] = [];
+  for (const entry of readdirSync(join(PROTO_ROOT, 'world'), { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
+    const src = readFileSync(join(PROTO_ROOT, 'world', entry.name), 'utf8');
+    if (/import[^\n]*moradon-biome/.test(src)) offenders.push(entry.name);
+  }
+  eq(offenders.join(','), '', 'biome\'u import eden world modülü:');
+
+  /* Biome YALNIZ ızgara boyutunu okur, yükseklik DEĞERİ okumaz. */
+  const bio = readFileSync(join(PROTO_ROOT, 'data', 'moradon-biome.ts'), 'utf8');
+  ok(!/heightAt|terrainNodeHeight/.test(bio), 'biome yükseklik okuyor');
+});
+
+test('§150 VERTEX RENGİ her düğüme yazılıyor', () => {
+  const colors = buildBiomeColors();
+  /* 129×129 düğüm × 3 bileşen. */
+  eq(colors.length, MORADON_GRID * MORADON_GRID * 3, 'renk dizisi uzunluğu:');
+  /* Çarpanlar 1'i AŞABİLİR (zemin dokusu koyu zeytin) — bu yüzden
+     `BufferAttribute` normalize EDİLMEZ. Test bunu korur. */
+  let over = 0, min = Infinity, max = -Infinity;
+  for (const v of colors) {
+    if (v > 1) over += 1;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  ok(over > 0, 'hiçbir çarpan 1\'i aşmıyor — normalize varsayımı sızmış olabilir');
+  ok(min > 0, `çarpan sıfır ya da negatif: ${min}`);
+  ok(max < 4, `çarpan aşırı: ${max}`);
+
+  /* Beş bandın hepsi kullanılmalı — biri boşsa harita tek renk olur. */
+  eq(BIOME_TINT.length, 5, 'bant sayısı:');
+  const used = new Set<string>();
+  for (let i = 0; i < colors.length; i += 3) {
+    used.add(`${colors[i]!.toFixed(3)},${colors[i + 1]!.toFixed(3)}`);
+  }
+  ok(used.size >= 5, `haritada yalnız ${used.size} farklı renk var`);
+});
+
+test('§150 ARAZİ MESH\'İ renk özniteliği taşıyor', () => {
+  /* `vertexColors` açıkken öznitelik YOKSA three çizemez. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'terrain.ts'), 'utf8');
+  ok(/setAttribute\('color'/.test(src), 'renk özniteliği yazılmıyor');
+  /* Materyalde `vertexColors` YALNIZ gerçek arazide açılmalı —
+     zindanın düz tabanında renk özniteliği yok. */
+  const rend = readFileSync(join(PROTO_ROOT, 'render3d', 'ThreeWorldRenderer.ts'), 'utf8');
+  ok(/vertexColors: TERRAIN_MESH_ACTIVE/.test(rend),
+    'vertexColors koşulsuz açılmış — düz tabanda öznitelik yok');
+});
+
+/* ================= P2.42 — DESTEK SKILL AĞACI ================= */
+console.log('P2.42 — sol bar destek ağacı:');
+
+test('§151 PUAN KURALI KO\'NUNKİ — ağaca yatırılır, skill satın alınmaz', () => {
+  /* Kullanıcının verdiği referans: Sv60'ta archery 60 + destek 42 = 102.
+     Bizim Sv60 bütçemiz de 102. Yani gereken puan skillin SEVİYESİ. */
+  const S = new PrototypeState(4600);
+  S.player.level = 60;
+  eq(S.stats.progression.skillBudget, 102, 'Sv60 puanı:');
+
+  /* Her destek skillinin ağaç puanı = kaynak seviyesi. */
+  for (const sk of SUPPORT_SKILLS) {
+    ok(sk.treePoints >= 1 && sk.treePoints <= 70, `${sk.displayName} puanı aralık dışı`);
+  }
+  /* Sv50'de 82 puan: 50 okçu + 32 destek → Safety açılır, Light Feet AÇILMAZ. */
+  const at32 = unlockedSupport(32).map((s) => s.displayName);
+  ok(at32.includes('Korunma'), 'Safety 32 puanda açılmalı');
+  ok(!at32.includes('Hafif Ayak'), 'Light Feet 32 puanda açılmamalı');
+  /* Gerilim burada: okçudan kısarsan Engerek Oku\'nu kaybedersin. */
+  ok(unlockedSupport(35).some((s) => s.displayName === 'Hafif Ayak'),
+    'Light Feet 35 puanda açılmalı');
+});
+
+test('§151 SAVUNMA YÜZDE — kaynak sayısı taşınamadı, ORAN korundu', () => {
+  /* Ölçüldü: "+400 savunma" bizim çıkarma tabanlı formülümüzde Sv20'de
+     ölümsüzlük (%95 azalma), Sv50'de hiçbir şey (%12) veriyordu. */
+  const def = SUPPORT_SKILLS.filter((s) => s.effect.kind === 'damageReduction');
+  eq(def.length, 3, 'savunma kademesi:');
+  let prev = 0;
+  for (const s of def.sort((a, b) => a.treePoints - b.treePoints)) {
+    if (s.effect.kind !== 'damageReduction') continue;
+    ok(s.effect.percent > prev, `${s.displayName} önceki kademeden zayıf`);
+    ok(s.effect.percent < 100, `${s.displayName} tam bağışıklık veriyor`);
+    prev = s.effect.percent;
+  }
+  /* SALDIRI CEZASI YOK — Genie otomatik farm ederken oyunu durdururdu. */
+  for (const s of SUPPORT_SKILLS) {
+    ok(s.effect.kind !== 'attackBuff' || s.effect.percent > 0,
+      `${s.displayName} saldırıyı düşürüyor`);
+  }
+});
+
+test('§151 KESİNTİSİZ KORUMA ancak ÜÇ kademeyle', () => {
+  /* Saldırı cezası yerine geçen kısıt bu. İki kademeyle %75'te kalınır. */
+  const def = SUPPORT_SKILLS.filter((s) => s.effect.kind === 'damageReduction')
+    .sort((a, b) => a.treePoints - b.treePoints);
+  ok(defenseUptime([def[0]!]) < 0.5, 'tek kademe çok kapsıyor');
+  ok(defenseUptime([def[0]!, def[1]!]) < 1, 'iki kademe kesintisiz koruyor');
+  ok(defenseUptime(def) >= 1, 'üç kademe bile kesintisiz koruyamıyor');
+  /* Süre ve bekleme MAKUL olmalı. */
+  for (const s of def) {
+    if (s.effect.kind !== 'damageReduction') continue;
+    ok(s.cooldownSec > s.effect.durationSec,
+      `${s.displayName} beklemesi süresinden kısa — sürekli açık tutulur`);
+  }
+});
+
+test('§151 TÜRETİLEN SKILLER İŞARETLİ', () => {
+  /* Kaynakta olmayanlar açıkça `fromSource: false`. */
+  const derived = SUPPORT_SKILLS.filter((s) => !s.fromSource);
+  eq(derived.length, 4, 'türetilen skill sayısı:');
+  for (const s of derived) eq(s.sourceName, '—', `${s.displayName} kaynak adı:`);
+  /* Kaynaktan gelenlerin KO adı yazılı olmalı. */
+  for (const s of SUPPORT_SKILLS.filter((x) => x.fromSource)) {
+    ok(s.sourceName.length > 1, `${s.displayName} KO adı eksik`);
+  }
+  /* Türetilenler kendi hattının ALT kademesinden güçlü olmalı. */
+  for (const line of ['heal', 'attack', 'weaken']) {
+    const tier = SUPPORT_SKILLS.filter((s) => s.line === line)
+      .sort((a, b) => a.treePoints - b.treePoints);
+    ok(tier.length >= 2, `${line} hattı tek kademeli`);
+  }
+});
+
+test('§151 SOL BAR sekiz yuva, on iki skill — hepsi sığmaz', () => {
+  eq(SUPPORT_BAR_SLOTS, 8, 'sol bar yuvası:');
+  ok(SUPPORT_SKILLS.length > SUPPORT_BAR_SLOTS,
+    'skill sayısı yuvadan az — seçim üretmiyor');
+  /* Kimlikler benzersiz. */
+  const refs = SUPPORT_SKILLS.map((s) => s.ref);
+  eq(new Set(refs).size, refs.length, 'yinelenen kimlik:');
+  /* Okçu skilleriyle çakışmamalı. */
+  for (const r of refs) {
+    ok(!ARCHER_SKILL_ORDER.includes(r), `destek kimliği okçuyla çakışıyor: ${r}`);
+  }
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

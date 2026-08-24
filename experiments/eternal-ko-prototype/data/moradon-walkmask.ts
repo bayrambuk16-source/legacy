@@ -20,21 +20,69 @@
  *  verirdi. */
 
 import { decodeBase64 } from './moradon-codec.js';
-import { isCityCleared } from './moradon-city-clear.js';
-import { isLakeCell } from './moradon-lake-mask.js';
 import {
   MORADON_CELL_SIZE, MORADON_MASK_B64, MORADON_MASK_CELLS, MORADON_PLAYABLE_RECT,
 } from './moradon-walkmask-data.js';
+import { MORADON_CITY_CLEAR_B64, MORADON_CITY_CLEAR_CELLS } from './moradon-city-clear.js';
+import { MORADON_LAKE_MASK_B64, MORADON_LAKE_CELLS } from './moradon-lake-mask.js';
 
 export { MORADON_CELL_SIZE, MORADON_MASK_CELLS, MORADON_PLAYABLE_RECT };
 
-/** Bit maskesi: `1` = KAPALI. Satır-major, LSB-first. */
+function popcount(bytes: Uint8Array): number {
+  let n = 0;
+  for (const b of bytes) {
+    let v = b;
+    while (v) { n += v & 1; v >>= 1; }
+  }
+  return n;
+}
+
+/** Bit maskesi: `1` = KAPALI. Satır-major, LSB-first.
+ *
+ *  ══════════════ ZİNCİR — SIRA ÖNEMLİ ══════════════
+ *      ham maske  AND NOT (city-clear)  OR (lake-mask)
+ *
+ *  `moradon-walkmask-data.ts` EZİLMEZ. İki düzeltme ayrı dosyalarda durur:
+ *  eski şehrin YAPI collision'ı çıkarılır, göl EKLENİR. Ne silindiği ve ne
+ *  eklendiği her zaman denetlenebilir kalır.
+ *
+ *  Zincir bir KEZ, modül yüklenirken uygulanır — `isCellBlocked()` sıcak
+ *  yolda tek bit okumaya devam eder, ek maliyet yoktur. */
 const MASK: Uint8Array = (() => {
-  const m = decodeBase64(MORADON_MASK_B64);
   const need = (MORADON_MASK_CELLS * MORADON_MASK_CELLS) / 8;
-  if (m.length !== need) throw new Error(`[P2.4C] maske bozuk: ${m.length} bayt, beklenen ${need}`);
-  return m;
+  const base = decodeBase64(MORADON_MASK_B64);
+  if (base.length !== need) throw new Error(`[P2.4C] maske bozuk: ${base.length} bayt, beklenen ${need}`);
+
+  const clear = decodeBase64(MORADON_CITY_CLEAR_B64);
+  if (clear.length !== need) throw new Error(`[P2.35] şehir maskesi bozuk: ${clear.length} bayt`);
+  if (popcount(clear) !== MORADON_CITY_CLEAR_CELLS) {
+    throw new Error('[P2.35] şehir maskesi hücre sayısı bildirilen ile uyuşmuyor');
+  }
+
+  const lake = decodeBase64(MORADON_LAKE_MASK_B64);
+  if (lake.length !== need) throw new Error(`[P2.35] göl maskesi bozuk: ${lake.length} bayt`);
+  if (popcount(lake) !== MORADON_LAKE_CELLS) {
+    throw new Error('[P2.35] göl maskesi hücre sayısı bildirilen ile uyuşmuyor');
+  }
+
+  const out = new Uint8Array(need);
+  for (let i = 0; i < need; i++) out[i] = ((base[i]! & ~clear[i]!) | lake[i]!) & 0xff;
+  return out;
 })();
+
+/** Zincir uygulanmadan ÖNCEKİ ham maske — yalnız denetim ve test içindir. */
+const MASK_RAW: Uint8Array = decodeBase64(MORADON_MASK_B64);
+
+/** HÜCRE indisiyle HAM maske sorgusu (şehir silme ve göl UYGULANMAMIŞ).
+ *  Gameplay bunu KULLANMAZ; kaynak verinin denetlenebilirliği içindir. */
+export function isCellBlockedRaw(cx: number, cy: number): boolean {
+  if (cx < 0 || cy < 0 || cx >= MORADON_MASK_CELLS || cy >= MORADON_MASK_CELLS) return true;
+  const bit = cy * MORADON_MASK_CELLS + cx;
+  return (MASK_RAW[bit >> 3]! & (1 << (bit & 7))) !== 0;
+}
+
+/** Zincir sonrası kapalı hücre sayısı — denetim içindir. */
+export const MORADON_BLOCKED_CELLS = popcount(MASK);
 
 /** World koordinatının hücre indisi (aşağı yuvarlama, negatifte de doğru). */
 export function cellIndex(world: number): number {
@@ -42,25 +90,10 @@ export function cellIndex(world: number): number {
 }
 
 /** HÜCRE indisleriyle sorgu. Izgara dışı → KAPALI. */
-/** ═══ P2.35 — MASKE ZİNCİRİ ═══
- *
- *  Kaynak maske EZİLMEZ; iki seyrek katman ÜSTÜNE binerler:
- *
- *      ham  AND NOT (şehir temizliği)  OR  (göl)
- *
- *  SIRA ÖNEMLİ ve bu sırayla üretilen maske referansla bit-birebir
- *  doğrulandı. Önce şehir açılır (surlar, kuleler, iç kale ve
- *  duvar içindeki 46 bina — toplam 28 758 ince hücre), sonra göl
- *  kapatılır. Ters sırada gölün şehirle kesiştiği yerler açılırdı.
- *
- *  Doğal kayalar ve ağaç kütleleri KORUNUR — yalnız yapı collision'ı
- *  kaldırıldı. */
 export function isCellBlocked(cx: number, cy: number): boolean {
   if (cx < 0 || cy < 0 || cx >= MORADON_MASK_CELLS || cy >= MORADON_MASK_CELLS) return true;
   const bit = cy * MORADON_MASK_CELLS + cx;
-  const raw = (MASK[bit >> 3]! & (1 << (bit & 7))) !== 0;
-  const cleared = raw && !isCityCleared(cx, cy);
-  return cleared || isLakeCell(cx, cy);
+  return (MASK[bit >> 3]! & (1 << (bit & 7))) !== 0;
 }
 
 /** World noktası yürünebilir mi? Sınır dışı → `false`. */

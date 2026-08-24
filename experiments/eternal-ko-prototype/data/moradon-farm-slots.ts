@@ -132,7 +132,7 @@ const PLACEMENT: readonly Placement[] = [
   { x: 2965, y: 225, r: 160, ref: 1201, count: 8, name: 'Muhafız', ai: 'ELITE', art: BOSS },   /* E · Sv48 · 5138 */
   { x: 4864, y: 2053, r: 160, ref: 1201, count: 8, name: 'Muhafız', ai: 'ELITE', art: BOSS },   /* E · Sv48 · 5201 */
   { x: 3537, y: 347, r: 180, ref: 512, count: 8, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },   /* E · Sv50 · 5250 */
-  { x: 4235, y: 430, r: 170, ref: 512, count: 8, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },   /* E · Sv50 · 5538 */
+  { x: 4235, y: 430, r: 210, ref: 512, count: 8, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },   /* E · Sv50 · 5538 */   /* P2.35: 170→210, 8 mob 3×3 ızgarada dip dibe düşüyordu (§50) */
 ];
 
 /** Slot başına gerçek yürüme mesafesi, PLACEMENT ile AYNI SIRADA.
@@ -157,9 +157,10 @@ export const MORADON_FARM_SLOTS: readonly MobSpawnSlot[] = PLACEMENT.map((p, i) 
 
 /** Sahada GERÇEKTEN doğan mob sayısı.
  *
- *  P2.37 — ham `count` DEĞİL, TAVANLANMIŞ sayı toplanır. Üst bantlarda
- *  slot başına sekiz mob ölçümde çöküyordu (bkz. `mob-count-cap.ts`);
- *  tavan `slotPlacement` içinde uygulanıyor ve sayım da aynı kapıdan
- *  geçmeli, yoksa "kaç mob var" sorusunun iki farklı cevabı olur. */
+ *  P2.37 — ham `count` DEĞİL, TAVANLANMIŞ sayı toplanır. Yerleşim üst
+ *  bantlarda slot başına sekiz mob yazıyor; ölçümde bu çöküyordu
+ *  (bkz. `mob-count-cap.ts`). Tavan `slotPlacement` içinde uygulanır ve
+ *  sayım da aynı kapıdan geçmeli, yoksa "kaç mob var" sorusunun iki
+ *  farklı cevabı olur. */
 export const MORADON_POPULATION = MORADON_FARM_SLOTS
   .reduce((n, s) => n + slotPlacement(s).count, 0);
