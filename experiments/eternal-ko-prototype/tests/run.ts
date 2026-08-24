@@ -71,6 +71,15 @@ import {
 } from '../data/moradon-loot-pool.js';
 import { FIXED_SELL_PRICES, equipSellPrice, fixedSellPrice } from '../data/sell-prices.js';
 import {
+  ARMOR_HALVING_POINT, RISK_LABEL, combatPower, effectiveHealth, floorRisk,
+} from '../data/combat-power.js';
+import type { PowerInput } from '../data/power-score.js';
+import {
+  BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
+  WAVE_MAX_COUNT, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE, coinForKill, floorLevelBand,
+  floorMonsters, floorStatMult, planWave, recommendedPower, trophyValue,
+} from '../data/wave-floors.js';
+import {
   GATE_ALPHA, SKILL_ICONS, gateBadge, skillGate, skillIconKey, skillInitial,
   skillsWithoutIcon,
 } from '../data/skill-visuals.js';
@@ -12338,6 +12347,126 @@ test('§106 SABİT FİYATLI eşyalar tanımlı ve tutarlı', () => {
     'Sv50 ganimeti daha ucuz görünüyor');
   /* Parşömen SATILMAKTANSA kullanılsın — ucuz olmalı. */
   ok(FIXED_SELL_PRICES[SCROLL_ITEM_REF]! < 500, 'parşömen satmak çok kârlı');
+});
+
+/* ================= P3.1 — DALGA MODU: GÜÇ VE KAT VERİSİ ================= */
+console.log('P3.1 — dalga modu aşama 1 (savaş gücü + kat yapılandırması):');
+
+test('§110 SAVAŞ GÜCÜ üstel skordan AYRI ve DOĞRUSALA yakın', () => {
+  /* Güç skoru (`power-score.ts`) üsteldir: Sv1→Sv50 arası 63'ten
+     19,21M'ye, yani 300 000 kat. Gerçek savaş gücü 62 kat artıyor.
+     Kat kapısı üstel sayıya bağlanamaz. */
+  const mk = (attack: number, defense: number, maxHp: number): PowerInput =>
+    ({ attack, defense, maxHp, maxMp: 100, dex: 70, sta: 60 });
+  const low = combatPower(mk(7, 0, 38));
+  const high = combatPower(mk(434, 250, 1400));
+  const ratio = high / low;
+  ok(ratio > 20 && ratio < 200, `savaş gücü oranı üstel görünüyor: ${ratio.toFixed(0)}×`);
+
+  /* İKİ BİLEŞEN DE gerekli: yalnız saldırıya yatırmak gücü katlamamalı. */
+  const onlyAtk = combatPower(mk(400, 0, 38));
+  const balanced = combatPower(mk(200, 120, 700));
+  ok(balanced > onlyAtk, 'dengeli yapı saf saldırıdan güçlü olmalı');
+
+  /* Zırh formülü KO'dan gelir: AC 240'ta hasar yarıya iner. */
+  eq(ARMOR_HALVING_POINT, 240, 'zırh yarılama noktası:');
+  const eh = effectiveHealth(mk(10, 240, 1000));
+  ok(Math.abs(eh - 2000) < 1, `AC 240'ta efektif can iki katı olmalı: ${eh}`);
+});
+
+test('§110 RİSK ETİKETİ kapı DEĞİL — oyuncu her zaman geçebilir', () => {
+  /* Kullanıcı kararı: yapay duvar yerine risk. */
+  eq(floorRisk(200, 150), 'safe', 'fazlasıyla güçlü:');
+  eq(floorRisk(140, 150), 'fair', 'sınırda:');
+  eq(floorRisk(100, 150), 'high', 'zayıf:');
+  eq(floorRisk(50, 150), 'extreme', 'çok zayıf:');
+  for (const k of ['safe', 'fair', 'high', 'extreme'] as const) {
+    ok(RISK_LABEL[k].length > 0, `${k} etiketi yok`);
+  }
+  /* Fonksiyon HİÇBİR durumda "geçemezsin" demiyor — yalnız etiket. */
+  ok(floorRisk(1, 999_999) === 'extreme', 'en kötü durumda bile etiket dönmeli');
+});
+
+test('§111 DALGA DESENİ: beşte bir elit, yirmi beşte bir boss', () => {
+  eq(ELITE_EVERY, 5, 'elit aralığı:');
+  eq(BOSS_EVERY, 25, 'boss aralığı:');
+  eq(planWave(5).kind, 'elite', '5. dalga:');
+  eq(planWave(10).kind, 'elite', '10. dalga:');
+  eq(planWave(25).kind, 'boss', '25. dalga:');
+  eq(planWave(1).kind, 'normal', '1. dalga:');
+  /* Boss TEK gelir; elit normalden az ama daha sert. */
+  eq(planWave(25).count, 1, 'boss sayısı:');
+  ok(planWave(25).statMult > planWave(5).statMult, 'boss elitten sert olmalı');
+  ok(planWave(5).statMult > planWave(4).statMult, 'elit normalden sert olmalı');
+
+  /* Mob sayısı ARTAR ama TAVANLIDIR — çizim tavanımız 30 görsel. */
+  let prev = 0;
+  for (let w = 1; w <= 60; w++) {
+    const p = planWave(w);
+    ok(p.count <= WAVE_MAX_COUNT, `dalga ${w} tavanı aştı: ${p.count}`);
+    if (p.kind === 'normal') { ok(p.count >= prev, `dalga ${w} küçüldü`); prev = p.count; }
+  }
+  ok(WAVE_MAX_COUNT < 30, 'dalga tavanı çizim tavanını aşıyor');
+});
+
+test('§111 KAT → MOB BANDI: mevcut moblar, ADLARI DEĞİŞMEDEN', () => {
+  /* Kullanıcı kararı: yeni düşman yok. */
+  for (let f = 1; f <= MAX_DISTINCT_FLOOR; f++) {
+    const refs = floorMonsters(f);
+    ok(refs.length > 0, `kat ${f} mobsuz`);
+    const band = floorLevelBand(f);
+    for (const r of refs) {
+      const m = Content.monster(r);
+      ok(m !== undefined, `kat ${f}: mob kaynakta yok (${r})`);
+      ok(m!.level >= band.min && m!.level <= band.max,
+        `kat ${f}: ${m!.displayName} bant dışı (Sv${m!.level})`);
+      /* Ad DEĞİŞMEMELİ — normal haritadaki mobun aynısı. */
+      eq(m!.displayName, Content.monster(r)!.displayName, 'ad:');
+    }
+  }
+  /* Kat 10'dan sonra mob AYNI kalır, çarpan büyür. */
+  eq(floorMonsters(11).join(','), floorMonsters(10).join(','), 'kat 11 mobları:');
+  eq(floorStatMult(10), 1, 'kat 10 çarpanı:');
+  ok(floorStatMult(15) > floorStatMult(11), 'çarpan katla büyümeli');
+});
+
+test('§112 COIN kaynaktan türer, satılabilir DOĞRUSAL büyür', () => {
+  /* `K_MONSTER.iMoney` ölçüldü: Sv1→18, Sv11→145, Sv30→544, Sv48→827.
+     Oran ≈ 17 coin/seviye. */
+  eq(COIN_PER_LEVEL, 17, 'coin/seviye:');
+  ok(coinForKill(10, 1) > coinForKill(5, 1), 'coin seviyeyle artmalı');
+  /* Ödül YARIYA — kullanıcı kararı. */
+  eq(WAVE_REWARD_MULT, 0.5, 'ödül çarpanı:');
+  eq(coinForKill(10, 1), Math.floor(17 * 10 * 0.5), 'coin hesabı:');
+
+  /* Satılabilir DOĞRUSAL — ikiye katlanma REDDEDİLDİ. */
+  eq(trophyValue(1), TROPHY_BASE_VALUE, 'kat 1 ganimeti:');
+  eq(trophyValue(10), TROPHY_BASE_VALUE * 10, 'kat 10 ganimeti:');
+  /* Üstel olsaydı kat 10'da 2,56M olurdu; iksir ölçeğini çökertirdi. */
+  ok(trophyValue(10) < 100_000, `kat 10 ganimeti patlamış: ${trophyValue(10)}`);
+  ok(trophyValue(20) < 200_000, `kat 20 ganimeti patlamış: ${trophyValue(20)}`);
+  /* En pahalı iksir 7 000 altın — ganimet onunla aynı bantta kalmalı. */
+  ok(trophyValue(1) / 7000 < 2, 'kat 1 ganimeti iksir ölçeğini aşıyor');
+  eq(WAVE_TROPHY_CHANCE, 0.01, 'ganimet şansı:');
+});
+
+test('§112 ÖNERİLEN GÜÇ mob verisinden TÜRER ve katla artar', () => {
+  let prev = 0;
+  for (let f = 1; f <= 15; f++) {
+    const r = recommendedPower(f);
+    ok(r > prev, `kat ${f} önerisi geriye gitti: ${prev} → ${r}`);
+    prev = r;
+  }
+  /* Kat 1, Sv1 çıplak oyuncunun ULAŞABİLECEĞİ yerde olmalı — yoksa
+     mod ilk adımda duvara çarpar. */
+  const S = new PrototypeState(4200);
+  const f = S.stats.finalStats();
+  const p = combatPower({
+    attack: f.attack, defense: f.defense, maxHp: f.maxHp, maxMp: f.maxMp,
+    dex: S.stats.effectiveDex(), sta: S.stats.effectiveSta(),
+  });
+  ok(p >= recommendedPower(1), `Sv1 oyuncu kat 1'e yetmiyor: ${p} < ${recommendedPower(1)}`);
+  ok(p < recommendedPower(3), `Sv1 oyuncu kat 3'e fazla güçlü: ${p}`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
