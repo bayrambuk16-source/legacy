@@ -285,7 +285,7 @@ import { MobRig, MutantRigFactory } from '../render3d/MobRig.js';
 import { ARROW_MODEL, ARROW_TIP_LOCAL } from '../data/arrow-model.js';
 import { ArcherRig } from '../render3d/ArcherRig.js';
 import {
-  decodeDataUri, findNode, inlineGlbImages, loadGlb, parseGlb, sanitizedNodeName,
+  adoptOrphanBones, decodeDataUri, findNode, inlineGlbImages, loadGlb, parseGlb, sanitizedNodeName,
   type LoadedGlb,
 } from '../render3d/GlbLoader.js';
 import { installHeadlessImageShim } from './headless-dom.js';
@@ -15054,5 +15054,46 @@ test('§154 İSKELETLİ MOB frustum kırpmasına GİRMEZ — siyah ekran', () =>
   ok(MAX_MOB_VISUALS > 0 && MAX_MOB_VISUALS < 60, 'görsel tavanı makul değil');
 });
 
+/* §131 için üst düzey importlar — koşucu senkron, await test dışında yapılır. */
+const T131 = await import('three');
+const SK131 = await import('three/addons/utils/SkeletonUtils.js');
+
+test('§132 YETİM KEMİK EVLATLIĞI — bozuk dışa aktarım klonda çökertmez', () => {
+  /* goblin_mobile_v1.glb vakası: iskelet eklemlerinin bir kısmı sahne
+     grafiğinin dışında. `SkeletonUtils.clone` yalnız sahne alt ağacını
+     kopyaladığı için klonun kemik dizisinde `undefined` kalıyor ve ilk
+     sınır küresi hesabı render döngüsünü öldürüyordu (P3.29). */
+  const scene = new T131.Group();
+  const mesh = new T131.SkinnedMesh(new T131.BufferGeometry());
+  const inBone = new T131.Bone(); inBone.name = 'icerde';
+  const orphanRoot = new T131.Bone(); orphanRoot.name = 'yetim_kok';
+  const orphanChild = new T131.Bone(); orphanChild.name = 'yetim_cocuk';
+  orphanRoot.add(orphanChild);
+  scene.add(mesh); mesh.add(inBone);
+  /* Vendored tip tanımı Skeleton kurucusunu, `bind`'i ve `skeleton`
+     alanını kırpmış; çalışma anındaki gerçek API'ye unknown üzerinden
+     inilir. */
+  const SkeletonCtor = T131.Skeleton as unknown as new (bones: unknown[]) => unknown;
+  (mesh as unknown as { skeleton: unknown }).skeleton =
+    new SkeletonCtor([inBone, orphanRoot, orphanChild]);
+  const adopted = adoptOrphanBones(scene);
+  eq(adopted, 1, 'tek yetim zincir evlat edinilmeli:');
+  /* evlatlık sonrası TÜM kemikler sahnenin altında olmalı */
+  const inScene = new Set<unknown>();
+  scene.traverse((o) => inScene.add(o));
+  for (const b of mesh.skeleton.bones) ok(inScene.has(b), `kemik sahnede: ${b.name}`);
+  /* klon artık eksiksiz: SkeletonUtils.clone kemik kaybetmemeli */
+  const clone = SK131.clone(scene);
+  let cloneUndef = 0;
+  clone.traverse((o) => {
+    const sm = o as InstanceType<typeof T131.SkinnedMesh> & { isSkinnedMesh?: boolean };
+    if (sm.isSkinnedMesh === true) cloneUndef += sm.skeleton.bones.filter((b) => !b).length;
+  });
+  eq(cloneUndef, 0, 'klonda undefined kemik:');
+  /* sağlam sahnede ikinci çağrı hiçbir şey yapmaz (idempotent) */
+  eq(adoptOrphanBones(scene), 0, 'ikinci geçiş boş olmalı:');
+});
+
 console.log(`\n${pass} geçti, ${fail} kaldı`);
 if (fail > 0) process.exit(1);
+

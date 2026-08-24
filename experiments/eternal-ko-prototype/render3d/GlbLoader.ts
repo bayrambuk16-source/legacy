@@ -77,12 +77,56 @@ export function findNode(root: Object3D, manifestName: string): Object3D | null 
 }
 
 function collect(gltf: GLTF): LoadedGlb {
+  adoptOrphanBones(gltf.scene);
   let skinned: SkinnedMesh | null = null;
   gltf.scene.traverse((o) => {
     const maybe = o as Object3D & { isSkinnedMesh?: boolean };
     if (maybe.isSkinnedMesh === true && skinned === null) skinned = o as SkinnedMesh;
   });
   return { scene: gltf.scene, clips: gltf.animations, skinned };
+}
+
+/** ═══ P3.29 — YETİM KEMİK EVLATLIĞI ═══
+ *
+ *  Bozuk dışa aktarımlarda (ör. `goblin_mobile_v1.glb`: 22 düğümün 8'i
+ *  sahnede, iskeletin 15 ekleminden 10'u sahne grafiğinin DIŞINDA)
+ *  `GLTFLoader` eklemleri yine bağlar — düğümler bellekte vardır, yalnız
+ *  sahne ağacının altında değildirler. Orijinal model bu yüzden ÇALIŞIR
+ *  ve bozukluk gizli kalır.
+ *
+ *  Patlama `SkeletonUtils.clone()` ile gelir: klon YALNIZ sahne alt
+ *  ağacını kopyalar, yetim kemikler eşlemeye girmez ve klonun
+ *  `skeleton.bones` dizisinde `undefined` kalır. İlk sınır küresi
+ *  hesabı (`applyBoneTransform`) `undefined.matrixWorld` okur, render
+ *  döngüsü ölür — OYUN AÇILIŞTA DONAR.
+ *
+ *  Onarım yükleyicidedir çünkü varlık DOSYASINA dokunmak yasaktır
+ *  (P2.1 asset override kuralı; bu dosya zaten doku cerrahisi yapıyor).
+ *  Her yetim kemiğin sahne dışındaki EN ÜST atası bulunur ve sahne
+ *  köküne eklenir — `add()` alt zinciri olduğu gibi taşır, kemiklerin
+ *  kendi aralarındaki ebeveynlik bozulmaz. Sağlam dosyalarda (kecoon:
+ *  0 yetim) bu fonksiyon hiçbir şey yapmaz. */
+export function adoptOrphanBones(scene: Group): number {
+  const inScene = new Set<Object3D>();
+  scene.traverse((o) => inScene.add(o));
+  const skinnedMeshes: SkinnedMesh[] = [];
+  scene.traverse((o) => {
+    if ((o as Object3D & { isSkinnedMesh?: boolean }).isSkinnedMesh === true) {
+      skinnedMeshes.push(o as SkinnedMesh);
+    }
+  });
+  let adopted = 0;
+  for (const sm of skinnedMeshes) {
+    for (const bone of sm.skeleton?.bones ?? []) {
+      if (!bone || inScene.has(bone)) continue;
+      let top: Object3D = bone;
+      while (top.parent && !inScene.has(top.parent)) top = top.parent;
+      scene.add(top);
+      top.traverse((x) => inScene.add(x));
+      adopted += 1;
+    }
+  }
+  return adopted;
 }
 
 /* ───────────────────────── bayt kaynakları (fetch YOK) ───────────────────────── */
