@@ -1369,11 +1369,17 @@ export class WorldPrototypeScene implements Scene {
       this.applyGenieActions(this.S.genie.update(dt, this.ents(), this.S.world));
     }
 
-    /* P3.8 — ZİNDAN AKIŞI. Normal dünyada `dungeon` null olduğu için
-       bu çağrı hiçbir şey yapmaz; zindan kuralları oraya sızamaz. */
-    this.tickDungeon();
+    /* ═══ P3.16 — ÖNCE ÖDÜL, SONRA SÜPÜRME ═══
+       `reapDead()` ölen mobun EXP/coin/ganimetini verir. Zindan akışı
+       ise temizlenen dalganın cesetlerini listeden siler.
 
+       Sıra tersken ("moblar ölüyor ama EXP gelmiyor" bulgusu) ölen mob
+       ödülü verilmeden listeden çıkıyor ve kazanç buharlaşıyordu. */
     this.reapDead();
+
+    /* Normal dünyada `dungeon` null olduğu için bu çağrı hiçbir şey
+       yapmaz; zindan kuralları oraya sızamaz. */
+    this.tickDungeon();
 
     /* ═══ P2.0 — THREE KATMANI: gameplay'den SONRA, YALNIZ OKUR ═══
        Bu çağrı gameplay durumuna hiçbir şey yazmaz; renderer kapalıysa

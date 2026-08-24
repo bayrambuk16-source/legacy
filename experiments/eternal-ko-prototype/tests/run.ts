@@ -13503,5 +13503,94 @@ test('§126 BAŞLANGIÇ YAYI YÜKSELTİLEMEZ — güvenlik ağı yakılmasın', 
   ok(r2.ok, `normal yay yükseltilemedi: ${JSON.stringify(r2)}`);
 });
 
+/* ================= P3.16 — ÖNCE ÖDÜL, SONRA SÜPÜRME ================= */
+console.log('P3.16 — zindanda EXP kaybı:');
+
+test('§127 SÜPÜRME ÖDÜLDEN ÖNCE GELİRSE kazanç buharlaşır', () => {
+  /* Oyun testi bulgusu: "moblar ölüyor ama EXP gelmiyor". Ölen mob
+     listeden çıkınca ödül kapısı onu HİÇ GÖRMÜYORDU. */
+  const drive = (reapFirst: boolean): { exp: number; coin: number } => {
+    const D = new DungeonSession(9800);
+    const S = D.state;
+    S.lootPolicy.setMode('auto');
+    D.startNextWave();
+    S.genie.start(S.world);
+    for (let i = 0; i < 3600; i++) {
+      if (!S.player.alive) { D.onDeath(); D.startNextWave(); }
+      if (!S.genie.enabled) S.genie.start(S.world);
+      const ents = S.entities();
+      S.mobs.update(1 / 60, S.world);
+      S.potions.update(1 / 60);
+      S.genie.update(1 / 60, ents, S.world);
+      S.combat.update(1 / 60);
+      S.adapter.updateAction(1 / 60);
+      S.stepCombat(1 / 60, ents);
+      if (reapFirst) {
+        S.reapDead();
+        if (!D.sweepCleared() && !D.dungeon.waveActive) D.startNextWave();
+      } else {
+        if (!D.sweepCleared() && !D.dungeon.waveActive) D.startNextWave();
+        S.reapDead();
+      }
+    }
+    return { exp: S.player.exp, coin: S.player.coins };
+  };
+  const right = drive(true);
+  ok(right.coin > 0, 'doğru sırada coin gelmiyor');
+
+  /* SAHNE SIRASI korunmalı: `reapDead` ÖNCE, `tickDungeon` SONRA. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  const reapAt = src.indexOf('this.reapDead();');
+  const tickAt = src.indexOf('this.tickDungeon();');
+  ok(reapAt >= 0 && tickAt >= 0, 'çağrılar bulunamadı');
+  ok(reapAt < tickAt, 'süpürme ödülden önce çalışıyor — kazanç kaybolur');
+});
+
+test('§127 ÖDÜLÜ VERİLMEMİŞ CESET SÜPÜRÜLMEZ', () => {
+  /* Sıra sahnede düzeltildi, ama koruma oturum katmanında da duruyor:
+     ileride sıra yeniden bozulsa bile ödül kaybolmasın. */
+  const D = new DungeonSession(9801);
+  D.startNextWave();
+  const S = D.state;
+  /* Mobları ÖLDÜR ama reap ETME. */
+  for (const m of S.mobs.mobs) {
+    if (!m.slotId.startsWith('wave_')) continue;
+    m.hp = 0; m.state = 'dying'; m.ai = 'idle';
+  }
+  ok(!D.sweepCleared(), 'ödülü verilmemiş ceset süpürüldü');
+  ok(S.mobs.mobs.length > 0, 'cesetler silinmiş');
+
+  /* Reap edildikten SONRA süpürülebilmeli. */
+  const before = S.player.coins;
+  S.reapDead();
+  ok(S.player.coins > before, 'reap coin vermedi');
+  ok(D.sweepCleared(), 'reap sonrası süpürülemedi');
+  eq(S.mobs.mobs.length, 0, 'ceset kalmamalı:');
+});
+
+test('§127 CANLI: zindanda seviye ATLANIR', () => {
+  const D = new DungeonSession(9802);
+  const S = D.state;
+  S.lootPolicy.setMode('auto');
+  D.startNextWave();
+  S.genie.start(S.world);
+  const startLevel = S.player.level;
+  for (let i = 0; i < 10800; i++) {
+    if (!S.player.alive) { D.onDeath(); D.startNextWave(); }
+    if (!S.genie.enabled) S.genie.start(S.world);
+    const ents = S.entities();
+    S.mobs.update(1 / 60, S.world);
+    S.potions.update(1 / 60);
+    S.genie.update(1 / 60, ents, S.world);
+    S.combat.update(1 / 60);
+    S.adapter.updateAction(1 / 60);
+    S.stepCombat(1 / 60, ents);
+    S.reapDead();
+    if (!D.sweepCleared() && !D.dungeon.waveActive) D.startNextWave();
+  }
+  ok(S.player.level > startLevel,
+    `üç dakikada seviye atlamadı: Sv${startLevel} → Sv${S.player.level}`);
+});
+
 console.log(`\n${pass} geçti, ${fail} kaldı`);
 if (fail > 0) process.exit(1);

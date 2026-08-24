@@ -85,8 +85,24 @@ export class DungeonSession {
   }
 
   /** Temizlenen dalganın cesetlerini dünyadan siler ve sayacı
-   *  ilerletir. Zindanda respawn yok; ceset birikmemeli. */
+   *  ilerletir. Zindanda respawn yok; ceset birikmemeli.
+   *
+   *  ═══ P3.16 — REAP EDİLMEMİŞ CESET SÜPÜRÜLMEZ ═══
+   *  Oyun testi bulgusu: "moblar ölüyor ama EXP gelmiyor". Sebep bir
+   *  SIRA hatasıydı: sahne önce süpürüyor, sonra `reapDead()` çağırıyordu.
+   *  Ölen mob listeden çıkınca ödül kapısı onu HİÇ GÖRMÜYOR ve EXP,
+   *  coin, ganimet buharlaşıyordu.
+   *
+   *  Sıra sahnede düzeltildi; buraya da bir KORUMA konuldu: `dying`
+   *  durumundaki (henüz ödülü verilmemiş) mob süpürülmez. Böylece
+   *  ileride sıra yeniden bozulsa bile ödül kaybolmaz. */
   sweepCleared(): boolean {
+    /* Ödülü verilmemiş ceset varsa BEKLE — `reapDead()` onu bu karede
+       ya da sonraki karede işleyecek. */
+    const pending = this.state.mobs.mobs.some(
+      (m) => m.slotId.startsWith('wave_') && m.state === 'dying' && m.ai !== 'dead',
+    );
+    if (pending) return false;
     if (!this.dungeon.completeWaveIfCleared()) return false;
     /* `mobs` salt okunur bir dizi ALANIDIR — yeniden atanamaz, yerinde
        budanır. Referansı koruyan sistemler (AI, hedefleme) bozulmasın. */
