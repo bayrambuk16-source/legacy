@@ -87,6 +87,32 @@ export class MobRig {
       if (mesh.isMesh === true || mesh.isSkinnedMesh === true) {
         o.castShadow = true;
         o.receiveShadow = false;
+        /* ═══ P3.28 — FRUSTUM KIRPMASI KAPALI ═══
+           OYUN SİYAH EKRANDA KALIYORDU. Konsol zinciri:
+
+             THREE.PropertyBinding: No target node found for track:
+               CATRigSpine2_010.quaternion …
+             Uncaught TypeError: Cannot read properties of undefined
+               (reading 'matrixWorld')
+                 at applyBoneTransform → computeBoundingSphere
+                 → intersectsObject → render
+
+           Three, iskeletli mesh'i frustum'a göre kırpmak için sınır
+           küresini hesaplıyor; bunun için her verteksin kemik dönüşümünü
+           okuyor. İki modelin kemik kümesi aynı değil (goblin 21 CATRig
+           düğümü, Monster X 31) ve eşleşmeyen kemik `undefined` kalıyor.
+           Okuma patlayınca RENDER DÖNGÜSÜ ölüyor ve hiçbir kare
+           çizilmiyor — siyah ekranın sebebi bu.
+
+           Kırpmayı kapatmak kaybettirmez: mesafe kesimimiz zaten var
+           (`MOB_DRAW_DISTANCE`, `MAX_MOB_VISUALS`) ve uzaktaki moblar
+           görünmez yapılıyor. Three'nin kırpması onun üstüne bir şey
+           katmıyordu, yalnız çökme riski getiriyordu.
+
+           Kemik uyuşmazlığının KENDİSİ ayrı bir iş: klip ile iskelet
+           aynı GLB'den gelmeli. Bu satır çökmeyi durdurur, kök sebebi
+           gizlemez — uyarılar konsolda kalmaya devam eder. */
+        o.frustumCulled = false;
       }
     });
 

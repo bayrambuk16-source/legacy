@@ -15024,5 +15024,24 @@ test('§153 VERTEX RENGİ olan materyal ÖZNİTELİKSİZ geometriyle paylaşıla
     'arazi materyalinde vertexColors koşulsuz');
 });
 
+test('§154 İSKELETLİ MOB frustum kırpmasına GİRMEZ — siyah ekran', () => {
+  /* Oyun siyah ekranda kalıyordu. Konsol zinciri:
+       PropertyBinding: No target node found for track: CATRig…
+       TypeError: Cannot read properties of undefined ('matrixWorld')
+         applyBoneTransform → computeBoundingSphere → render
+
+     Three, iskeletli mesh'i kırpmak için sınır küresini hesaplıyor ve
+     her verteksin kemik dönüşümünü okuyor. İki modelin kemik kümesi
+     aynı değil (goblin 21 CATRig düğümü, Monster X 31); eşleşmeyen
+     kemik `undefined` kalıyor ve okuma patlayınca RENDER DÖNGÜSÜ
+     ölüyor. */
+  const src = readFileSync(join(PROTO_ROOT, 'render3d', 'MobRig.ts'), 'utf8');
+  ok(/o\.frustumCulled = false;/.test(src),
+    'mob rig frustum kırpmasında — sınır küresi hesabı çökebilir');
+  /* Kapatmanın bedeli YOK: kendi mesafe kesimimiz duruyor. */
+  ok(MOB_DRAW_DISTANCE > 0, 'mesafe kesimi kapalı');
+  ok(MAX_MOB_VISUALS > 0 && MAX_MOB_VISUALS < 60, 'görsel tavanı makul değil');
+});
+
 console.log(`\n${pass} geçti, ${fail} kaldı`);
 if (fail > 0) process.exit(1);
