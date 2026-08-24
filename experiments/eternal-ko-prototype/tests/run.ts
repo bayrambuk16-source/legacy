@@ -79,6 +79,8 @@ import {
   SPAWN_BAND_AHEAD, SPAWN_BAND_WIDTH, WaveSpawner,
 } from '../world/WaveSpawner.js';
 import { DungeonState } from '../world/DungeonState.js';
+import { DungeonSession } from '../world/DungeonSession.js';
+import { DUNGEON_SAVE_KEY, PROTO_SAVE_KEY } from '../data/proto-save.js';
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
@@ -12737,6 +12739,118 @@ test('§115 KAYIT: kat ve tavan korunur, DALGA sıfırlanır', () => {
   D2.restore(null);
   eq(D2.floor, 1, 'boş kayıt:');
   eq(D2.highestFloor, 1, 'boş kayıt tavanı:');
+});
+
+/* ================= P3.5 — AYRI KARAKTER, AYRI KAYIT ================= */
+console.log('P3.5 — zindan karakteri ayrı (aşama 4):');
+
+test('§116 KAYIT ANAHTARLARI AYRI — en pahalı hata bu olurdu', () => {
+  /* Aynı anahtara yazarlarsa biri diğerini SİLER. */
+  /* Karşılaştırma `string` üzerinden: sabit literal tiplerle yapılırsa
+     tsc "her zaman doğru" der ve test derlenmez. */
+  const a: string = PROTO_SAVE_KEY, b: string = DUNGEON_SAVE_KEY;
+  ok(a !== b, 'iki karakter aynı anahtarı kullanıyor');
+  ok(PROTO_SAVE_KEY.length > 0 && DUNGEON_SAVE_KEY.length > 0, 'anahtar boş');
+  /* Varsayılan anahtar ESKİ değer olmalı — mevcut kayıtlar bozulmasın. */
+  const S = new PrototypeState(7000);
+  eq(S.saves.key, PROTO_SAVE_KEY, 'normal karakter anahtarı:');
+  const D = new DungeonSession(7001);
+  eq(D.state.saves.key, DUNGEON_SAVE_KEY, 'zindan karakteri anahtarı:');
+});
+
+test('§116 İKİ KARAKTER birbirine KARIŞMAZ', () => {
+  const S = new PrototypeState(7002);
+  const D = new DungeonSession(7003);
+  /* Seviye, altın ve envanter bağımsız olmalı. */
+  S.player.level = 30; S.player.coins = 99_999;
+  D.state.player.level = 5; D.state.player.coins = 100;
+  eq(S.player.level, 30, 'normal seviye:');
+  eq(D.state.player.level, 5, 'zindan seviyesi:');
+  eq(S.player.coins, 99_999, 'normal altın:');
+  eq(D.state.player.coins, 100, 'zindan altını:');
+
+  /* Envanter örnekleri paylaşılmamalı. Her iki karakter de kendi
+     başlangıç eşyasıyla doğar; sınanan şey SONRADAN eklenenin
+     sızmamasıdır. */
+  const before = D.state.inventory.usedSlots;
+  const add = S.inventory.add(TROPHY_ITEM_REF, { quantity: 3 });
+  ok(add.ok, 'normal karaktere item');
+  eq(D.state.inventory.usedSlots, before, 'zindan çantası değişmemeli:');
+  eq(D.state.inventory.count(TROPHY_ITEM_REF), 0, 'eşya zindana sızmamalı:');
+});
+
+test('§116 ZİNDANDA SABİT MOB YOK — yalnız dalga', () => {
+  /* Normal haritanın 52 slotu zindanda doğmamalı. */
+  const D = new DungeonSession(7004);
+  eq(D.state.mobs.mobs.length, 0, 'zindanda başlangıç mobu:');
+  eq(D.state.mobs.slotConfigs().length, 0, 'zindanda slot:');
+
+  /* Dalga doğunca dünyaya bağlanmalı — savaş ve ganimet aynı
+     kapılardan geçsin. */
+  ok(D.startNextWave(), 'dalga doğmalı');
+  ok(D.state.mobs.mobs.length > 0, 'dalga dünyaya bağlanmadı');
+  const n = D.state.mobs.mobs.length;
+  eq(D.dungeon.activeMobs.length, n, 'sahadaki mob sayısı:');
+  /* Çifte doğuş reddedilmeli. */
+  ok(!D.startNextWave(), 'ikinci doğuş reddedilmeli');
+  eq(D.state.mobs.mobs.length, n, 'mob sayısı ikiye katlanmamalı:');
+});
+
+test('§116 TEMİZLENEN dalganın cesetleri SÜPÜRÜLÜR', () => {
+  /* Zindanda respawn yok; ceset birikirse çizim yükü büyür. */
+  const D = new DungeonSession(7005);
+  D.startNextWave();
+  for (const m of D.state.mobs.mobs) { m.hp = 0; m.ai = 'dead'; }
+  ok(D.sweepCleared(), 'temiz dalga süpürülmeli');
+  eq(D.state.mobs.mobs.length, 0, 'ceset kalmamalı:');
+  eq(D.dungeon.wave, 2, 'dalga ilerlemeli:');
+  /* Temizlenmemiş dalga süpürülmemeli. */
+  D.startNextWave();
+  ok(!D.sweepCleared(), 'canlı dalga süpürülmemeli');
+  ok(D.state.mobs.mobs.length > 0, 'canlı moblar silinmiş');
+});
+
+test('§116 ÖLÜM sahayı temizler ve karakteri diriltir', () => {
+  const D = new DungeonSession(7006);
+  for (let i = 0; i < 3; i++) {
+    D.startNextWave();
+    for (const m of D.state.mobs.mobs) { m.hp = 0; m.ai = 'dead'; }
+    D.sweepCleared();
+    D.dungeon.nextFloor();
+  }
+  eq(D.dungeon.floor, 4, 'ulaşılan kat:');
+  D.startNextWave();
+  ok(D.state.mobs.mobs.length > 0, 'sahada mob olmalı');
+  D.state.player.takeDamage(999_999);
+  ok(!D.state.player.alive, 'ölmüş olmalı');
+
+  eq(D.onDeath(), 3, 'bir kat düşmeli:');
+  eq(D.state.mobs.mobs.length, 0, 'saha temizlenmeli:');
+  ok(D.state.player.alive, 'karakter dirilmeli');
+  eq(D.dungeon.highestFloor, 4, 'tavan korunmalı:');
+});
+
+test('§116 KAYIT/YÜKLEME: karakter ve kat BİRLİKTE', () => {
+  const D = new DungeonSession(7007);
+  D.state.player.level = 12;
+  D.state.player.coins = 4_321;
+  for (let i = 0; i < 4; i++) {
+    D.startNextWave();
+    for (const m of D.state.mobs.mobs) { m.hp = 0; m.ai = 'dead'; }
+    D.sweepCleared();
+    D.dungeon.nextFloor();
+  }
+  const snap = D.state.snapshot();
+  const dsnap = D.dungeon.serialize();
+  eq(dsnap.floor, 5, 'kaydedilen kat:');
+
+  const D2 = new DungeonSession(7008);
+  D2.state.restore(snap);
+  D2.dungeon.restore(dsnap);
+  eq(D2.state.player.level, 12, 'geri yüklenen seviye:');
+  eq(D2.state.player.coins, 4_321, 'geri yüklenen altın:');
+  eq(D2.dungeon.floor, 5, 'geri yüklenen kat:');
+  eq(D2.dungeon.wave, 1, 'dalga 1\'den başlamalı:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

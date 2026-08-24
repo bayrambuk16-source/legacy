@@ -33,7 +33,7 @@ import { QuestSystem, type QuestCompletion } from './world/QuestSystem.js';
 
 /** P2.27 — ölüm başına EXP kaybı oranı (kullanıcı kararı: %5). */
 export const DEATH_EXP_PENALTY = 0.05;
-import { ProtoSaveSystem, type ProtoSaveData } from './data/proto-save.js';
+import { PROTO_SAVE_KEY, ProtoSaveSystem, type ProtoSaveData } from './data/proto-save.js';
 import { allDefinitions } from './data/item-catalog.js';
 import { KoPotionSystem } from './world/PotionSystem.js';
 import { PlayerAnimator } from './world/PlayerAnimation.js';
@@ -132,8 +132,10 @@ export class PrototypeState {
   lastDeathPenalty = 0;
   /** Son oto giy olayı — HUD bildirimi bunu okur, sonra temizler. */
   lastUpgrade: EquipUpgradeEvent | null = null;
-  /** P2.15 — yerel kayıt. Ana oyunun `SaveSystem`inden AYRI anahtar. */
-  readonly saves = new ProtoSaveSystem();
+  /** P2.15 — yerel kayıt. Ana oyunun `SaveSystem`inden AYRI anahtar.
+   *  P3.5 — anahtar KURUCUDAN gelir: zindan karakteri ayrı anahtara
+   *  yazar, yoksa biri diğerini siler. */
+  readonly saves: ProtoSaveSystem;
   /** Kurucuya verilen dünya (doğuş noktası ölümde yeniden kullanılır). */
   private worldCfg: WorldConfig;
   /** Oyuncu görsel durum makinesi — saldırı animasyonu YALNIZ buradan tetiklenir. */
@@ -474,7 +476,9 @@ export class PrototypeState {
     seed = 20260821,
     slots: readonly MobSpawnSlot[] = FARM_AREA_SLOTS,
     worldCfg: WorldConfig = ACTIVE_WORLD,
+    saveKey: string = PROTO_SAVE_KEY,
   ) {
+    this.saves = new ProtoSaveSystem(undefined, saveKey);
     this.worldCfg = worldCfg;
     registerPrototypeSkills();                 // 15 okçu skilli kayıt olsun
     this.world.worldX = worldCfg.spawn.x;

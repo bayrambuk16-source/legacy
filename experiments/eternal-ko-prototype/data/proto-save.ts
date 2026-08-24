@@ -25,7 +25,17 @@ import type { AutoGearSettings } from '../world/AutoGearSystem.js';
 import type { QuestSaveData } from '../world/QuestSystem.js';
 
 export const PROTO_SAVE_VERSION = 1;
-const KEY = 'project-legacy-proto';
+/** ═══ P3.5 — İKİ AYRI KARAKTER, İKİ AYRI ANAHTAR ═══
+ *
+ *  Normal dünya ve zindan AYRI karakter taşır (kullanıcı kararı:
+ *  "data duplication değil, progression separation"). Aynı anahtara
+ *  yazarlarsa biri diğerini SİLER — bu, kaybedilecek en pahalı hata
+ *  olurdu, o yüzden anahtar artık kurucudan gelir ve varsayılanı
+ *  eski değerdir (mevcut kayıtlar bozulmaz).
+ *
+ *  ANAHTARLAR AYNI OLAMAZ; test bunu doğrular. */
+export const PROTO_SAVE_KEY = 'project-legacy-proto';
+export const DUNGEON_SAVE_KEY = 'project-legacy-dungeon';
 
 export interface ProtoSaveData {
   saveVersion: number;
@@ -40,6 +50,9 @@ export interface ProtoSaveData {
   autoGear: AutoGearSettings;
   /** P2.21 — görev ilerlemesi ve kazanılmış sınıf aşaması. */
   quests?: QuestSaveData;
+  /** P3.5 — zindan ilerlemesi. YALNIZ zindan kaydında bulunur;
+   *  normal kayıtta `undefined` kalır. */
+  dungeon?: { floor: number; highestFloor: number };
   /** Oyuncunun dünyadaki konumu. */
   world: { x: number; y: number };
 }
@@ -86,14 +99,18 @@ export class ProtoSaveSystem {
   /** Yazım gerçekten kalıcı mı? (UI bilgilendirmesi) */
   readonly persistent: boolean;
 
-  constructor(storage?: StorageLike) {
+  /** Bu örneğin yazdığı anahtar. */
+  readonly key: string;
+
+  constructor(storage?: StorageLike, key: string = PROTO_SAVE_KEY) {
+    this.key = key;
     this.storage = storage ?? pickStorage();
     this.persistent = !(this.storage instanceof MemoryStorage);
   }
 
   save(data: ProtoSaveData): boolean {
     try {
-      this.storage.setItem(KEY, JSON.stringify({ ...data, saveVersion: PROTO_SAVE_VERSION }));
+      this.storage.setItem(this.key, JSON.stringify({ ...data, saveVersion: PROTO_SAVE_VERSION }));
       return true;
     } catch {
       return false;
@@ -102,7 +119,7 @@ export class ProtoSaveSystem {
 
   load(): ProtoSaveData | null {
     try {
-      const raw = this.storage.getItem(KEY);
+      const raw = this.storage.getItem(this.key);
       if (!raw) return null;
       const parsed: unknown = JSON.parse(raw);
       return looksValid(parsed) ? parsed : null;
@@ -112,7 +129,7 @@ export class ProtoSaveSystem {
   }
 
   wipe(): void {
-    try { this.storage.removeItem(KEY); } catch { /* yoksay */ }
+    try { this.storage.removeItem(this.key); } catch { /* yoksay */ }
   }
 
   get hasSave(): boolean { return this.load() !== null; }
