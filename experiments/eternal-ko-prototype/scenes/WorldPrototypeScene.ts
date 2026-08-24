@@ -2401,13 +2401,28 @@ export class WorldPrototypeScene implements Scene {
       }
       return;
     }
-    if (hit.id === 'inv_drop') {
-      if (sel.kind !== 'bag') { this.say('Kuşanılı eşya atılamaz — önce çıkar'); return; }
+    if (hit.id === 'inv_sell') {
+      /* ═══ P3.10 — "AT" YERİNE "SAT" ═══
+         Eskiden eşya SİLİNİYORDU ve karşılığında hiçbir şey
+         alınmıyordu. Oyuncunun çantasını boşaltmak için tek yolu
+         değerli eşyayı yok etmekti — bu, ganimet toplamayı
+         cezalandırıyordu.
+
+         Fiyat `AutoGearSystem.sellPrice` ile AYNI kaynaktan gelir
+         (`data/sell-prices.ts`); satış ekranı ve buradaki düğme
+         farklı fiyat veremez. */
+      if (sel.kind !== 'bag') { this.say('Kuşanılı eşya satılamaz — önce çıkar'); return; }
       const inst = this.S.inventory.get(sel.instanceId);
       if (!inst) { this.invSel = null; return; }
       if (inst.locked) { this.say('Eşya kilitli'); return; }
-      this.S.inventory.remove(sel.instanceId, inst.quantity);
-      this.say('Eşya atıldı');
+      const price = this.S.autoGear.sellPrice(inst);
+      if (price <= 0) { this.say('Bu eşyanın satış değeri yok'); return; }
+      const name = Content.item(inst.itemRef)?.displayName ?? 'Eşya';
+      const qty = inst.quantity;
+      this.S.inventory.remove(sel.instanceId, qty);
+      this.S.player.coins += price;
+      this.host.audio.play('ui');
+      this.say(`${name}${qty > 1 ? ` x${qty}` : ''} satıldı  ·  +${price} altın`);
       this.invSel = null;
     }
   }

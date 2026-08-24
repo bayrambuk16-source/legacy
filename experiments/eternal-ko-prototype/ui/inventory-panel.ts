@@ -105,7 +105,9 @@ export function invButtons(): Array<UiRect & { id: string; label: string }> {
   return [
     { id: 'inv_equip', label: 'KUŞAN', x: 45, y, w: 159, h },
     { id: 'inv_unequip', label: 'ÇIKAR', x: 226, y, w: 167, h },
-    { id: 'inv_drop', label: 'AT', x: 414, y, w: 158, h },
+    /* P3.10 — "AT" kaldırıldı, yerine "SAT". Eşyayı yok etmek
+       ganimet toplamayı cezalandırıyordu; artık altına dönüşür. */
+    { id: 'inv_sell', label: 'SAT', x: 414, y, w: 158, h },
   ];
 }
 

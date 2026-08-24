@@ -70,7 +70,9 @@ import {
   HIGH_TIER_TROPHY_CHANCE, HIGH_TIER_TROPHY_REF, equipChanceFor,
   itemTierLevel, pickFromPool, poolFor, slotCoverage,
 } from '../data/moradon-loot-pool.js';
-import { FIXED_SELL_PRICES, equipSellPrice, fixedSellPrice } from '../data/sell-prices.js';
+import {
+  FIXED_SELL_PRICES, SELL_UPGRADE_PER_LEVEL, equipSellPrice, fixedSellPrice,
+} from '../data/sell-prices.js';
 import {
   ARMOR_HALVING_POINT, RISK_LABEL, combatPower, effectiveHealth, floorRisk,
 } from '../data/combat-power.js';
@@ -13204,6 +13206,44 @@ test('§121 ZİNDANDA GERÇEKTEN SALDIRI OLUR — mob menzile girer', () => {
   }
   ok(kills > 0, 'bir dakikada hiç mob ölmedi — saldırı çalışmıyor');
   ok(S.player.coins > 0, 'coin kazanılmadı');
+});
+
+test('§122 ENVANTERDE "AT" YOK, "SAT" VAR', () => {
+  /* Eşyayı yok etmek ganimet toplamayı cezalandırıyordu. */
+  const ids = invButtons().map((b) => b.id);
+  ok(!ids.includes('inv_drop'), 'AT düğmesi hâlâ duruyor');
+  ok(ids.includes('inv_sell'), 'SAT düğmesi yok');
+  const sell = invButtons().find((b) => b.id === 'inv_sell')!;
+  eq(sell.label, 'SAT', 'düğme metni:');
+  /* Dokunulabilir olmalı. */
+  ok(sell.w >= 120 && sell.h >= 40, `SAT düğmesi küçük: ${sell.w}×${sell.h}`);
+
+  /* Sahne kodu gerçekten SATIYOR: siliyor DEĞİL. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  /* `renderInventory` metin içinde DAHA ÖNCE geçiyor (import/yorum),
+     bu yüzden blok sonu için satış kodunun kendi kapanışı aranır. */
+  const start = src.indexOf("hit.id === 'inv_sell'");
+  const blk = src.slice(start, start + 1600);
+  ok(/this\.S\.player\.coins \+= price;/.test(blk), 'satıştan altın gelmiyor');
+  ok(/sellPrice\(inst\)/.test(blk), 'fiyat ortak kaynaktan gelmiyor');
+  ok(/inst\.locked/.test(blk), 'kilitli eşya korunmuyor');
+});
+
+test('§122 SATIŞ FİYATI satış ekranıyla AYNI kaynaktan', () => {
+  /* İki farklı fiyat vermek oyuncuyu şaşırtırdı. */
+  const S = protoState(9300);
+  const def = allDefinitions()[0]!;
+  const a = S.inventory.add(def.definitionRef, { upgradeLevel: 2 });
+  ok(a.ok, 'eşya eklenmeli');
+  if (!a.ok) return;
+  const viaAuto = S.autoGear.sellPrice(a.instance);
+  const base = equipSellPrice(def);
+  eq(viaAuto, Math.floor(base * (1 + 2 * SELL_UPGRADE_PER_LEVEL)), 'fiyat hesabı:');
+  ok(viaAuto > 0, 'fiyat sıfır');
+
+  /* Yığın fiyatı adetle çarpılmalı. */
+  const t = S.inventory.add(TROPHY_ITEM_REF, { quantity: 5 });
+  if (t.ok) eq(S.autoGear.sellPrice(t.instance), 5_000 * 5, 'yığın fiyatı:');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
