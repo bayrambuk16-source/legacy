@@ -1350,7 +1350,17 @@ export class WorldPrototypeScene implements Scene {
        kendisi otomatik farm üzerine kuruludur. Ayar ekranı yine
        durdurur — orada set değiştirirken cast etmesi karışıklık
        yaratır. */
-    if (this.inDungeon && !this.genieOpen && this.S.player.alive) {
+    /* ═══ P3.11 — SADECE KAPALIYKEN BAŞLAT ═══
+       Oyun testi bulgusu: "zindanda hâlâ saldırı yapmıyor". Sebep bu
+       satırdı: `start()` her çağrıldığında KARAR SAATİNİ SIFIRLIYOR
+       (`accumulator = 0`). Her karede çağırınca sayaç hiçbir zaman
+       karar aralığına (0,1 sn) ulaşamıyor ve Genie ÖMÜR BOYU karar
+       veremiyordu.
+
+       Kendi eklediğim "Genie sürekli açık" satırı, Genie'yi sonsuza
+       kadar susturmuştu. Artık yalnız KAPALIYSA başlatılır. */
+    if (this.inDungeon && !this.genieOpen && this.S.player.alive
+      && !this.S.genie.enabled) {
       this.S.genie.start(this.S.world);
     }
     if (!this.genieOpen && !this.deathOpen) {

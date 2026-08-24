@@ -34,7 +34,14 @@ export interface WavePlan {
  *
  *  Mob sayısı dalga ile ARTAR ama TAVANLIDIR: çizim tavanımız 30 görsel
  *  (`MAX_MOB_VISUALS`) ve mobil performansı bunun üstünü kaldırmaz. */
-export const WAVE_MIN_COUNT = 3;
+/** ═══ P3.11 — İLK DALGALAR SEYREK ═══
+ *  Ölçüldü: üç mobla başlayan kat 1, Sv1 karakteri iki dakikada
+ *  DOKUZ KEZ öldürüyordu. Üç mobun aynı anda saldırması 38 canlı bir
+ *  başlangıç karakteri için fazla.
+ *
+ *  Bir mobla başlar, üçüncü dalgada ikiye, altıncıda üçe çıkar.
+ *  Oyuncu ısınarak girer; tempo hâlâ artar. */
+export const WAVE_MIN_COUNT = 1;
 export const WAVE_MAX_COUNT = 12;
 export const ELITE_EVERY = 5;
 export const BOSS_EVERY = 25;

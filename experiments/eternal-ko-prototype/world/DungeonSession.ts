@@ -63,6 +63,10 @@ export class DungeonSession {
     this.state.balance.set({
       expMultiplier: this.state.balance.exp * WAVE_REWARD_MULT,
     });
+    /* NOT: karakter zaten yirmi can iksiriyle doğuyor (`PrototypeState`
+       başlangıç envanteri). Zindana AYRICA iksir vermedim — ölçüm,
+       asıl sorunun iksir eksikliği değil ERKEN DALGA KALABALIĞI
+       olduğunu gösterdi (bkz. `wave-floors.ts`, `WAVE_MIN_COUNT`). */
   }
 
   /** Doğan dalgayı dünyaya bağlar: `MobSlotSystem`in mob listesine

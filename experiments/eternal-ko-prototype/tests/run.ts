@@ -91,7 +91,8 @@ import {
 import { planPurchase, restorePerCoin, shopCatalog } from '../ui/potion-shop.js';
 import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
-  DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
+  DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_MIN_COUNT,
+  WAVE_REWARD_MULT,
   WAVE_TROPHY_CHANCE, coinForKill, dungeonLootLevel, floorLevelBand,
   floorMonsters, floorStatMult, planWave, recommendedPower, trophyValue,
 } from '../data/wave-floors.js';
@@ -270,7 +271,8 @@ import {
   MORADON_WORLD_WIDTH, MORADON_ZONE_ID, koToWorld, worldToKo,
 } from '../data/moradon-coords.js';
 import {
-  DEFAULT_MP_POTION_REF, DEV_TEST_POTIONS, KO_POTIONS, koPotion, potionOptions, potionsFor,
+  DEFAULT_MP_POTION_REF, DEV_TEST_POTIONS, KO_POTIONS, koPotion,
+  potionOptions, potionsFor,
 } from '../data/ko-potions.js';
 import { PLAYER_SPEED_DEFAULT, PLAYER_SPEED_OPTIONS } from '../config.js';
 import {
@@ -13244,6 +13246,76 @@ test('§122 SATIŞ FİYATI satış ekranıyla AYNI kaynaktan', () => {
   /* Yığın fiyatı adetle çarpılmalı. */
   const t = S.inventory.add(TROPHY_ITEM_REF, { quantity: 5 });
   if (t.ok) eq(S.autoGear.sellPrice(t.instance), 5_000 * 5, 'yığın fiyatı:');
+});
+
+test('§123 GENIE\'İ HER KARE BAŞLATMAK ONU SUSTURUR', () => {
+  /* Oyun testi bulgusu: "zindanda hâlâ saldırı yapmıyor". Sebep benim
+     eklediğim "Genie sürekli açık" satırıydı: `start()` KARAR SAATİNİ
+     sıfırlar (`accumulator = 0`); her karede çağrılınca sayaç karar
+     aralığına (0,1 sn) HİÇ ulaşamıyor ve Genie ömür boyu karar
+     veremiyordu. */
+  const src = readFileSync(join(PROTO_ROOT, 'scenes', 'WorldPrototypeScene.ts'), 'utf8');
+  ok(/!this\.S\.genie\.enabled\) \{\s*\n\s*this\.S\.genie\.start/.test(src),
+    'Genie kapalı değilken de başlatılıyor — karar saati sıfırlanır');
+
+  /* CANLI: iki yolu da sür, farkı ölç. */
+  const drive = (restartEveryFrame: boolean): number => {
+    const D = new DungeonSession(9400);
+    D.startNextWave();
+    const S = D.state;
+    S.lootPolicy.setMode('auto');
+    let kills = 0;
+    for (let i = 0; i < 1800; i++) {
+      if (!S.player.alive) { D.onDeath(); D.startNextWave(); }
+      if (restartEveryFrame || !S.genie.enabled) S.genie.start(S.world);
+      const ents = S.entities();
+      S.mobs.update(1 / 60, S.world);
+      S.potions.update(1 / 60);
+      S.genie.update(1 / 60, ents, S.world);
+      S.combat.update(1 / 60);
+      S.adapter.updateAction(1 / 60);
+      S.stepCombat(1 / 60, ents);
+      kills += S.reapDead().length;
+      if (!D.dungeon.waveActive) { D.sweepCleared(); D.startNextWave(); }
+    }
+    return kills;
+  };
+  eq(drive(true), 0, 'her kare başlatınca Genie susmalı (hatanın kanıtı):');
+  ok(drive(false) > 0, 'doğru yolda kill olmalı');
+});
+
+test('§123 İLK DALGALAR SEYREK — üç mob Sv1\'i öldürüyordu', () => {
+  /* Ölçüldü: üç mobla başlayan kat 1, Sv1 karakteri iki dakikada
+     DOKUZ KEZ öldürüyordu. Çözüm iksir yığmak DEĞİL (karakter zaten
+     yirmi iksirle doğuyor), erken dalgaları seyreltmekti. */
+  eq(WAVE_MIN_COUNT, 1, 'ilk dalga mob sayısı:');
+  eq(planWave(1).count, 1, 'dalga 1:');
+  ok(planWave(6).count > planWave(1).count, 'tempo artmalı');
+  /* Geç dalgalar kalabalıklaşmalı — ELİT dalgalar normalin yarısı
+     kadar gelir, o yüzden ölçüm NORMAL bir dalgadan alınır. */
+  ok(planWave(31).count >= 8, `geç dalga seyrek: ${planWave(31).count}`);
+
+  /* CANLI: iki dakikada ölüm sayısı makul olmalı. */
+  const D = new DungeonSession(9401);
+  D.startNextWave();
+  const S = D.state;
+  S.lootPolicy.setMode('auto');
+  let deaths = 0, kills = 0;
+  for (let i = 0; i < 7200; i++) {
+    if (!S.player.alive) { deaths += 1; D.onDeath(); D.startNextWave(); }
+    if (!S.genie.enabled) S.genie.start(S.world);
+    const ents = S.entities();
+    S.mobs.update(1 / 60, S.world);
+    S.potions.update(1 / 60);
+    S.genie.update(1 / 60, ents, S.world);
+    S.combat.update(1 / 60);
+    S.adapter.updateAction(1 / 60);
+    S.stepCombat(1 / 60, ents);
+    kills += S.reapDead().length;
+    if (!D.dungeon.waveActive) { D.sweepCleared(); D.startNextWave(); }
+  }
+  ok(kills > 0, 'hiç mob ölmedi');
+  ok(deaths <= 4, `kat 1 hâlâ çok öldürücü: iki dakikada ${deaths} ölüm`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
