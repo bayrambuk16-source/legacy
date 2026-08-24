@@ -76,6 +76,9 @@ import {
 } from '../data/combat-power.js';
 import type { PowerInput } from '../data/power-score.js';
 import {
+  SPAWN_BAND_AHEAD, SPAWN_BAND_WIDTH, WaveSpawner,
+} from '../world/WaveSpawner.js';
+import {
   BOSS_EVERY, COIN_PER_LEVEL, ELITE_EVERY, MAX_DISTINCT_FLOOR, TROPHY_BASE_VALUE,
   DUNGEON_DROP_UPGRADE, DUNGEON_TIER_PENALTY, WAVE_MAX_COUNT, WAVE_REWARD_MULT,
   WAVE_TROPHY_CHANCE, coinForKill, dungeonLootLevel, floorLevelBand,
@@ -12524,6 +12527,97 @@ test('§113 ZİNDAN DROPLARI +1 gelir, normal harita ETKİLENMEZ', () => {
     }
   }
   ok(checked > 0, 'senaryo hiç ekipman düşürmedi');
+});
+
+/* ================= P3.3 — DALGA DOĞUŞU ================= */
+console.log('P3.3 — dalga doğuşu (aşama 2):');
+
+/** Zindan doğuşu için yalın bir kurulum: gerçek AI ve gerçek mob
+ *  tanımları, ama slot sistemi YOK. */
+function waveSetup(seed = 5000): { S: PrototypeState; sp: WaveSpawner } {
+  const S = protoState(seed);
+  const sp = new WaveSpawner({
+    rng: mulberry32(seed),
+    ai: S.mobs.ai,
+    playerAt: () => ({ x: S.world.worldX, y: S.world.worldY }),
+  });
+  return { S, sp };
+}
+
+test('§114 DALGA doğar, sayı ve tür PLANDAN gelir', () => {
+  const { sp } = waveSetup();
+  for (const w of [1, 5, 25]) {
+    const out = sp.spawn(1, w);
+    eq(out.mobs.length, out.plan.count, `dalga ${w} sayısı:`);
+    ok(out.mobs.length > 0, `dalga ${w} boş`);
+    /* Mob TÜRÜ katın bandından olmalı. */
+    for (const m of out.mobs) {
+      ok(m.monster.level >= 1 && m.monster.level <= 5, `kat 1 bandı dışı: Sv${m.monster.level}`);
+    }
+  }
+  /* Boss TEK gelir ve SERT olur. */
+  const boss = sp.spawn(1, 25);
+  eq(boss.mobs.length, 1, 'boss sayısı:');
+  const normal = sp.spawn(1, 1);
+  ok(boss.mobs[0]!.maxHp > normal.mobs[0]!.maxHp * 3, 'boss yeterince sert değil');
+});
+
+test('§114 KAYNAK MOB VERİSİ DEĞİŞMEZ — çarpan kopyaya uygulanır', () => {
+  /* `Content` deposundaki kayıt asla değiştirilmemeli; değişirse
+     normal haritadaki aynı mob da sertleşir. */
+  const ref = floorMonsters(1)[0]!;
+  const before = Content.monster(ref)!.hp;
+  const { sp } = waveSetup(5001);
+  sp.spawn(1, 25);              // boss: 6× çarpan
+  sp.spawn(12, 25);             // kat çarpanı da devrede
+  eq(Content.monster(ref)!.hp, before, 'kaynak mob HP değişti:');
+});
+
+test('§114 DİKEY YERLEŞİM: moblar oyuncunun ÜSTÜNDE doğar', () => {
+  /* Kullanıcı kararı: telefon dikey, oyuncu altta, moblar yukarıdan. */
+  const { S, sp } = waveSetup(5002);
+  const out = sp.spawn(3, 4);
+  for (const m of out.mobs) {
+    ok(m.worldY < S.world.worldY, `mob oyuncunun altında doğdu: ${m.worldY}`);
+    const ahead = S.world.worldY - m.worldY;
+    ok(ahead >= SPAWN_BAND_AHEAD, `mob çok yakın doğdu: ${Math.round(ahead)}`);
+  }
+  /* ŞERİDE YAYILMALI — hepsi tek noktada olmamalı. */
+  const xs = out.mobs.map((m) => m.worldX);
+  const spread = Math.max(...xs) - Math.min(...xs);
+  ok(spread > SPAWN_BAND_WIDTH / 3, `moblar tek noktada toplanmış: ${Math.round(spread)}`);
+});
+
+test('§114 ZİNDAN UID UZAYI normal dünyayla ÇAKIŞMAZ', () => {
+  /* Çakışırsa havadaki oklar yanlış hedefe bağlanır. */
+  const { S, sp } = waveSetup(5003);
+  const worldUids = new Set(S.mobs.mobs.map((m) => m.uid));
+  const wave = sp.spawn(1, 1);
+  for (const m of wave.mobs) {
+    ok(!worldUids.has(m.uid), `uid çakıştı: ${m.uid}`);
+  }
+  /* Dalga içinde de benzersiz. */
+  const ids = wave.mobs.map((m) => m.uid);
+  eq(new Set(ids).size, ids.length, 'dalga içi uid:');
+});
+
+test('§114 DALGA TEMİZLENDİ ölçütü — respawn YOK', () => {
+  const { sp } = waveSetup(5004);
+  const out = sp.spawn(1, 1);
+  ok(!WaveSpawner.isCleared(out.mobs), 'yeni dalga temiz görünüyor');
+  for (const m of out.mobs) m.hp = 0;
+  ok(WaveSpawner.isCleared(out.mobs), 'ölü dalga temiz sayılmalı');
+  /* Zindanda respawn sayacı ÇALIŞMAMALI. */
+  for (const m of out.mobs) eq(m.respawnTimer, 0, 'respawn sayacı:');
+});
+
+test('§114 KAT ÇARPANI kat 10 sonrası devreye girer', () => {
+  const { sp } = waveSetup(5005);
+  const f10 = sp.spawn(10, 1).mobs[0]!;
+  const f15 = sp.spawn(15, 1).mobs[0]!;
+  /* Kat 15 mobu aynı türden ama daha sert olmalı. */
+  eq(f15.monster.sourceRef !== undefined, true, 'mob kaynağı yok');
+  ok(f15.maxHp > f10.maxHp, `kat 15 daha sert olmalı: ${f10.maxHp} → ${f15.maxHp}`);
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);
