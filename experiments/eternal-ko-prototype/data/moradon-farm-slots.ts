@@ -73,73 +73,88 @@ interface Placement {
 /** Ham yerleşim — maske taramasının çıktısı. `x`/`y` dikdörtgenin SOL ÜST
  *  köşesidir; kenar `SLOT_RECT`. Yorumdaki mesafe doğuş noktasınadır. */
 const PLACEMENT: readonly Placement[] = [
-  /* ═══ P2.33 — 52 SLOT, SV1-50 ═══
-     Moradon'un tavanı Sv30'dan Sv50'ye çıktı (kullanıcı kararı).
-     Slot sayısı 33'ten 52'ye, mob havuzu 21'den 31'e.
+  /* ═══ P2.34 — YÜRÜME MESAFESİNE GÖRE DAĞITIM ═══
+     P2.33'te dağıtım KUŞ UÇUŞU mesafeye göreydi ve haritada bakınca
+     bozuk görünüyordu: şehrin sağ tarafındaki slotlar doğuşa yakın
+     ölçülüyor ama arada binalar olduğu için yürüyerek uzak kalıyordu.
+     Sv32'lik bir slot, Sv9'un hemen yanında duruyordu.
 
-     Dağıtım OTOMATİK: yürünebilirlik maskesi tarandı, 200×200'lük
-     alanı tamamen açık ve birbirinden en az 330 birim uzak 129 aday
-     bulundu; 52 slot mesafeye göre EŞİT ARALIKLI seçildi ve mob havuzu
-     seviye sırasına göre eşlendi. Seviye mesafeyle MONOTON artar.
+     Artık mesafe BFS ile hesaplanıyor: doğuş noktasından yürünebilir
+     hücreler üzerinden gerçek yol uzunluğu. 40 birimlik ızgarada
+     16 384 hücrenin 12 527'si ulaşılabilir; en uzak nokta 6 283 birim.
 
-     HARİTA BÜYÜTÜLMEDİ — yalnız slot yoğunluğu arttı (kullanıcı
-     kararı: bitki sayısı sabit, moblar artacak). Ayrık mesafe 420'den
-     330'a indi ki 52 slot 5120×5120'ye sığsın.
+     Slotlar bu gerçek mesafeye göre EŞİT ARALIKLI seçildi (120 aday
+     içinden 52). Şehir arkasındaki noktalar artık doğru bantlarına
+     düşüyor ve boş kalan köşeler doluyor.
 
-     MOB SAYISI seviyeyle AZALIR: Sv1-10 sekiz, Sv36+ beş. Güçlü mobun
-     kalabalık olması hazırlıksız oyuncuyu anında öldürürdü. */
-  { x: 1600, y: 4240, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 1750, y: 4540, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 1810, y: 3970, ref: 850, count: 8, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 1540, y: 3370, ref: 850, count: 8, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 100, y: 2830, ref: 752, count: 8, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
-  { x: 1780, y: 3070, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 250, y: 2530, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
-  { x: 2470, y: 3910, ref: 150, count: 8, name: 'Yamyam Goblin', ai: 'NORMAL', art: SMALL },
-  { x: 2110, y: 3040, ref: 150, count: 8, name: 'Yamyam Goblin', ai: 'NORMAL', art: SMALL },
-  { x: 1480, y: 2410, ref: 754, count: 8, name: 'Leş Böceği', ai: 'NORMAL', art: SMALL },
-  { x: 880, y: 2170, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SMALL },
-  { x: 2440, y: 2950, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SMALL },
-  { x: 1780, y: 2260, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
-  { x: 1120, y: 1930, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
-  { x: 3160, y: 4090, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 850, y: 1720, ref: 250, count: 7, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1750, y: 1930, ref: 250, count: 7, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3130, y: 3250, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2110, y: 1930, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3490, y: 4030, ref: 105, count: 7, name: 'Kecoon Savaşçısı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1780, y: 1600, ref: 203, count: 7, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3640, y: 3730, ref: 203, count: 7, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2140, y: 1600, ref: 301, count: 7, name: 'Dev Gavolt', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2470, y: 1690, ref: 301, count: 7, name: 'Dev Gavolt', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1240, y: 1090, ref: 204, count: 7, name: 'Leş Kuşu', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2800, y: 1750, ref: 109, count: 7, name: 'Kecoon Kaptanı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3790, y: 3040, ref: 109, count: 7, name: 'Kecoon Kaptanı', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2530, y: 1360, ref: 1000, count: 6, name: 'Ceset', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 1510, y: 880, ref: 500, count: 6, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 2860, y: 1420, ref: 500, count: 6, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: SWAMP },
-  { x: 3460, y: 1870, ref: 114, count: 6, name: 'Kecoon Cengaveri', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 1030, y: 550, ref: 114, count: 6, name: 'Kecoon Cengaveri', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 3190, y: 1510, ref: 502, count: 6, name: 'Ay Kurdu', ai: 'AGGRESSIVE', art: BOSS },
+     Diğer kurallar P2.33'ten aynen sürüyor: harita büyütülmedi, bitki
+     sayısı sabit, mob sayısı seviyeyle azalır (Sv1-10 sekiz, Sv36+
+     beş), ayrık mesafe 330 birim. */
+  { x: 580, y: 3100, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 1450, y: 3400, ref: 750, count: 8, name: 'Toprak Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 220, y: 3040, ref: 850, count: 8, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 580, y: 2740, ref: 850, count: 8, name: 'Çalı Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 250, y: 2710, ref: 752, count: 8, name: 'Kan Solucanı', ai: 'NORMAL', art: SMALL },
+  { x: 2140, y: 3550, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 1690, y: 2740, ref: 851, count: 8, name: 'Yaban Sıçanı', ai: 'NORMAL', art: SMALL },
+  { x: 220, y: 2380, ref: 150, count: 8, name: 'Yamyam Goblin', ai: 'NORMAL', art: SMALL },
+  { x: 1240, y: 2380, ref: 150, count: 8, name: 'Yamyam Goblin', ai: 'NORMAL', art: SMALL },
+  { x: 2200, y: 2860, ref: 754, count: 8, name: 'Leş Böceği', ai: 'NORMAL', art: SMALL },
+  { x: 1930, y: 2500, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SMALL },
+  { x: 220, y: 2020, ref: 852, count: 8, name: 'Çöpçü Sıçan', ai: 'NORMAL', art: SMALL },
+  { x: 2860, y: 3580, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 580, y: 1660, ref: 755, count: 8, name: 'Kapkaççı', ai: 'AGGRESSIVE', art: SMALL },
+  { x: 2500, y: 2590, ref: 255, count: 8, name: 'Bataklık Yaratığı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 220, y: 1660, ref: 250, count: 7, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3130, y: 3220, ref: 250, count: 7, name: 'Bataklık Devi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 2410, y: 2020, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1180, y: 1480, ref: 252, count: 7, name: 'Bataklık Reisi', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1810, y: 1630, ref: 105, count: 7, name: 'Kecoon Savaşçısı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3040, y: 2620, ref: 203, count: 7, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 520, y: 1060, ref: 203, count: 7, name: 'Dev Bulcan', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3460, y: 2950, ref: 301, count: 7, name: 'Dev Gavolt', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 100, y: 1000, ref: 301, count: 7, name: 'Dev Gavolt', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3010, y: 1780, ref: 204, count: 7, name: 'Leş Kuşu', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1750, y: 1180, ref: 109, count: 7, name: 'Kecoon Kaptanı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1120, y: 820, ref: 109, count: 7, name: 'Kecoon Kaptanı', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 2530, y: 1390, ref: 1000, count: 6, name: 'Ceset', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 1450, y: 880, ref: 500, count: 6, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 3340, y: 1870, ref: 500, count: 6, name: 'Kurt Adam', ai: 'AGGRESSIVE', art: SWAMP },
+  { x: 940, y: 520, ref: 114, count: 6, name: 'Kecoon Cengaveri', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 1780, y: 790, ref: 114, count: 6, name: 'Kecoon Cengaveri', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 2770, y: 1150, ref: 502, count: 6, name: 'Ay Kurdu', ai: 'AGGRESSIVE', art: BOSS },
   { x: 1480, y: 550, ref: 115, count: 6, name: 'Kecoon Ejderhası', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 2230, y: 760, ref: 115, count: 6, name: 'Kecoon Ejderhası', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 3520, y: 1540, ref: 1100, count: 6, name: 'İskelet', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 4660, y: 3730, ref: 1100, count: 6, name: 'İskelet', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 1780, y: 370, ref: 505, count: 6, name: 'Azgın Kurt', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 2110, y: 430, ref: 905, count: 5, name: 'İğneli Akrep', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 3970, y: 1840, ref: 905, count: 5, name: 'İğneli Akrep', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 2920, y: 790, ref: 1102, count: 5, name: 'İskelet Şövalye', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 3250, y: 880, ref: 1102, count: 5, name: 'İskelet Şövalye', ai: 'AGGRESSIVE', art: BOSS },
-  { x: 2800, y: 460, ref: 600, count: 5, name: 'Kılıç Dişli', ai: 'ELITE', art: BOSS },
-  { x: 3160, y: 550, ref: 1103, count: 5, name: 'İskelet Kahraman', ai: 'ELITE', art: BOSS },
-  { x: 4090, y: 1240, ref: 1103, count: 5, name: 'İskelet Kahraman', ai: 'ELITE', art: BOSS },
-  { x: 3040, y: 220, ref: 603, count: 5, name: 'Kılıç Diş', ai: 'ELITE', art: BOSS },
-  { x: 4510, y: 1540, ref: 603, count: 5, name: 'Kılıç Diş', ai: 'ELITE', art: BOSS },
-  { x: 3850, y: 580, ref: 1111, count: 5, name: 'Ölüm Şövalyesi', ai: 'ELITE', art: BOSS },
-  { x: 4810, y: 1390, ref: 1201, count: 5, name: 'Muhafız', ai: 'ELITE', art: BOSS },
-  { x: 4720, y: 1060, ref: 1201, count: 5, name: 'Muhafız', ai: 'ELITE', art: BOSS },
-  { x: 4600, y: 730, ref: 512, count: 5, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },
-  { x: 4690, y: 130, ref: 512, count: 5, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },
+  { x: 3490, y: 1300, ref: 115, count: 6, name: 'Kecoon Ejderhası', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 2290, y: 760, ref: 1100, count: 6, name: 'İskelet', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 1180, y: 280, ref: 1100, count: 6, name: 'İskelet', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 2680, y: 820, ref: 505, count: 6, name: 'Azgın Kurt', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3340, y: 1000, ref: 905, count: 5, name: 'İğneli Akrep', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3850, y: 1420, ref: 905, count: 5, name: 'İğneli Akrep', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3730, y: 1060, ref: 1102, count: 5, name: 'İskelet Şövalye', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 2920, y: 580, ref: 1102, count: 5, name: 'İskelet Şövalye', ai: 'AGGRESSIVE', art: BOSS },
+  { x: 3580, y: 760, ref: 600, count: 5, name: 'Kılıç Dişli', ai: 'ELITE', art: BOSS },
+  { x: 4180, y: 1540, ref: 1103, count: 5, name: 'İskelet Kahraman', ai: 'ELITE', art: BOSS },
+  { x: 3970, y: 820, ref: 1103, count: 5, name: 'İskelet Kahraman', ai: 'ELITE', art: BOSS },
+  { x: 3160, y: 340, ref: 603, count: 5, name: 'Kılıç Diş', ai: 'ELITE', art: BOSS },
+  { x: 4330, y: 940, ref: 603, count: 5, name: 'Kılıç Diş', ai: 'ELITE', art: BOSS },
+  { x: 4210, y: 580, ref: 1111, count: 5, name: 'Ölüm Şövalyesi', ai: 'ELITE', art: BOSS },
+  { x: 3730, y: 190, ref: 1201, count: 5, name: 'Muhafız', ai: 'ELITE', art: BOSS },
+  { x: 4570, y: 700, ref: 1201, count: 5, name: 'Muhafız', ai: 'ELITE', art: BOSS },
+  { x: 4810, y: 940, ref: 512, count: 5, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },
+  { x: 4720, y: 130, ref: 512, count: 5, name: 'Kan Avcısı', ai: 'ELITE', art: BOSS },
+];
+
+/** P2.34 — SLOT BAŞINA GERÇEK YÜRÜME MESAFESİ (dünya birimi).
+ *
+ *  `PLACEMENT` ile AYNI SIRADA. BFS ile hesaplandı: doğuş noktasından
+ *  yürünebilir hücreler üzerinden gerçek yol uzunluğu (40 birimlik
+ *  ızgara, sekiz yön).
+ *
+ *  Neden saklanıyor: seviye gradyanı artık KUŞ UÇUŞU değil YÜRÜME
+ *  mesafesine göre monoton. Test bunu doğrular; kuş uçuşuyla ölçerse
+ *  şehir arkasındaki slotlar yanlış görünür. */
+export const MORADON_WALK_DISTANCE: readonly number[] = [
+  1240, 1331, 1469, 1600, 1789, 1915, 2047, 2109, 2225, 2307, 2387, 2469, 2595, 2680, 2743, 2829, 2984, 3066, 3129, 3217, 3279, 3313, 3460, 3559, 3578, 3640, 3735, 3755, 3828, 3881, 3989, 4057, 4095, 4165, 4256, 4296, 4329, 4382, 4503, 4543, 4596, 4721, 4843, 4887, 4935, 5060, 5222, 5275, 5452, 5561, 5735, 5970,
 ];
 
 /** Kanonik slot tablosu — haritanın tamamına yayılmış. */

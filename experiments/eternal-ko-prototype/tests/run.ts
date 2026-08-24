@@ -128,7 +128,8 @@ import {
 } from '../ui/camera-zoom.js';
 import { CORPSE_VISIBLE_SEC } from '../render3d/frame.js';
 import {
-  KEEP_RADIUS, MORADON_PLAY_SPAWN, MORADON_POPULATION, MORADON_RESPAWN_SEC, SLOT_RECT,
+  KEEP_RADIUS, MORADON_PLAY_SPAWN, MORADON_POPULATION, MORADON_RESPAWN_SEC,
+  MORADON_WALK_DISTANCE, SLOT_RECT,
 } from '../data/moradon-farm-slots.js';
 import { FORGE_LIST_BOX, FORGE_PAGE_SIZE, FORGE_PREVIEW_BOX, forgeButtons, forgeHitTest, forgeRowRects } from '../ui/character-panel.js';
 import { GROUND_TEXTURE_KEY, PROTO_MODELS, UI_ASSETS } from '../data/proto-assets.js';
@@ -10908,10 +10909,15 @@ test('§82 SEVİYE MERDİVENİ kesintisiz: Sv1-20 arası boşluk YOK', () => {
 test('§82 SEVİYE GRADYANI MONOTON — uzaklaştıkça mob güçlenir', () => {
   /* P2.27 — slotlar sıfırdan dağıtıldı. Önceki dağılımda Sv16-20 ile
      Sv9-15 birbirine karışmıştı ve gradyan zıplıyordu. */
-  const dist = (s: typeof FARM_AREA_SLOTS[number]): number =>
-    Math.hypot(s.homeX - MORADON_PLAY_SPAWN.x, s.homeY - MORADON_PLAY_SPAWN.y);
+  /* P2.34 — gradyan artık YÜRÜME mesafesine göre. Kuş uçuşu ölçerse
+     şehir arkasındaki slotlar yanlış sırada görünür: binalar arada
+     olduğu için düz mesafe yakın, yürüyüş uzaktır. */
+  eq(MORADON_WALK_DISTANCE.length, FARM_AREA_SLOTS.length, 'yürüme tablosu eksik:');
   const rows = FARM_AREA_SLOTS
-    .map((s) => ({ d: dist(s), lv: Content.monster(s.monsterRef)?.level ?? 0 }))
+    .map((s, i) => ({
+      d: MORADON_WALK_DISTANCE[i]!,
+      lv: Content.monster(s.monsterRef)?.level ?? 0,
+    }))
     .sort((a, b) => a.d - b.d);
   /* Seviye GERİYE gitmemeli. Aynı seviyenin tekrarı serbest. */
   for (let i = 1; i < rows.length; i++) {
