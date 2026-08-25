@@ -133,8 +133,8 @@ import {
   floorMonsters, floorStatMult, planWave, recommendedPower, trophyValue,
 } from '../data/wave-floors.js';
 import {
-  GATE_ALPHA, SKILL_ICONS, gateBadge, skillGate, skillIconKey, skillInitial,
-  skillsWithoutIcon,
+  GATE_ALPHA, SKILL_ICONS, SUPPORT_ICONS, gateBadge, skillGate, skillIconKey,
+  skillInitial, skillsWithoutIcon, supportIconKey,
 } from '../data/skill-visuals.js';
 import {
   GOBLIN_MAX_LEVEL, KECOON_ATTRIBUTION, KECOON_CLIPS, KECOON_CLIP_MAP,
@@ -15135,6 +15135,39 @@ test('§155 İKSİR MAĞAZASI MORADON\'DA — satın alma dünyadan bağımsız'
   ok(!/private renderShop[^]*?const d = this\.dungeon;\n    if \(!d\) return;/.test(src),
     'mağaza hâlâ zindana kilitli');
   ok(/İKSİR MAĞAZASI  ›/.test(src), 'Satış panelinde mağaza girişi yok');
+});
+
+test('§156 DESTEK AĞACI İKONLARI eksiksiz ve benzersiz', () => {
+  /* P3.5 — sol bar (destek ağacı) çizimi HENÜZ YOK, ama on iki ikon
+     üretildi ve eşlendi. Bu test eşlemeyi çizimden BAĞIMSIZ bağlar:
+     sol bar yazıldığında eksik ikon sürprizi çıkmasın. */
+  const refler = SUPPORT_SKILLS.map((s) => s.ref);
+  eq(refler.length, 12, 'destek skill sayısı:');
+
+  /* Her skilin ikonu VAR — yer tutucu harfe düşen kalmamalı. */
+  const eksik = refler.filter((r) => supportIconKey(r) === null);
+  eq(eksik.length, 0, `ikonu olmayan destek skili: ${eksik.join(', ')}`);
+
+  /* Her anahtar manifestte kayıtlı olmalı, yoksa oyunda boş çizilir. */
+  for (const [refStr, key] of Object.entries(SUPPORT_ICONS)) {
+    ok(PROTO_ASSETS[key] !== undefined, `ikon manifestte yok: ${key}`);
+    ok(refler.includes(Number(refStr)), `bilinmeyen destek skili: ${refStr}`);
+  }
+
+  /* Anahtarlar benzersiz. Kademe varyantları (Şifa/Şifa II, Kurt Gücü
+     I-II-III, Duman Perdesi I-II) AYNI ikonu paylaşamaz: üçü birden
+     barda durabildiği için oyuncunun hangisine bastığı görünmeli. */
+  const keys = Object.values(SUPPORT_ICONS);
+  eq(new Set(keys).size, keys.length, 'aynı ikon iki destek skilinde:');
+
+  /* Okçu ve destek ağaçları ikon paylaşmaz. */
+  const okcu = new Set(Object.values(SKILL_ICONS));
+  const cakisan = keys.filter((k) => okcu.has(k));
+  eq(cakisan.length, 0, `iki ağaçta ortak ikon: ${cakisan.join(', ')}`);
+
+  /* Sekiz yuva, on iki skill — hepsi aynı anda taşınamaz. Bu tasarım
+     kararı; ikon sayısı yuva sayısından ÇOK olmalı ki seçim olsun. */
+  ok(refler.length > 8, 'seçim gerilimi yok: skill sayısı yuvadan fazla olmalı');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

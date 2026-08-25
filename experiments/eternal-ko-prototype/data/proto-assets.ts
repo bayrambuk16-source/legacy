@@ -167,6 +167,10 @@ export const UI_ASSETS: Record<string, string> = {
   ui_check_on: 'assets/ui/ui_check_on.webp',
   ui_corner_sm: 'assets/ui/ui_corner_sm.webp',
   ui_daire_lg: 'assets/ui/ui_daire_lg.webp',
+  /* P3.8 — HUD şerit plakaları (kullanıcı üretimi, tek görselden kesildi).
+     Üst: kontrast perdesi (12,5:1). Alt: nav şeridi + EXP yivi (4,2:1). */
+  ui_serit_ust: 'assets/ui/ui_serit_ust.webp',
+  ui_serit_alt: 'assets/ui/ui_serit_alt.webp',
   ui_daire_sm: 'assets/ui/ui_daire_sm.webp',
   ui_death_panel: 'assets/ui/ui_death_panel.webp',
   ui_dungeon_panel: 'assets/ui/ui_dungeon_panel.webp',

@@ -175,7 +175,7 @@ export function hudNavBoxes(): Array<UiSprite & { id: string }> {
 }
 
 /** EXP çubuğu. Kaynak 1020×98. */
-export const HUD_EXP_BAR = sprite('ui_exp_bar', 40, 1584, 861, 1020 / 98);  /* P3.7 — tam genişlik. */
+export const HUD_EXP_BAR = sprite('ui_exp_bar', 40, 1560, 861, 1020 / 98);  /* P3.8 — alt plakanın yivine oturur. */
 /** EXP dolgusunun çubuk İÇİNDEKİ yeri (görselden ölçüldü).
  *  NOT: varlıktaki boyalı "48.37%" yazısı SİLİNDİ; "EXP" etiketi sabit
  *  olduğu için kaldı. Çubukta %48'lik altın dolgu BOYALIDIR — Scene önce

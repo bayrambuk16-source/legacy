@@ -23,6 +23,7 @@
  *  canvas, three, mutasyon YOKTUR. */
 
 import { ARCHER } from './archer-balance.js';
+import { SUPPORT } from './support-skills.js';
 
 /** Skill referansı → HUD ikon anahtarı. Anahtar `PROTO_ASSETS` içinde
  *  kayıtlı olmalıdır; test bunu doğrular. */
@@ -50,6 +51,37 @@ export const SKILL_ICONS: Readonly<Record<number, string>> = {
 };
 
 /** İkon anahtarı; yoksa `null` — çağıran yer tutucu çizer. */
+/** ═══ P3.5 — DESTEK AĞACI İKONLARI (SOL BAR) ═══
+ *
+ *  On iki destek skilinin on ikisinin de ikonu üretildi ve
+ *  `proto-assets.ts` içinde kayıtlı. Sol bar ÇİZİMİ henüz yok; bu tablo
+ *  onu beklemiyor, hazır duruyor — çizim yazıldığında `supportIconKey`
+ *  çağrılır ve tek satır bile değişmez.
+ *
+ *  Kademe varyantları AYRI görsel taşır (Şifa / Şifa II, Kurt Gücü I-II-III,
+ *  Duman Perdesi I-II): aynı temanın gitgide güçlenen hâli çizildi, çünkü
+ *  üçü de aynı anda barda durabilir ve oyuncunun hangisine bastığını
+ *  görmesi gerekir. */
+export const SUPPORT_ICONS: Readonly<Record<number, string>> = {
+  [SUPPORT.SWIFT]: 'ui_skill_swift',
+  [SUPPORT.MINOR_HEALING]: 'ui_skill_heal',
+  [SUPPORT.EVADE]: 'ui_skill_evade',
+  [SUPPORT.WOLF]: 'ui_skill_wolf',
+  [SUPPORT.SAFETY]: 'ui_skill_safety',
+  [SUPPORT.LIGHT_FEET]: 'ui_skill_lightfeet',
+  [SUPPORT.MINOR_HEALING_II]: 'ui_skill_heal2',
+  [SUPPORT.WOLF_II]: 'ui_skill_wolf2',
+  [SUPPORT.SCALED_SKIN]: 'ui_skill_scaled',
+  [SUPPORT.SMOKE_SCREEN]: 'ui_skill_smoke',
+  [SUPPORT.WOLF_III]: 'ui_skill_wolf3',
+  [SUPPORT.SMOKE_SCREEN_II]: 'ui_skill_smoke2',
+};
+
+/** Destek skilinin ikon anahtarı; yoksa `null` — çağıran yer tutucu çizer. */
+export function supportIconKey(ref: number): string | null {
+  return SUPPORT_ICONS[ref] ?? null;
+}
+
 export function skillIconKey(sourceRef: number): string | null {
   return SKILL_ICONS[sourceRef] ?? null;
 }

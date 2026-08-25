@@ -1841,6 +1841,14 @@ export class WorldPrototypeScene implements Scene {
     const A = HUD_ALPHA;
 
     /* ---- oyuncu kartı ---- */
+    /* P3.8 — üst şerit PLAKASI: bandın EN ALTINA çizilir ki kart, plaket
+       ve düğmeler üstünde kalsın. İnce görsel (12,5:1) bandı sırtlamak
+       için dikey esnetilir — deri ve düz altın kenar bunu kaldırıyor. */
+    if (this.host.assets.has('ui_serit_ust')) {
+      g.image('ui_serit_ust', 6, 2, { w: PROTO.screenW - 12, h: 102, alpha: 0.9 * A });
+    } else {
+      g.rect(0, 0, PROTO.screenW, 104, '#060504', 0.34 * A);
+    }
     const pc = HUD_PLAYER_CARD;
     g.image(pc.key, pc.x, pc.y, { w: pc.w, h: pc.h, alpha: A });
     /* ÇUBUKLAR VARLIKTA DOLU BOYALI: eksik kısmı ÖRTERİZ, dolu kısmı
@@ -1943,9 +1951,16 @@ export class WorldPrototypeScene implements Scene {
     /* P3.7 — KONTRAST PERDELERİ (öneri #7): üst HUD bandı ve alt menü
        şeridi arkasına hafif koyu plaka. Arka planla karışma azalır; alfa
        düşük tutulur ki dünya kaybolmasın. Nav şeridi tek plaka (#6). */
-    g.rect(0, 0, PROTO.screenW, 104, '#060504', 0.34 * A);
-    g.rect(14, 926, PROTO.screenW - 28, 118, '#0d0a07', 0.66 * A);
-    g.rect(14, 926, PROTO.screenW - 28, 2, '#6a5637', 0.8 * A);
+    /* P3.8 — plakalar artık GÖRSEL: üst perde ve alt şerit kullanıcı
+       üretimi deri/altın plakalarla çizilir; görsel yoksa düz kutu kalır. */
+    if (this.host.assets.has('ui_serit_alt')) {
+      /* Alt plaka nav şeridini VE EXP yivini birlikte taşır (oran 4,23). */
+      const sw = PROTO.screenW - 16, sh = sw / 4.227;
+      g.image('ui_serit_alt', 8, 942, { w: sw, h: sh, alpha: 0.96 * A });
+    } else {
+      g.rect(14, 926, PROTO.screenW - 28, 118, '#0d0a07', 0.66 * A);
+      g.rect(14, 926, PROTO.screenW - 28, 2, '#6a5637', 0.8 * A);
+    }
     const power = this.S.autoGear.score();
     const quest = this.S.quests.active();
     if (!this.inDungeon) {
