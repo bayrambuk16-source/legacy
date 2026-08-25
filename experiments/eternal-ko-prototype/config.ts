@@ -70,7 +70,7 @@ export const PROTO: ProtoConstants = {
   joystickDeadZone: 0.18,
   /* P2.6 — yeni HUD'da alt menü 928 px'te başlıyor; joystick tabanı (ui(260)
      ≈ 171 px) ona girmesin diye merkez 880 → 838 yükseltildi. */
-  joystickCenter: { x: 122, y: 838 },
+  joystickCenter: { x: 118, y: 876 },  /* P3.7 — küçülen tabanla alta indi. */
   /** Oyuncu çarpışma yarıçapı (world birimi) */
   playerRadius: 20,
   /** Kamera look-ahead dönüş yumuşatması (joystick bırakılınca merkeze dönüş) */

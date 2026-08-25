@@ -130,15 +130,90 @@ export const UI_ASSETS: Record<string, string> = {
   ui_target_btn: 'assets/ui/ui_target_btn.webp',
   ui_btn_potion: 'assets/ui/ui_btn_potion.webp',
   ui_btn_gear: 'assets/ui/ui_btn_gear.webp',
-  ui_frame_a: 'assets/ui/ui_frame_a.webp',
-  ui_frame_b: 'assets/ui/ui_frame_b.webp',
-  ui_frame_c: 'assets/ui/ui_frame_c.webp',
+  /* P3.5 PASİF — yeni kitte karşılığı yok, dosya `assets/ui/eski/` altında.
+     Kodda kullanımı da yok; geri almak için satırı aç ve dosyayı geri taşı.
+  ui_frame_a: 'assets/ui/ui_frame_a.webp', */
+  /* P3.5 PASİF — yeni kitte karşılığı yok, dosya `assets/ui/eski/` altında.
+     Kodda kullanımı da yok; geri almak için satırı aç ve dosyayı geri taşı.
+  ui_frame_b: 'assets/ui/ui_frame_b.webp', */
+  /* P3.5 PASİF — yeni kitte karşılığı yok, dosya `assets/ui/eski/` altında.
+     Kodda kullanımı da yok; geri almak için satırı aç ve dosyayı geri taşı.
+  ui_frame_c: 'assets/ui/ui_frame_c.webp', */
   ui_arrow_left: 'assets/ui/ui_arrow_left.webp',
   ui_arrow_right: 'assets/ui/ui_arrow_right.webp',
   ui_corner_tl: 'assets/ui/ui_corner_tl.webp',
-  ui_corner_tr: 'assets/ui/ui_corner_tr.webp',
+  /* P3.5 PASİF — yeni kitte karşılığı yok, dosya `assets/ui/eski/` altında.
+     Kodda kullanımı da yok; geri almak için satırı aç ve dosyayı geri taşı.
+  ui_corner_tr: 'assets/ui/ui_corner_tr.webp', */
   ui_divider: 'assets/ui/ui_divider.webp',
   ui_divider_small: 'assets/ui/ui_divider_small.webp',
+
+  /* ═══ P3.5 — YENİ UI KİTİ ═══
+     151 varlık tek elden üretildi: 61 eşya ikonu, 27 beceri ikonu,
+     8 nav ikonu, 8 panel, çekirdek widget seti. Ölçüler ve oranlar
+     koddan türetildi; ayrıntı `docs/` altındaki brief dosyalarında.
+     Yollar DÜZ METİN — `pack-preview.mjs` manifesti metin olarak tarar. */
+  ui_badge_count: 'assets/ui/ui_badge_count.webp',
+  ui_bar_hp: 'assets/ui/ui_bar_hp.webp',
+  ui_bar_mp: 'assets/ui/ui_bar_mp.webp',
+  ui_bar_xp: 'assets/ui/ui_bar_xp.webp',
+  ui_bar_yatak: 'assets/ui/ui_bar_yatak.webp',
+  ui_btn_cancel: 'assets/ui/ui_btn_cancel.webp',
+  ui_btn_close: 'assets/ui/ui_btn_close.webp',
+  ui_btn_confirm: 'assets/ui/ui_btn_confirm.webp',
+  ui_btn_md: 'assets/ui/ui_btn_md.webp',
+  ui_btn_neutral: 'assets/ui/ui_btn_neutral.webp',
+  ui_check_off: 'assets/ui/ui_check_off.webp',
+  ui_check_on: 'assets/ui/ui_check_on.webp',
+  ui_corner_sm: 'assets/ui/ui_corner_sm.webp',
+  ui_daire_lg: 'assets/ui/ui_daire_lg.webp',
+  ui_daire_sm: 'assets/ui/ui_daire_sm.webp',
+  ui_death_panel: 'assets/ui/ui_death_panel.webp',
+  ui_dungeon_panel: 'assets/ui/ui_dungeon_panel.webp',
+  ui_forge_panel: 'assets/ui/ui_forge_panel.webp',
+  ui_fx_fail: 'assets/ui/ui_fx_fail.webp',
+  ui_fx_success: 'assets/ui/ui_fx_success.webp',
+  ui_nav_magaza: 'assets/ui/ui_nav_magaza.webp',
+  ui_nav_savas: 'assets/ui/ui_nav_savas.webp',
+  ui_nav_sehir: 'assets/ui/ui_nav_sehir.webp',
+  ui_popup_confirm: 'assets/ui/ui_popup_confirm.webp',
+  ui_popup_item: 'assets/ui/ui_popup_item.webp',
+  ui_popup_levelup: 'assets/ui/ui_popup_levelup.webp',
+  ui_sell_panel: 'assets/ui/ui_sell_panel.webp',
+  ui_skill_alev: 'assets/ui/ui_skill_alev.webp',
+  ui_skill_delici: 'assets/ui/ui_skill_delici.webp',
+  ui_skill_engerek: 'assets/ui/ui_skill_engerek.webp',
+  ui_skill_evade: 'assets/ui/ui_skill_evade.webp',
+  ui_skill_heal: 'assets/ui/ui_skill_heal.webp',
+  ui_skill_heal2: 'assets/ui/ui_skill_heal2.webp',
+  ui_skill_izci: 'assets/ui/ui_skill_izci.webp',
+  ui_skill_keskin: 'assets/ui/ui_skill_keskin.webp',
+  ui_skill_kor: 'assets/ui/ui_skill_kor.webp',
+  ui_skill_lightfeet: 'assets/ui/ui_skill_lightfeet.webp',
+  ui_skill_patlayici: 'assets/ui/ui_skill_patlayici.webp',
+  ui_skill_safety: 'assets/ui/ui_skill_safety.webp',
+  ui_skill_scaled: 'assets/ui/ui_skill_scaled.webp',
+  ui_skill_smoke: 'assets/ui/ui_skill_smoke.webp',
+  ui_skill_smoke2: 'assets/ui/ui_skill_smoke2.webp',
+  ui_skill_swift: 'assets/ui/ui_skill_swift.webp',
+  ui_skill_toksik: 'assets/ui/ui_skill_toksik.webp',
+  ui_skill_wolf: 'assets/ui/ui_skill_wolf.webp',
+  ui_skill_wolf2: 'assets/ui/ui_skill_wolf2.webp',
+  ui_skill_wolf3: 'assets/ui/ui_skill_wolf3.webp',
+  ui_skill_yirtici: 'assets/ui/ui_skill_yirtici.webp',
+  ui_skill_zehirli: 'assets/ui/ui_skill_zehirli.webp',
+  ui_slider_knob: 'assets/ui/ui_slider_knob.webp',
+  ui_slider_track: 'assets/ui/ui_slider_track.webp',
+  ui_slot_empty: 'assets/ui/ui_slot_empty.webp',
+  ui_slot_locked: 'assets/ui/ui_slot_locked.webp',
+  ui_slot_q_high: 'assets/ui/ui_slot_q_high.webp',
+  ui_slot_q_low: 'assets/ui/ui_slot_q_low.webp',
+  ui_slot_q_mid: 'assets/ui/ui_slot_q_mid.webp',
+  ui_slot_q_rare: 'assets/ui/ui_slot_q_rare.webp',
+  ui_slot_q_unique: 'assets/ui/ui_slot_q_unique.webp',
+  ui_tab_off: 'assets/ui/ui_tab_off.webp',
+  ui_tab_on: 'assets/ui/ui_tab_on.webp',
+  ui_toast: 'assets/ui/ui_toast.webp',
 };
 
 export const PROTO_ASSETS: Record<string, string> = {
@@ -244,7 +319,8 @@ export const PROTO_MODELS: Record<string, string> = {
   nature_ot: 'assets/nature/ot.glb',
   nature_cicek: 'assets/nature/cicek.glb',
   nature_kaya: 'assets/nature/kaya.glb',
-};
+
+  };
 
 /** Önizleme paketi varsa gömülü data URI, yoksa dosya yolu. */
 export function modelSrc(key: keyof typeof PROTO_MODELS | string): string {

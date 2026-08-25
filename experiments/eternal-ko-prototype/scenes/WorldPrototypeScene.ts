@@ -1940,11 +1940,20 @@ export class WorldPrototypeScene implements Scene {
      *  çubuğu. Yerleşim değişmedi (aynı y bandı), yalnız giydirildi.
      *  ZİNDANDA ÇİZİLMEZ: aynı bandı zindanın KAT/Dalga/Güç şeridi
      *  kullanır ve görevler normal dünyanın kavramıdır. */
+    /* P3.7 — KONTRAST PERDELERİ (öneri #7): üst HUD bandı ve alt menü
+       şeridi arkasına hafif koyu plaka. Arka planla karışma azalır; alfa
+       düşük tutulur ki dünya kaybolmasın. Nav şeridi tek plaka (#6). */
+    g.rect(0, 0, PROTO.screenW, 104, '#060504', 0.34 * A);
+    g.rect(14, 926, PROTO.screenW - 28, 118, '#0d0a07', 0.66 * A);
+    g.rect(14, 926, PROTO.screenW - 28, 2, '#6a5637', 0.8 * A);
     const power = this.S.autoGear.score();
     const quest = this.S.quests.active();
     if (!this.inDungeon) {
-      const pw = 300, px = PROTO.screenW / 2 - pw / 2;
-      const py = 80, ph = quest ? 78 : 30;
+      /* P3.7 — plaket ÜST SIRAYA alındı ve daraltıldı: oyuncu kartı ile
+         oto-saldırı arasındaki boşluğa oturur, üst HUD tek hizada okunur. */
+      const pw = 224, px = 240;
+      const py = 16, ph = quest ? 78 : 30;
+      const pcx = px + pw / 2;
       g.rect(px, py, pw, ph, '#0f0c08', 0.72);
       /* altın kenarlar: üst/alt tam, yanlar kısa köşe vurgusu */
       g.rect(px, py, pw, 1, '#6a5637', 0.9);
@@ -1953,24 +1962,24 @@ export class WorldPrototypeScene implements Scene {
       g.rect(px + pw - 1, py, 1, 12, '#6a5637', 0.9);
       g.rect(px, py + ph - 12, 1, 12, '#6a5637', 0.9);
       g.rect(px + pw - 1, py + ph - 12, 1, 12, '#6a5637', 0.9);
-      g.text(`GÜÇ ${formatPower(power)}`, PROTO.screenW / 2, py + 15,
+      g.text(`GÜÇ ${formatPower(power)}`, pcx, py + 15,
         { align: 'center', size: 12, bold: true, color: '#e8d9a0' });
       if (quest) {
         /* süs ayracı — GÜÇ ile görev arasında */
         const dw = 132, dh = dw * (68 / 200);
-        g.image('ui_divider_small', PROTO.screenW / 2 - dw / 2, py + 20 - dh / 2 + 11,
+        g.image('ui_divider_small', pcx - dw / 2, py + 20 - dh / 2 + 11,
           { w: dw, h: dh, alpha: A * 0.9 });
         const pr = this.S.quests.progress(quest)!;
         const parts = quest.objectives.map((o) => {
           const nm = Content.monster(o.monsterRef)?.displayName ?? `#${o.monsterRef}`;
           return `${nm} ${pr.counts[o.monsterRef] ?? 0}/${o.count}`;
         });
-        g.text(quest.title, PROTO.screenW / 2, py + 42,
+        g.text(quest.title, pcx, py + 42,
           { align: 'center', size: 11, bold: true, color: '#c9a05a' });
-        g.text(parts.join('   ·   '), PROTO.screenW / 2, py + 56,
+        g.text(parts.join('   ·   '), pcx, py + 56,
           { align: 'center', size: 10, color: '#9d9282' });
         /* İlerleme çubuğu — çerçeveli yuva + altın dolgu. */
-        const bw = 220, bx = PROTO.screenW / 2 - bw / 2, by = py + 66;
+        const bw = 180, bx = pcx - bw / 2, by = py + 66;
         g.rect(bx - 1, by - 1, bw + 2, 7, '#6a5637', 0.65);
         g.rect(bx, by, bw, 5, '#191410', 0.95);
         g.rect(bx, by, bw * this.S.quests.ratio(quest), 5, '#c9a05a', 0.95);
@@ -2043,17 +2052,24 @@ export class WorldPrototypeScene implements Scene {
         : 'ready';
       const alpha = A * (def ? GATE_ALPHA[gate] : 0.3);
       const iconKey = def ? skillIconKey(def.sourceRef) : null;
-      if (iconKey !== null && this.host.assets.has(iconKey)) {
-        g.image(iconKey, b.x, b.y, { w: b.w, h: b.h, alpha });
+      /* P3.6 — ALTIN ÇEMBER ZEMİN (maket): ikonlar çıplak çizilince
+         kilitli skill'in düşük alfası çimende kayboluyordu. Çember
+         kapıya bakmadan tam görünür kalır — boş/kilitli yuva bile maket
+         gibi altın halka olarak okunur; kapı alfası YALNIZ ikona iner. */
+      const daire = b.w >= 80 ? 'ui_daire_lg' : 'ui_daire_sm';
+      if (this.host.assets.has(daire)) {
+        g.image(daire, b.x, b.y, { w: b.w, h: b.h, alpha: A * 0.95 });
       } else {
-        /* İkon YOK — sahte eşleme yapmak yerine yer tutucu. Hangi
-           skillin görselinin eksik olduğu GÖRÜNÜR kalır. */
-        g.rect(b.x, b.y, b.w, b.h, '#221c14', alpha);
-        g.rect(b.x, b.y, b.w, 2, GATE_COLOR[gate], alpha);
-        if (def) {
-          g.text(skillInitial(def.displayName), b.x + b.w / 2, b.y + b.h / 2 - 12,
-            { align: 'center', size: 20, bold: true, color: GATE_COLOR[gate], alpha });
-        }
+        g.rect(b.x, b.y, b.w, b.h, '#221c14', A * 0.8);
+      }
+      if (iconKey !== null && this.host.assets.has(iconKey)) {
+        const pad = Math.round(b.w * 0.16);
+        g.image(iconKey, b.x + pad, b.y + pad, { w: b.w - pad * 2, h: b.h - pad * 2, alpha });
+      } else if (def) {
+        /* İkon YOK — sahte eşleme yapmak yerine yer tutucu baş harf.
+           Hangi skillin görselinin eksik olduğu GÖRÜNÜR kalır. */
+        g.text(skillInitial(def.displayName), b.x + b.w / 2, b.y + b.h / 2 - 12,
+          { align: 'center', size: 20, bold: true, color: GATE_COLOR[gate], alpha });
       }
       /* Kalıcı kilit rozeti — Sv1 oyuncu neyi kullanamadığını görsün.
          P2.33 — tam genişlik şerit yuvarlak butonların altından taşıyordu;

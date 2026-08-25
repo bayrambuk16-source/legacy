@@ -97,6 +97,14 @@ export const ITEM_ICONS: Readonly<Record<number, string>> = {
   389017000: 'item_zihin_iksiri',
   389018000: 'item_bilgelik_iksiri',
   389019000: 'item_irfan_iksiri',
+
+  /* P3.5 — YENİ 15 EŞYANIN EŞLEMESİ BEKLİYOR.
+     İkon dosyaları üretildi ve `proto-assets.ts` içinde kayıtlı, ama
+     referansları (160610000 Kompozit Yay, 168110000 Arbalet, 243/244
+     serisi Plaka ve Tam Plaka) henüz `item-catalog.ts` içinde YOK.
+     Katalogda olmayan referansa ikon bağlamak §92'yi kırar; doğrusu
+     katalog genişleyince bu satırları açmaktır. */
+
 };
 
 /** Manifest yolları — `PROTO_ASSETS` bunları yükler. */
@@ -167,6 +175,8 @@ export const ITEM_ICON_PATHS: Readonly<Record<string, string>> = {
   item_zihin_iksiri: 'assets/ui/items/zihin_iksiri.webp',
   item_bilgelik_iksiri: 'assets/ui/items/bilgelik_iksiri.webp',
   item_irfan_iksiri: 'assets/ui/items/irfan_iksiri.webp',
+
+  /* P3.5 — Moradon listesindeki 15 yeni eşya. */
 };
 
 /** Bir eşyanın ikon anahtarı. Yoksa `null` — çağıran slot ikonuna düşer. */

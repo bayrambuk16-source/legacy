@@ -12346,10 +12346,22 @@ test('§102 İKON SKİLLE bağlı, YUVA KONUMUNA değil', () => {
 });
 
 test('§102 EKSİK ikonlar GİZLENMİYOR — yer tutucu var', () => {
-  /* Beş ikon, on beş skill. Sahte eşleme yapmak yerine `null` döner. */
-  const missing = skillsWithoutIcon(ARCHER_SKILL_ORDER);
-  ok(missing.length > 0, 'senaryo geçersiz — tüm skillerin ikonu var');
-  for (const ref of missing) eq(skillIconKey(ref), null, `${ref} sahte ikon:`);
+  /* P3.5 — on beş skillin on beşinin de ikonu geldi, yani "eksik ikon"
+     senaryosu gerçek veride artık YOK. Test yine de gerekli: yeni bir
+     skill eklenip ikonu gelmediğinde sahte eşleme yapılmamalı, `null`
+     dönmeli. Bu yüzden senaryo gerçek veriden değil, TANIMSIZ bir
+     referanstan kuruluyor — test veri büyüdükçe bozulmaz. */
+  const bilinmeyen = 999999;
+  ok(!ARCHER_SKILL_ORDER.includes(bilinmeyen), 'seçilen referans gerçekten tanımsız olmalı');
+  eq(skillIconKey(bilinmeyen), null, 'tanımsız referans sahte ikon aldı:');
+  eq(skillsWithoutIcon([bilinmeyen]).length, 1, 'ikonsuz sayımı:');
+
+  /* Gerçek kadroda ise artık ikonsuz skill KALMAMALI — ekranda harf
+     yer tutucu görünmemeli. Yeni skill gelip ikonu unutulursa burası
+     kırılır ve eksik GÖRÜNÜR kalır. */
+  const eksik = skillsWithoutIcon(ARCHER_SKILL_ORDER);
+  eq(eksik.length, 0, `ikonu olmayan skill: ${eksik.join(', ')}`);
+
   /* Yer tutucu harfi Türkçe büyük harf kuralına uymalı. */
   eq(skillInitial('İzci Oku'), 'İ', 'Türkçe büyük harf:');
   eq(skillInitial('kara takip'), 'K', 'baş harf:');

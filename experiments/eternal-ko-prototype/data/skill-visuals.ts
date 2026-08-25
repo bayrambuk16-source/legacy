@@ -32,6 +32,21 @@ export const SKILL_ICONS: Readonly<Record<number, string>> = {
   [ARCHER.BESLI_SALVO]: 'ui_skill_yesil',
   [ARCHER.GOLGE_AVCISI]: 'ui_skill_golge',
   [ARCHER.KARA_TAKIP]: 'ui_skill_kara',
+  /* P3.5 — kalan on skillin ikonu geldi. Yukarıdaki not artık geçmişi
+     anlatıyor: on beş skillin on beşinin de görseli var, yer tutucu
+     harf yalnız yeni bir skill eklenip ikonu gelmediğinde çıkar.
+     `ui_skill_yesil` adı BEŞLİ SALVO'ya aittir — dosya adı skille
+     uymuyor gibi görünse de manifest ona bağlı, DEĞİŞTİRİLMEZ. */
+  [ARCHER.DELICI_OK]: 'ui_skill_delici',
+  [ARCHER.KOR_OKU]: 'ui_skill_kor',
+  [ARCHER.ZEHIRLI_UC]: 'ui_skill_zehirli',
+  [ARCHER.IZCI_OKU]: 'ui_skill_izci',
+  [ARCHER.KESKIN_ATIS]: 'ui_skill_keskin',
+  [ARCHER.ALEV_ATISI]: 'ui_skill_alev',
+  [ARCHER.TOKSIK_ATIS]: 'ui_skill_toksik',
+  [ARCHER.YIRTICI_OK]: 'ui_skill_yirtici',
+  [ARCHER.PATLAYICI_OK]: 'ui_skill_patlayici',
+  [ARCHER.ENGEREK_OKU]: 'ui_skill_engerek',
 };
 
 /** İkon anahtarı; yoksa `null` — çağıran yer tutucu çizer. */

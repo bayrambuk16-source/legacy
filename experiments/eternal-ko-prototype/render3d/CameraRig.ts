@@ -48,6 +48,8 @@ export interface CameraTuning {
   projection: CameraProjection;
   /** Ortografik modda görünür dünya yüksekliği (birim). */
   orthoHeight: number;
+  /** P3.7 — bakışın oyuncunun kuzeyine kayması (karakter merkez altında). */
+  lookAheadWorldY?: number;
 }
 
 /** PROJECT LEGACY TUNING — kaynaktan gelmez, playtest ile ayarlanır. */
@@ -55,12 +57,13 @@ export const CAMERA_V1: CameraTuning = {
   /* 270° = ekran ekseni 2D ile HİZALI (joystick doğru yönde). Bkz. başlık. */
   yawDeg: 270,
   pitchDeg: 60,
-  distance: 750,
+  distance: 600,   /* P3.7 — %20 yakın: karakter büyür, savaş hissi artar. */
   height: 90,
   fov: 40,
   smoothing: 8,
   projection: 'perspective',
   orthoHeight: 1100,
+  lookAheadWorldY: 70,
 };
 
 /** DEV panel seçenekleri. */
@@ -87,7 +90,9 @@ export function cameraPosition(target: GameplayPoint, t: CameraTuning): ScenePoi
 
 /** Kameranın BAKTIĞI nokta — ayak noktasının `height` kadar üstü. */
 export function cameraLookAt(target: GameplayPoint, t: CameraTuning): ScenePoint {
-  return { x: target.worldX, y: t.height, z: target.worldY };
+  /* P3.7 — bakış noktası oyuncunun biraz KUZEYİNE alınır: karakter ekranda
+     merkezin altına iner, üst alan görev/moblara açılır (ekran-yukarı = −Y). */
+  return { x: target.worldX, y: t.height, z: target.worldY - (t.lookAheadWorldY ?? 0) };
 }
 
 /** Kare-hızından BAĞIMSIZ üstel yumuşatma.

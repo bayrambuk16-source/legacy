@@ -38,9 +38,11 @@ function sprite(key: string, x: number, y: number, w: number, aspect: number): U
 /* ───────────────────────── üst şerit ───────────────────────── */
 
 /** Oyuncu kartı (portre + Sv + HP/MP). Kaynak 460×221. */
-export const HUD_PLAYER_CARD = sprite('ui_player_card', 8, 10, 348, 460 / 221);
+/* P3.5 — yeni kart 580×160 geldi; oran ÖLÇÜLDÜ, eskisi 460/221'di.
+   Kart yassılaştı: maket yüksekliği 167 → 96, üst şeritte yer açıldı. */
+export const HUD_PLAYER_CARD = sprite('ui_player_card', 8, 10, 348, 580 / 160);
 /** Hedef kartı (mob adı + HP). Kaynak 400×150. */
-export const HUD_TARGET_CARD = sprite('ui_target_card', 380, 30, 300, 400 / 150);
+export const HUD_TARGET_CARD = sprite('ui_target_card', 380, 30, 300, 500 / 141);
 /** Genie aç/kapa. Kaynak 160×158. */
 export const HUD_GENIE = sprite('ui_genie_toggle', 712, 18, 118, 160 / 158);
 /** Ayar düğmesi. Kaynak 110×112. */
@@ -72,8 +74,9 @@ function inset(
  *  ikinci bir dolgu çizmek "iki çubuk" görüntüsü yaratır — ekranda böyle
  *  oldu. Doğrusu TERSİDİR: eksik kısmın üstü koyu perdeyle ÖRTÜLÜR. */
 export const HUD_BARS = {
-  hp: inset(HUD_PLAYER_CARD, 0.374, 0.913, 0.407, 0.538),
-  mp: inset(HUD_PLAYER_CARD, 0.372, 0.915, 0.597, 0.729),
+  /* P3.5 — oranlar YENİ karttan ölçüldü (kırmızı/mavi bant sınırları). */
+  hp: inset(HUD_PLAYER_CARD, 0.337, 0.933, 0.415, 0.541),
+  mp: inset(HUD_PLAYER_CARD, 0.337, 0.933, 0.649, 0.775),
   /* "Sv 70" yazısı varlıktan SİLİNDİ; seviye buraya koddan yazılır. */
   levelText: { x: HUD_PLAYER_CARD.x + HUD_PLAYER_CARD.w * 0.42,
     y: HUD_PLAYER_CARD.y + HUD_PLAYER_CARD.h * 0.185 },
@@ -82,7 +85,7 @@ export const HUD_BARS = {
 /** Hedef kartı içindeki HP dolgusu ve ad satırı (ölçülmüş oranlar). */
 export const HUD_TARGET = {
   /* Hedef kartının HP çubuğu da DOLU boyalıdır — aynı perde kuralı. */
-  bar: inset(HUD_TARGET_CARD, 0.058, 0.947, 0.697, 0.848),
+  bar: inset(HUD_TARGET_CARD, 0.058, 0.914, 0.664, 0.834),
   name: { x: HUD_TARGET_CARD.x + HUD_TARGET_CARD.w * 0.5,
     y: HUD_TARGET_CARD.y + HUD_TARGET_CARD.h * 0.30 },
 } as const;
@@ -105,12 +108,15 @@ export const HUD_TARGET = {
 
    İkon artık SKILL REFERANSINDAN gelir: `data/skill-visuals.ts`.
    `key` alanı yalnız varlık ön-yüklemesi için korunur. */
+/* P3.7 — YAY DİZİLİMİ (öneri maketi): büyük yuva sağ-altta, dört küçük
+   sol-alttan sağ-üste yay çizer, hedef düğmesi yayın tepesinde kümeye
+   katılır. Sayfa noktaları kümenin altında kalır (çakışma yok). */
 const SKILL_SPOTS: ReadonlyArray<{ cx: number; cy: number; w: number; key: string }> = [
-  { cx: 762, cy: 1272, w: 132, key: 'ui_skill_standart' },
-  { cx: 700, cy: 1080, w: 116, key: 'ui_skill_yesil' },
-  { cx: 838, cy: 1080, w: 116, key: 'ui_skill_kara' },
-  { cx: 638, cy: 1212, w: 116, key: 'ui_skill_golge' },
-  { cx: 878, cy: 1212, w: 116, key: 'ui_skill_uclu' },
+  { cx: 852, cy: 1214, w: 140, key: 'ui_skill_standart' },
+  { cx: 600, cy: 1258, w: 110, key: 'ui_skill_yesil' },
+  { cx: 636, cy: 1130, w: 110, key: 'ui_skill_kara' },
+  { cx: 724, cy: 1042, w: 110, key: 'ui_skill_golge' },
+  { cx: 838, cy: 1000, w: 110, key: 'ui_skill_uclu' },
 ];
 
 /** Skill düğmelerinin sahne kutuları (merkezden köşeye çevrilmiş). */
@@ -122,7 +128,7 @@ export function hudSkillBoxes(): UiSprite[] {
 }
 
 /** "Hedef" düğmesi — skill çemberinin sol üstü. Kaynak 180×191. */
-export const HUD_TARGET_BTN = sprite('ui_target_btn', 806, 936, 92, 180 / 191);
+export const HUD_TARGET_BTN = sprite('ui_target_btn', 826, 892, 92, 180 / 191);
 
 /* ───────────────────────── iksir hızlı kullanım (P2.33) ───────────────────────── */
 
@@ -131,8 +137,9 @@ export const HUD_TARGET_BTN = sprite('ui_target_btn', 806, 936, 92, 180 / 191);
  *  bölgesine (y > %66) sarkar; dokunma önceliği Scene'de düğmelere verilir.
  *  Kaynak 110×116 (`ui_btn_potion`); MP aynı çerçeveyi kullanır, rozet
  *  rengi ayrıştırır. */
-export const HUD_POTION_HP = sprite('ui_btn_potion', 40, 1030, 104, 110 / 116);
-export const HUD_POTION_MP = sprite('ui_btn_potion', 168, 1030, 104, 110 / 116);
+/* P3.7 — iksirler joystick'in HEMEN üstüne alındı (öneri maketi). */
+export const HUD_POTION_HP = sprite('ui_btn_potion', 44, 1108, 100, 110 / 116);
+export const HUD_POTION_MP = sprite('ui_btn_potion', 164, 1108, 100, 110 / 116);
 
 /** Sayfa noktaları (1..8). Kaynak 520×73. */
 export const HUD_PAGE_DOTS = sprite('ui_page_dots', 566, 1348, 310, 520 / 73);
@@ -141,7 +148,7 @@ export const HUD_PAGE_DOTS = sprite('ui_page_dots', 566, 1348, 310, 520 / 73);
 
 /** Joystick tabanı ve topuzu. Merkez `PROTO.joystickCenter`tan gelir —
  *  girdi otoritesi orasıdır, görsel ona UYAR (tersi değil). */
-export const HUD_JOY_BASE_W = ui(236);
+export const HUD_JOY_BASE_W = ui(204);  /* P3.7 — %14 küçük, alta indi (config). */
 export const HUD_JOY_KNOB_W = ui(112);
 
 /* ───────────────────────── alt menü ───────────────────────── */
@@ -168,13 +175,17 @@ export function hudNavBoxes(): Array<UiSprite & { id: string }> {
 }
 
 /** EXP çubuğu. Kaynak 1020×98. */
-export const HUD_EXP_BAR = sprite('ui_exp_bar', 96, 1596, 749, 1020 / 98);
+export const HUD_EXP_BAR = sprite('ui_exp_bar', 40, 1584, 861, 1020 / 98);  /* P3.7 — tam genişlik. */
 /** EXP dolgusunun çubuk İÇİNDEKİ yeri (görselden ölçüldü).
  *  NOT: varlıktaki boyalı "48.37%" yazısı SİLİNDİ; "EXP" etiketi sabit
  *  olduğu için kaldı. Çubukta %48'lik altın dolgu BOYALIDIR — Scene önce
  *  yuvayı koyuyla örter, sonra gerçek oranı çizer. Sınırlar görselden
  *  ölçüldü (altın dolgu 0.158..0.531, yuva 0.814'e kadar sürüyor). */
-export const HUD_EXP_FILL = inset(HUD_EXP_BAR, 0.158, 0.812, 0.429, 0.592);
+/* P3.6 — kit çubuğu BAŞTAN AŞAĞI altın bir haptır (1020×98, orta piksel
+ *  224,170,27): eski görseldeki gibi ayrı bir dolgu penceresi yok. İç bölge
+ *  piksel taramayla ölçüldü; kenar pay bırakılıp altın çerçeve görünür kalır.
+ *  Sahne yatağı koyuya boyar, gerçek oranı altınla üstüne çizer. */
+export const HUD_EXP_FILL = inset(HUD_EXP_BAR, 0.055, 0.945, 0.16, 0.84);
 /** Yüzde yazısının yeri — çubuğun sağ penceresi (yazı silindi, burası boş). */
 export const HUD_EXP_TEXT = {
   x: HUD_EXP_BAR.x + HUD_EXP_BAR.w * 0.905,
