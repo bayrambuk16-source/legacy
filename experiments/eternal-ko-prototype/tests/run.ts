@@ -14501,17 +14501,18 @@ test('§143 CANLI: Sv50 tam donanımlı oyuncu üst bantta AYAKTA kalır', () =>
 test('§144 MOB SAYISI TAVANI üst bantta kalabalığı kırar', () => {
   /* Hasar eğrisi düzeltildikten SONRA bile üst bantta 20 ölüm vardı.
      Sebep tek tek mobun sertliği değil KALABALIK — aynı slot farklı
-     sayılarla ölçüldü: 8 mob → 31 ölüm, 4 mob → 7 ölüm. */
-  ok(mobCountCap(50) < mobCountCap(10), 'tavan üst bantta inmiyor');
+     sayılarla ölçüldü: 8 mob → 31 ölüm, 4 mob → 7 ölüm.
+     P2.47: aynı ölçüm ALT banttan da yapıldı (kendi seviyesinde
+     ilerleyen karakter, bir saat): 8 mob tempo çöküşünün kökü çıktı ve
+     alt bant da 4'e indi — tavan artık KESİN azalan değil, azalan-veya-
+     eşit; orta bantlar (6, 5) hâlâ üstte kalır. */
   eq(mobCountCap(50), MIN_MOBS_AFTER_CAP, 'en üst bant tavanı:');
 
-  /* MONOTON İNMELİ. */
-  let prev = Infinity;
+  /* P2.47 — iki yönlü ölçüm sonrası tavan HER bantta 4: üst-uç tablo
+     (8→31, 6→22, 5→15, 4→7 ölüm) ve alt-uç bir saatlik ilerleme
+     (8→Sv10/312 ölüm, 4→Sv20/117) aynı değeri gösteriyor. */
   for (let lv = 1; lv <= 60; lv++) {
-    const c = mobCountCap(lv);
-    ok(c <= prev, `Sv${lv}'de tavan yükseldi: ${c}`);
-    ok(c >= MIN_MOBS_AFTER_CAP, `Sv${lv} tavanı çok düşük: ${c}`);
-    prev = c;
+    eq(mobCountCap(lv), MIN_MOBS_AFTER_CAP, `Sv${lv} tavanı:`);
   }
 
   /* P2.41 — ARTIK ATAMA. Yerleşimin yazdığı sayı yok sayılır; sayıyı
@@ -14519,8 +14520,8 @@ test('§144 MOB SAYISI TAVANI üst bantta kalabalığı kırar', () => {
      tazelemede yine kendi değerini yazacak. */
   eq(cappedMobCount(4, 50), MIN_MOBS_AFTER_CAP, 'üst bant az isteyen:');
   eq(cappedMobCount(8, 50), MIN_MOBS_AFTER_CAP, 'üst bant çok isteyen:');
-  eq(cappedMobCount(5, 10), 8, 'alt bant az isteyen YÜKSELTİLMELİ:');
-  eq(cappedMobCount(8, 10), 8, 'alt bant çok isteyen:');
+  eq(cappedMobCount(5, 10), 4, 'alt bant az isteyen normalize:');
+  eq(cappedMobCount(8, 10), 4, 'alt bant çok isteyen:');
   /* Sıfır mob = slotun sessizce kaybolması. Olmamalı. */
   ok(cappedMobCount(0, 50) >= 1, 'sıfır mob üretildi');
   ok(MOB_COUNT_TIERS.length >= 2, 'bant tablosu tek kademeli');
@@ -15092,6 +15093,36 @@ test('§132 YETİM KEMİK EVLATLIĞI — bozuk dışa aktarım klonda çökertme
   eq(cloneUndef, 0, 'klonda undefined kemik:');
   /* sağlam sahnede ikinci çağrı hiçbir şey yapmaz (idempotent) */
   eq(adoptOrphanBones(scene), 0, 'ikinci geçiş boş olmalı:');
+});
+
+/* §155 için import — koşucu senkron, await test dışında. */
+const PSHOP = await import('../world/PotionShop.js');
+const KOPOT = await import('../data/ko-potions.js');
+
+test('§155 İKSİR MAĞAZASI MORADON\'DA — satın alma dünyadan bağımsız', () => {
+  /* P2.47 — tempo çöküşünün ölçülen kökü: HP iksiri 5. dakikada bitiyor
+     ve Moradon'da alım yolu yoktu. Satın alma ortak modüle taşındı;
+     Moradon durumuna da işlemek ZORUNDA. */
+  const S = new PrototypeState(4701);
+  const ref = KOPOT.DEFAULT_HP_POTION_REF;
+  const before = S.potions.stock(ref);
+  S.player.coins = 100000;
+  const r = PSHOP.buyPotionFor(S, ref, 10);
+  ok(r.ok, 'alım başarısız');
+  eq(S.potions.stock(ref), before + 10, 'stok artmalı:');
+  eq(S.player.coins, 100000 - r.cost, 'altın düşmeli:');
+  ok(r.cost > 0, 'fiyat kaynaktan gelmeli (sıfır olamaz)');
+  /* parasızken reddedilir, stok değişmez */
+  S.player.coins = 0;
+  const r2 = PSHOP.buyPotionFor(S, ref, 10);
+  ok(!r2.ok, 'parasız alım reddedilmeli');
+  eq(S.potions.stock(ref), before + 10, 'stok değişmemeli:');
+  /* sahne mağazayı zindan kapısı olmadan açabilmeli (kaynak denetimi) */
+  const src = readFileSync(new URL('../scenes/WorldPrototypeScene.ts', import.meta.url), 'utf8');
+  ok(/buyPotionFor\(this\.S,/.test(src), 'sahne ortak satın almayı kullanmalı');
+  ok(!/private renderShop[^]*?const d = this\.dungeon;\n    if \(!d\) return;/.test(src),
+    'mağaza hâlâ zindana kilitli');
+  ok(/İKSİR MAĞAZASI  ›/.test(src), 'Satış panelinde mağaza girişi yok');
 });
 
 console.log(`\n${pass} geçti, ${fail} kaldı`);

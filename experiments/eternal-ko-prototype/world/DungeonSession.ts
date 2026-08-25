@@ -31,7 +31,8 @@ import {
   DUNGEON_DROP_UPGRADE, WAVE_OVERLAP_THRESHOLD, WAVE_REWARD_MULT, WAVE_TROPHY_CHANCE,
 } from '../data/wave-floors.js';
 import { DUNGEON_TROPHY_REF } from '../data/sell-prices.js';
-import { planPurchase, shopCatalog, type BuyResult } from '../ui/potion-shop.js';
+import { type BuyResult } from '../ui/potion-shop.js';
+import { buyPotionFor } from './PotionShop.js';
 
 export class DungeonSession {
   /** Zindan karakteri — normal dünyadakinden BAĞIMSIZ. */
@@ -207,29 +208,9 @@ export class DungeonSession {
    *
    *  Genie'nin iksir tüketimiyle bu satın alma AYNI envanteri kullanır;
    *  ayrı bir "mağaza stoğu" yoktur. */
+  /** P2.47 — satın alma ortak modüle taşındı (Moradon'da da mağaza var
+   *  artık); bu yalnız delege eder. */
   buyPotion(itemRef: number, quantity: number): BuyResult {
-    const entry = shopCatalog().find((e) => e.itemRef === itemRef);
-    const coins = this.state.player.coins;
-    const plan = planPurchase(entry, quantity, coins);
-    if (!plan.ok || !entry) {
-      return {
-        ok: false, fail: plan.fail, itemRef, quantity,
-        cost: plan.cost, coinsAfter: coins,
-      };
-    }
-    const add = this.state.inventory.add(itemRef, { quantity });
-    if (!add.ok) {
-      return {
-        ok: false, fail: 'inventoryFull', itemRef, quantity,
-        cost: plan.cost, coinsAfter: coins,
-      };
-    }
-    /* Altın YALNIZ envantere gerçekten girdikten sonra düşer —
-       sıra ters olsaydı dolu çantada para buharlaşırdı. */
-    this.state.player.coins = coins - plan.cost;
-    return {
-      ok: true, itemRef, quantity, cost: plan.cost,
-      coinsAfter: this.state.player.coins,
-    };
+    return buyPotionFor(this.state, itemRef, quantity);
   }
 }

@@ -57,12 +57,32 @@
  *  Tehdit yukarıda birikiyor, kalabalık da orada iniyor. Alt bantlarda
  *  tersi: zayıf mob kalabalıkken hem eğlenceli hem hızlı. */
 export const MOB_COUNT_TIERS: ReadonlyArray<{ maxLevel: number; count: number }> = [
-  /* Sv1-18 — tek vuruşta ölüyorlar; kalabalık akışı canlı tutar. */
-  { maxLevel: 18, count: 8 },
+  /* Sv1-18 — DÖRT. Eski değer 8'di ve YALNIZ Sv50 perspektifinden
+     ("tek vuruşta ölüyorlar, kalabalık akışı canlı tutar") seçilmişti.
+     P2.47'de KENDİ bandında ilerleyen karakterle bir saatlik simülasyon
+     ölçüldü (iksir mağazası açıkken, alt bant mob sayısına göre):
+
+         mob   Sv(60dk)   ölüm   kill
+          8       10       312    118   ← tempo çöküyor (bildirilen kusur)
+          6       17       171    317
+          4       20       117    324
+
+     Sekiz mob kendi seviyesindeki oyuncuya bir saniyede stok yaktırıyor
+     ve ekonomi iksir giderini karşılayamıyor; %5 ölüm cezası Sv10'da
+     koşu bandına bağlıyor. Dört, hem alt oyunda tempoyu kurtarıyor hem
+     de Sv50 süpürücüsü için zaten en yüksek kill hızını veren değerdi
+     (yukarıdaki üst tablo). */
+  { maxLevel: 18, count: 4 },
+  /* P2.47 — orta bantlar da 4'e indi. 6 ve 5, üst-uç ölçüm tablosundaki
+     gradyanın ARA DEĞERLERİYDİ ve tek başına hiç doğrulanmamıştı
+     (kendi satırları 22 ve 15 ölüm gösteriyor — kabul edilen eşik 7).
+     İki yönlü ölçüm (Sv50 süpürücü + kendi bandında ilerleyen karakter)
+     aynı sonucu veriyor: 4 her bantta hem en yüksek kill hızı hem en az
+     ölüm. Bant yapısı İLERİDE ayrışmak isterse dursun diye korunuyor. */
   /* Sv19-30 — orta. Hâlâ hızlı ama vuruş sayısı artıyor. */
-  { maxLevel: 30, count: 6 },
+  { maxLevel: 30, count: 4 },
   /* Sv31-42 — ölçümde 5 mobla sıfır ölüm. */
-  { maxLevel: 42, count: 5 },
+  { maxLevel: 42, count: 4 },
   /* Sv43-50 — ölçümde 4 mobla 7 ölüm; 8 mobla 31'di. */
   { maxLevel: Number.POSITIVE_INFINITY, count: 4 },
 ];

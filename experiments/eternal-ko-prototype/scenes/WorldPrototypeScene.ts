@@ -97,6 +97,7 @@ import {
   screenToWorldMove,
 } from '../render3d/CameraRig.js';
 import { koPotion, potionLabel, potionOptions, DEFAULT_HP_POTION_REF, DEFAULT_MP_POTION_REF } from '../data/ko-potions.js';
+import { buyPotionFor } from '../world/PotionShop.js';
 import type { MovementSource } from '../world/GenieMovement.js';
 import { OKCU_FOOT_PAD, okcuSheet } from '../data/proto-assets.js';
 import {
@@ -2921,8 +2922,9 @@ export class WorldPrototypeScene implements Scene {
 
   /** İksir mağazası. */
   private renderShop(g: DrawApi): void {
-    const d = this.dungeon;
-    if (!d) return;
+    /* P2.47 — mağaza artık DÜNYADAN BAĞIMSIZ: zindan kapısı kalktı,
+       Moradon'dan Satış paneli üzerinden de açılır. Her şey `this.S`
+       okur; zindandayken S zaten zindan karakteridir. */
     g.rect(0, 0, PROTO.screenW, PROTO.screenH, '#050403', 0.8);
     g.rect(SHOP_PANEL.x, SHOP_PANEL.y, SHOP_PANEL.w, SHOP_PANEL.h, '#100d08', 0.97);
     g.rect(SHOP_PANEL.x, SHOP_PANEL.y, SHOP_PANEL.w, 3, '#c9a05a');
@@ -2956,8 +2958,6 @@ export class WorldPrototypeScene implements Scene {
   }
 
   private handleShopInput(p: PointerEventInfo): void {
-    const d = this.dungeon;
-    if (!d) return;
     if (this.hit(p, SHOP_CLOSE)) { this.host.audio.play('ui'); this.shopOpen = false; return; }
     const cat = shopCatalog();
     shopRows().forEach((r, i) => {
@@ -2965,7 +2965,7 @@ export class WorldPrototypeScene implements Scene {
       if (!e) return;
       for (const b of shopBuyButtons(r)) {
         if (!this.hit(p, { id: `buy_${i}_${b.qty}`, ...b, label: '' })) continue;
-        const res = d.buyPotion(e.itemRef, b.qty);
+        const res = buyPotionFor(this.S, e.itemRef, b.qty);
         this.host.audio.play('ui');
         this.say(res.ok
           ? `${e.displayName} x${b.qty} alındı (-${res.cost})`
@@ -3346,6 +3346,15 @@ export class WorldPrototypeScene implements Scene {
      bu metotlar yalnız iletir ve sonucu gösterir. */
 
   private handleSell(p: PointerEventInfo): void {
+    /* P2.47 — mağaza girişi. `sellHitTest`ten ÖNCE denetlenir: o test
+       yalnız kendi öğelerini tanır ve tanımadığında ERKEN ÇIKAR — düğme
+       ondan sonra olsaydı hiç çalışmazdı (ilk sürümün hatası buydu). */
+    const shopBtn = { id: 'sell_shop', x: SELL_PANEL.x + 20, y: SELL_PANEL.y + 30,
+      w: SELL_PANEL.w - 40, h: 26, label: '' };
+    if (this.hit(p, shopBtn)) {
+      this.host.audio.play('ui');
+      this.sellOpen = false; this.shopOpen = true; return;
+    }
     const pend = this.S.autoGear.pendingSales().slice(0, PENDING_PAGE_SIZE);
     const hit = sellHitTest(p.x, p.y, pend.length);
     if (hit === null) return;
@@ -3397,6 +3406,14 @@ export class WorldPrototypeScene implements Scene {
   private renderSell(g: DrawApi): void {
     const st = this.S.autoGear.settings;
     this.panelShell(g, 'SATIŞ VE OTOMATİK', `${this.S.player.coins} altın`);
+
+    /* P2.47 — İKSİR MAĞAZASI Moradon'dan erişilebilir. Tempo çöküşünün
+       ölçülen kökü iksirsiz kalmaktı; alım noktası tüccar ekranındadır. */
+    const shopBtn = { x: SELL_PANEL.x + 20, y: SELL_PANEL.y + 30, w: SELL_PANEL.w - 40, h: 26 };
+    g.rect(shopBtn.x, shopBtn.y, shopBtn.w, shopBtn.h, '#1c2028', 0.95);
+    g.rect(shopBtn.x, shopBtn.y, 3, shopBtn.h, '#6f8fd0');
+    g.text('İKSİR MAĞAZASI  ›', shopBtn.x + 14, shopBtn.y + shopBtn.h / 2 - 7,
+      { size: 12, bold: true, color: '#a8c0e8' });
 
     /* ---- aç/kapa anahtarları ---- */
     for (const t of toggleRects()) {
