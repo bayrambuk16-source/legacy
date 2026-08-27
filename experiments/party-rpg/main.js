@@ -5006,7 +5006,8 @@ function cizdir(){
 const saat = new THREE.Clock();
 function adim(){
   requestAnimationFrame(adim);
-  const dt = Math.min(saat.getDelta(), 0.05);
+  /* let: hit-stop (asagida) dt yi olceklendiriyor — const olursa strict mode atar */
+  let dt = Math.min(saat.getDelta(), 0.05);
   if(okcu) okcu.mixer.update(dt);
   if(brute) brute.mixer.update(dt);
   if(mage) mage.mixer.update(dt);
@@ -5627,6 +5628,44 @@ function slotEkraniGoster(basla){
     }
   }));
 }
+/* ═══════════ TEST KANCASI ═══════════
+   Yalnız ?dbg=1 ile açılır. Oyun akışına hiç dokunmaz: sadece zaten var
+   olan durum ve fonksiyonları window'a bağlar. Sebep: main.js tek ES
+   modül olduğu için dışarıdan hiçbir iç durum gözlenemiyordu; 30 başlıklı
+   test paketi ancak böyle çalışma zamanında doğrulanabiliyor. */
+if(new URLSearchParams(location.search).has('dbg')){
+  window.__PARTY = {
+    /* canlı durum */
+    get D(){ return D; }, get ENV(){ return ENV; }, get SLOT(){ return SLOT; },
+    get okcu(){ return okcu; }, get brute(){ return brute; },
+    get mage(){ return mage; }, get priest(){ return priest; },
+    get sahne(){ return sahne; }, get kamera(){ return kamera; },
+    get renderer(){ return renderer; }, get besteci(){ return besteci; },
+    get MODEL(){ return MODEL; }, get DOKU(){ return DOKU; }, get AC(){ return AC; },
+    /* sabitler */
+    sabit: { OK_HASAR, OK_ARALIK, OK_HIZ, OK_MENZIL, OKCU_CAN, BRUTE_CAN,
+      get MAGE_CAN(){ return MAGE_CAN; }, get PRIEST_CAN(){ return PRIEST_CAN; },
+      DIRILME_SN, DOGUM_ARALIK, AZAMI_MOB, VUR_MESAFE, HIZ,
+      TURLER, TUR_SIRA, ENC_SABLON, BASMA, BASMA_MAX, OCAK_TABLO, OCAK_MAX,
+      ITEM_FIYAT, ULTI_ESIK, SILAH2, TABAN_ITEM, KIMLER, SKILL9, DEPO_KAP },
+    /* saf fonksiyonlar */
+    fn: { zk, zkBolumBasi, sevEsik, encounterSec, anaTur, ikiTur, bossTur,
+      takimGucu, onerilenGuc, bireyselGuc, esyaGucu, nadirlikSec, bossOdul,
+      ocakMaliyet, sk, kritSans, kritCarp, ultiSarj, okMenzil, okAralik,
+      canKat, kMax, atakHiz, healKat, blokSans, drOran, tahminiDps },
+    /* deterministik adimlama: saat.getDelta ezilip adim() elle cagrilir */
+    get adim(){ return adim; }, get saat(){ return saat; },
+    get cizdir(){ return cizdir; }, get postKur(){ return postKur; },
+    get kaliteUygula(){ return kaliteUygula; }, get yenidenBoyutla(){ return yenidenBoyutla; },
+    /* etki eden fonksiyonlar (test tetikleyicileri) */
+    et: { mobDogur, mobaVur, kahramanaVur, dropDene, itemVer, basmaDene,
+      canEkle, kahramanDirilt, enYakinMob, enYakinKahraman, hudGuncelle,
+      panelAc, envKaydet, lvlKaydet, stageKaydet, rozetGuncelle, panelYenile,
+      okAt, buyuAt, zindanBaslat, oyunBitti, depoEkle, SES, sayiGoster,
+      focusAta, bolumDuyur, dilUygula, sevArayuz, envanterCiz, orsCiz }
+  };
+}
+
 hepsiniYukle().then(()=>{
   okcuKur();
   bruteKur();
