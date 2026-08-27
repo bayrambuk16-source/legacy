@@ -483,7 +483,9 @@ function kayaYap(s, mat, seed){                    /* referans görsel: yüzlü 
 }
 function cevreKur(T3){
   if(cevreG){
-    cevreG.traverse(o=>{ if(o.isMesh){ o.geometry.dispose(); if(o.material.dispose) o.material.dispose(); } });
+    /* isLine de gerekli: kaya kenar hatlari LineSegments, isMesh degil —
+       yalniz isMesh bakilinca EdgesGeometry'ler her tema kurulumunda sizardi. */
+    cevreG.traverse(o=>{ if(o.isMesh || o.isLine){ o.geometry.dispose(); if(o.material.dispose) o.material.dispose(); } });
     sahne.remove(cevreG);
   }
   cevreG = new THREE.Group();
@@ -3375,6 +3377,17 @@ function mobVfxTemizle(m){                             /* p157: mob üstü sahne
     m._buzH.traverse(o2=>{ if(o2.isMesh){ o2.geometry.dispose(); o2.material.dispose(); } });
     m._buzH = null;
   }
+  /* Can bari mob BASINA CanvasTexture + SpriteMaterial uretir (canBariYap).
+     sahne.remove(m.kok) sprite'i sahneden cikarir ama GPU kaynagini birakmaz;
+     olculdu: dispose edilmeyince mob basina ~1 doku sizinti. */
+  if(m.bar){
+    if(m.bar.sp){
+      m.kok.remove(m.bar.sp);
+      if(m.bar.sp.material.map) m.bar.sp.material.map.dispose();
+      m.bar.sp.material.dispose();
+    }
+    m.bar = null;
+  }
 }
 function combatStateReset(){                           /* p157: savaş sahnesinin tüm geçici durumu */
   for(const m of D.moblar){ mobVfxTemizle(m); sahne.remove(m.kok); }
@@ -3388,6 +3401,14 @@ function combatStateReset(){                           /* p157: savaş sahnesini
     sahne.remove(e.kok);
     if(e.tex) e.tex.dispose();
     if(e.tip==='parca' && parcaHavuz.length < 130) parcaHavuz.push(e.kok);
+    /* kare basi temizlikteki (asagida) ile ayni kural — burada eksikti:
+       havuza donmeyen efektlerin geometri/materyali birakilmaliydi. */
+    else if(e.tip!=='parca') e.kok.traverse(o2=>{
+      if(o2.isMesh || o2.isLine){
+        if(o2.geometry) o2.geometry.dispose();
+        if(o2.material && o2.material.dispose) o2.material.dispose();
+      }
+    });
   }
   D.efektler.length = 0;
   D.gecikme.length = 0;

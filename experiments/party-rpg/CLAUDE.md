@@ -40,7 +40,7 @@ tuzağa düşüldü (aşağıda "GPU kaynak sızıntısı" maddesi).
 
     index.html        kabuk: head, importmap, HUD markup (140 satır)
     styles/hud.css    tüm arayüz (483 satır, paket paket ekli — aşağıya bak)
-    main.js           oyun kodu, TEK DOSYA (5683 satır, 30 bölüm başlığı taşır)
+    main.js           oyun kodu, TEK DOSYA (5704 satır, 30 bölüm başlığı taşır)
 
 Varlıklar `public/assets/party/`: `models/` 12 .gltf · `vfx/` 19 .png ·
 `portraits/` 4 .svg (sınıf ikonları).
@@ -101,17 +101,28 @@ Doğrulanmış genişlikler: **320 / 345 / 360 / 374 / 375 / 393 / 412 / 430 / 7
 - **Görsel tavan payı:** materyaller hâlâ `MeshLambertMaterial` —
   `MeshStandardMaterial` + IBL (`PMREMGenerator` + `RoomEnvironment`)
   geçişi duruyor. Artık bloom canlı olduğuna göre değerlendirilebilir.
-- **GPU kaynak sızıntısı — AÇIK, düzeltilmedi.** Efektler sahneden
-  çıkarılıyor ama geometri/doku `dispose()` edilmiyor:
-  `renderer.info.memory` sürekli tırmanıyor (~1,3 geo/sn ve ~0,9 doku/sn;
-  ×10 slotunda daha hızlı). `D.efektler` ve `sahne.children` sınırlı
-  kalıyor, yani sorun sahne grafiğinde değil GPU kaynaklarında.
-  **Çizim yolundan bağımsız** — kontrollü testte hem doğrudan renderer
-  hem besteci yolunda aynı şekilde büyüyor, yani post-processing'in
-  ürünü değil, önceden mevcut.
-  UYARI: `renderer.info.memory` yalnız GPU'ya YÜKLENMİŞ kaynağı sayar.
+- **GPU kaynak sızıntısı — KISMEN düzeltildi, kalanı AÇIK.**
+  Kapatılanlar: (1) mob can barı — `canBariYap()` mob başına
+  `CanvasTexture` + `SpriteMaterial` üretiyordu, `mobVfxTemizle` bunu
+  bırakmıyordu; (2) `cevreKur` temizliği yalnız `isMesh` bakıyordu, kaya
+  kenar hatları `LineSegments` olduğu için `EdgesGeometry`'ler her tema
+  kurulumunda sızıyordu; (3) `combatStateReset` havuza dönmeyen
+  efektleri dispose etmeden atıyordu.
+  Ölçüm (aynı slot/bölüm/protokol): **mob başına doku 2,03 → 1,26.**
+  KALAN: hâlâ ~0,37 geo/sn ve ~0,23 doku/sn birikiyor. Kaynak mob DEĞİL
+  — mob modeli/materyali/dokusu kaynakla tamamen paylaşımlı
+  (`SkeletonUtils.clone` klonlamıyor, ölçüldü). Kalan, ölüm efektleri ve
+  drop görselleri: `itemVer` her ganimette yeni Ring/Cylinder/Octahedron
+  geometrisi + materyal üretiyor. Çözümü dispose değil, **paylaşılan
+  geometri + havuz** olur.
+  UYARI 1: `renderer.info.memory` yalnız GPU'ya YÜKLENMİŞ kaynağı sayar.
   `renderer.render` boşa alınarak yapılan ölçüm sızıntıyı GÖREMEZ —
   daha önce "sızıntı yok" sonucu bu yüzden yanlış çıkmıştı.
+  UYARI 2: saniye başı oranlar bölge/slot'a göre değişir (efekt
+  yoğunluğu). Düzeltme etkisini ölçmek için farklı oturumların sn başı
+  sayılarını KARŞILAŞTIRMAYIN; aynı slot+bölümde "mob başına" protokolü
+  kullanın. Sızıntıyı bulmanın en doğrudan yolu orphan sayımı: sahne +
+  havuzlardan erişilebilen kaynak ile `info.memory` farkı.
 - **Sanat üretimi:** kullanıcı ChatGPT ile konsept görsel üretiyor. Karar:
   parçaları TEK TEK, düz macenta/siyah zeminde, 512px+ istemek; tek sahne
   üretip kesmek değil. Tutarlılık için ilgili ikonları tek ızgarada iste.
