@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<defs>
+<radialGradient id="z" cx="38%" cy="30%" r="76%">
+  <stop offset="0" stop-color="#3d3319"/><stop offset="1" stop-color="#0c0906"/>
+</radialGradient>
+<radialGradient id="h" cx="50%" cy="52%" r="52%">
+  <stop offset="0" stop-color="#6fe07a" stop-opacity=".55"/>
+  <stop offset="1" stop-color="#6fe07a" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<circle cx="32" cy="32" r="31" fill="url(#z)"/>
+<circle cx="32" cy="32" r="26" fill="url(#h)"/>
+
+<path d="M26.4 10 h11.2 v13.4 H51 v11.2 H37.6 V54 H26.4 V34.6 H13 V23.4 h13.4 z" fill="#5cc96a"/>
+<path d="M26.4 10 h11.2 v13.4 H51 v11.2 H37.6 V54 H26.4 V34.6 H13 V23.4 h13.4 z" fill="none" stroke="#e8c46a" stroke-width="2.4" stroke-linejoin="round"/>
+<path d="M29.4 14 h5.2 v12.4 H47 v5.2 H34.6 V48 h-5.2 V31.6 H17 v-5.2 h12.4 z" fill="#d6f7c8" opacity=".55"/>
+<circle cx="32" cy="32" r="30.6" fill="none" stroke="#c9a24d" stroke-width="2.2"/>
+<circle cx="32" cy="32" r="27.4" fill="none" stroke="#f0d894" stroke-width="1" opacity=".38"/>
+</svg>

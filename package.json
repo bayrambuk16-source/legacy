@@ -26,7 +26,9 @@
     "telemetry:drops": "tsx experiments/eternal-ko-prototype/tools/drop-telemetry.ts",
     "telemetry:items": "tsx experiments/eternal-ko-prototype/tools/item-telemetry.ts",
     "verify:three": "tsx tools/verify-vendor.mjs",
-    "telemetry:render": "tsx experiments/eternal-ko-prototype/tools/render-telemetry.ts"
+    "telemetry:render": "tsx experiments/eternal-ko-prototype/tools/render-telemetry.ts",
+    "serve": "node tools/serve.mjs",
+    "dev:party": "node tools/serve.mjs"
   },
   "notes": {
     "toolchain": "Kurulum: npm install (devDependencies tam surum olarak pinlidir) → npm run verify. npm script calisirken node_modules/.bin PATH basina eklendigi icin tsc/tsx/esbuild YEREL pinli surumden calisir.",

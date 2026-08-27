@@ -1,0 +1,483 @@
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#1a2416;
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #sahne{position:fixed;inset:0;}
+  canvas{display:block;position:fixed;inset:0;width:100vw !important;height:100vh !important;height:100dvh !important;}
+  /* üst şerit: kesim sayacı */
+  #ust{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:0;right:0;
+    display:flex;justify-content:center;pointer-events:none;z-index:5;}
+  .rozetKutu{display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;}
+  #serit{position:relative;display:flex;align-items:center;gap:5px;padding:2px 8px 3px;
+    background:rgba(14,11,6,.72);border:1px solid rgba(201,162,77,.4);border-radius:9px;}
+  #serit i{width:7px;height:7px;border-radius:50%;background:#3c331c;border:1px solid #5c4d26;}
+  #serit i.gecti{background:linear-gradient(180deg,#ffd95e,#b8892f);border-color:#7a5c22;}
+  #serit i.aktif{background:linear-gradient(180deg,#ffe9a0,#d0a03a);border-color:#ffe9a0;
+    box-shadow:0 0 6px rgba(255,217,94,.7);}
+  #serit b{font-size:10px;line-height:1;opacity:.55;filter:grayscale(1);}
+  #serit b.aktif{opacity:1;filter:none;text-shadow:0 0 6px rgba(255,120,80,.8);}
+  #serit s{position:absolute;left:6px;right:6px;bottom:-1px;height:2px;border-radius:2px;
+    background:rgba(0,0,0,.6);text-decoration:none;overflow:hidden;display:block;}
+  #serit s::after{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--kp,0%);
+    background:linear-gradient(90deg,#c9a24d,#ffe9a0);}
+  #bossBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 52px);left:50%;transform:translateX(-50%);
+    z-index:5;display:none;flex-direction:column;align-items:center;gap:3px;width:min(72vw,340px);
+    pointer-events:none;}
+  #bossBar.acik{display:flex;}
+  #bossAd{color:#ffd9a0;font-size:13px;font-weight:800;letter-spacing:1.5px;
+    text-shadow:0 1px 3px #000, 0 0 10px rgba(255,120,60,.35);}
+  #bossBarKutu{width:100%;height:12px;background:linear-gradient(180deg,#0a0705,#141008);
+    border:1px solid #2a2010;border-radius:7px;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(201,162,77,.5), 0 2px 8px rgba(0,0,0,.6);}
+  #bossBarIc{height:100%;width:100%;border-radius:6px;transition:width .2s;
+    background:linear-gradient(180deg,#c05aff 0%,#7e2bb8 50%,#4a1470 100%);}
+  #bossGiris{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at 50% 40%, transparent 46%, rgba(0,0,0,.78) 100%);
+    transition:opacity .5s;}
+  #bossGiris.acik{opacity:1;}
+  #ust .rozet{background:linear-gradient(180deg,#241d10,#141008);border:1px solid #2a2010;
+    color:#eddfb3;border-radius:20px;padding:5px 18px;font-size:14px;font-weight:700;
+    letter-spacing:.4px;box-shadow:inset 0 0 0 1px rgba(201,162,77,.5),
+      inset 0 1px 0 rgba(255,230,170,.13), 0 2px 8px rgba(0,0,0,.5);}
+  /* kahraman kartları: yuvarlak ikon + can (kırmızı) / şarj (mavi) */
+  #kahramanHud{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 10px);
+    display:flex;gap:5px;z-index:5;
+    width:min(97vw,560px);}
+  .kart{position:relative;display:flex;align-items:center;gap:6px;flex:1;min-width:0;
+    background:linear-gradient(180deg,#251f12 0%,#171208 55%,#100c06 100%);
+    border:1px solid #6b5426;border-radius:12px;padding:5px 7px 5px 5px;
+    box-shadow:inset 0 0 0 1px rgba(212,172,92,.35), inset 0 1px 0 rgba(255,230,170,.14),
+      0 3px 12px rgba(0,0,0,.62);}
+  .kartIkon{width:42px;height:42px;border-radius:9px;flex:0 0 auto;object-fit:cover;
+    border:1px solid #2a2010;background:#1c1812;
+    box-shadow:0 0 0 2px #c9a24d, 0 0 0 3px #3a2c12, 0 2px 6px rgba(0,0,0,.6);}
+  .barlar{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+  .barKutu{position:relative;height:13px;background:linear-gradient(180deg,#060705,#10120c);
+    border:1px solid #000;border-radius:7px;overflow:hidden;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.07);}
+  .bar{height:100%;width:100%;border-radius:6px;transition:width .15s;}
+  .bar.can{background:linear-gradient(180deg,#ff7a64 0%,#d63d2e 45%,#8a1c12 100%);}
+  .bar.sarj{background:linear-gradient(180deg,#ffe98f 0%,#e8b83e 50%,#a87816 100%);}
+  .bar.sarj.dolu{box-shadow:0 0 8px 1px #ffd95e;}
+  .barYazi{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:8.5px;font-weight:800;color:#fff;letter-spacing:.3px;
+    text-shadow:0 1px 2px #000, 0 0 3px rgba(0,0,0,.9);pointer-events:none;}
+  .sevYazi{position:absolute;left:34px;top:-6px;min-width:15px;height:15px;
+    background:linear-gradient(180deg,#e8c46a,#a87d2c);color:#241a08;
+    border:1px solid #5c451a;border-radius:8px;font-size:10px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 3px;
+    box-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;}
+  .artiBtn{position:absolute;top:-44px;left:50%;transform:translateX(-50%);
+    width:38px;height:38px;border-radius:50%;border:2px solid #e8c46a;
+    background:radial-gradient(circle at 35% 30%,#7fce6a,#2c7a1e);
+    color:#fff;font-size:24px;font-weight:800;line-height:1;display:none;
+    align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 3px 10px rgba(0,0,0,.6), 0 0 12px rgba(127,206,106,.5);
+    animation:artiNabiz 1s ease-in-out infinite;}
+  .artiBtn.gorunur{display:flex;}
+  .ultiBtn{position:absolute;top:-40px;left:calc(50% + 38px);transform:translateX(-50%);
+    width:34px;height:34px;border-radius:50%;border:2px solid #ffe9a0;
+    background:radial-gradient(circle at 35% 30%,#ffd95e,#b8892f);
+    display:none;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 3px 10px rgba(0,0,0,.6), 0 0 14px rgba(255,217,94,.6);
+    animation:artiNabiz 0.85s ease-in-out infinite;}
+  .ultiBtn.gorunur{display:flex;}
+  .ultiBtn.secili{animation:none;background:radial-gradient(circle at 35% 30%,#fff3c0,#e0a828);
+    box-shadow:0 0 18px rgba(255,230,140,.95), 0 3px 10px rgba(0,0,0,.6);}
+  .bildirim{position:absolute;right:5px;top:-4px;width:11px;height:11px;border-radius:50%;
+    background:#e5493d;display:none;box-shadow:0 0 7px #e5493d;border:1px solid #7d1610;}
+  #expKutu{position:fixed;top:12px;left:12px;z-index:6;display:flex;flex-direction:column;gap:4px;
+    background:linear-gradient(180deg,#241d10,#141008);border:1px solid #2a2010;border-radius:12px;
+    padding:6px 10px;box-shadow:inset 0 0 0 1px rgba(201,162,77,.5),
+      inset 0 1px 0 rgba(255,230,170,.13), 0 2px 10px rgba(0,0,0,.55);}
+  #expSv{color:#e8c46a;font-size:13px;font-weight:800;letter-spacing:.5px;}
+  #expBarKutu{width:92px;height:7px;background:rgba(8,10,7,.9);border:1px solid rgba(0,0,0,.7);
+    border-radius:5px;overflow:hidden;}
+  #expBar{height:100%;width:0%;background:linear-gradient(180deg,#f0d27a,#b8892f);
+    border-radius:4px;transition:width .2s;}
+  .skillSira{display:flex;gap:3px;margin-top:3px;}
+  .skillKutu{width:21px;height:21px;border-radius:5px;border:1px solid #2a2010;
+    background:linear-gradient(180deg,#2a2314,#171208);
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;line-height:1;position:relative;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(201,162,77,.5), 0 1px 2px rgba(0,0,0,.5);}
+  .skillKutu.kilitli{box-shadow:inset 0 0 0 1px rgba(120,100,60,.3);}
+  .skillKutu span{display:flex;align-items:center;justify-content:center;}
+  .skillKutu svg{filter:drop-shadow(0 1px 1px rgba(0,0,0,.55));}
+  .skillKutu.kilitli span{opacity:0;}
+  .skillKutu.kilitli::after{content:'🔒';position:absolute;inset:0;display:flex;
+    align-items:center;justify-content:center;font-size:10px;opacity:.55;filter:grayscale(1);}
+  .cdYazi{position:absolute;inset:0;color:#ffd75e;
+    background:conic-gradient(rgba(0,0,0,.74) var(--cdp,100%), rgba(0,0,0,.12) 0);
+    font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;}
+  /* ═══ karakter paneli ═══ */
+  #panel{position:fixed;top:13%;left:64px;right:64px;bottom:150px;z-index:21;display:none;
+    background:rgba(10,14,9,.95);border:1.5px solid #8a7440;border-radius:16px;
+    box-shadow:0 8px 34px rgba(0,0,0,.65);
+    flex-direction:column;overflow:hidden;}
+  #panel.genel #panelIkon,#panel.genel #pKhSec,#panel.genel #sekmeler{display:none;}
+  #panelArka{position:fixed;inset:0;z-index:20;display:none;background:rgba(0,0,0,.28);}
+  #panel.acik{display:flex;}
+  #panelBas{display:flex;align-items:center;gap:10px;padding:12px 14px 8px;}
+  #panelIkon{width:40px;height:40px;border-radius:50%;border:2px solid #8a7440;background:#1c1812;}
+  #panelAd{color:#e8d9a8;font-size:18px;font-weight:800;letter-spacing:.5px;flex:1;}
+  #panelX{width:38px;height:38px;border-radius:10px;border:1px solid #8a7440;
+    background:rgba(30,24,14,.9);color:#e8c46a;font-size:19px;font-weight:800;cursor:pointer;}
+  #dilBtn{width:46px;height:38px;border-radius:10px;border:1px solid #8a7440;margin-right:6px;
+    background:rgba(30,24,14,.9);color:#e8c46a;font-size:13px;font-weight:800;cursor:pointer;}
+  .nSatir{display:flex;align-items:baseline;gap:5px;padding:2.5px 9px;font-size:10.5px;color:#c9d4e4;line-height:1.3;}
+  .nSatir b{color:#fff;}
+  .nSatir.kilitli{opacity:.38;font-style:italic;}
+  .nSatir .oz{color:#ffca6a;font-weight:800;}
+  .kys{font-weight:900;margin-left:6px;font-size:13px;}
+  #slotEkran{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 20%,#1c2416,#0a0d08 75%);
+    z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+  #slotBaslik{font-size:24px;font-weight:900;color:#e8d9a8;letter-spacing:3px;
+    text-shadow:0 2px 12px rgba(0,0,0,.8);margin-bottom:6px;}
+  #slotListe{display:flex;flex-direction:column;gap:9px;width:min(320px,86vw);}
+  .slotKart{position:relative;display:flex;flex-direction:column;gap:3px;padding:12px 15px;
+    border:1px solid #4a4432;border-radius:12px;background:rgba(20,24,15,.92);cursor:pointer;}
+  .slotKart b{color:#f0e6c8;font-size:14px;}
+  .slotKart span{color:#9aa38a;font-size:11.5px;}
+  .slotKart.testSlot{border-color:#c9a52f;background:rgba(38,32,12,.94);}
+  .slotKart.testSlot b{color:#ffd95e;}
+  .slotSil{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    background:none;border:1px solid #6b4034;border-radius:8px;color:#ff8d80;
+    font-size:13px;padding:4px 8px;cursor:pointer;}
+  #orsAc{position:fixed;right:8px;bottom:118px;z-index:22;width:42px;height:42px;
+    border-radius:50%;border:1px solid #8a7440;background:rgba(30,25,14,.92);
+    font-size:19px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5);}
+  #orsAc.hazir::after{content:'';position:absolute;right:2px;top:2px;width:10px;height:10px;
+    border-radius:50%;background:#7dde8a;border:1px solid #1c3a20;}
+  #hizliOrs{position:fixed;left:6px;right:56px;bottom:112px;z-index:21;
+    background:rgba(16,14,9,.93);border:1px solid #4a4432;border-radius:14px;
+    padding:7px 9px;backdrop-filter:blur(3px);}
+  #hoKahraman{display:flex;gap:6px;margin-bottom:6px;}
+  .hoKh{flex:1;text-align:center;padding:4px 0;border-radius:8px;border:1px solid #3a3324;
+    background:#1c1810;color:#c9bfa4;font-size:11px;font-weight:800;cursor:pointer;}
+  .hoKh.aktif{border-color:#c9a52f;color:#ffd95e;background:#2c2416;}
+  #hoItemler{display:flex;gap:5px;}
+  .hoIt{position:relative;flex:1;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+    font-size:17px;border-radius:9px;border:1.5px solid #3a3324;background:#171410;cursor:pointer;}
+  .hoIt.secili{border-color:#ffd95e;background:#241d0e;}
+  .hoIt.bos{opacity:.3;}
+  .hoIt .hoB{position:absolute;left:2px;top:1px;font-size:8.5px;font-weight:900;color:#e8d9b8;}
+  .hoIt .hoN{position:absolute;right:2px;top:2px;width:7px;height:7px;border-radius:50%;
+    background:#7dde8a;border:1px solid #1c3a20;}
+  #hoOnizleme{display:flex;align-items:center;gap:8px;margin-top:6px;min-height:30px;
+    font-size:11px;color:#cfd6c4;flex-wrap:wrap;}
+  #hoOnizleme b{color:#ffd95e;}
+  #hoOnizleme .basBtn{margin-left:auto;padding:6px 16px;}
+  .envIzgara{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px 4px;}
+  .envIz{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+    border:1.5px solid #3a3324;border-radius:12px;cursor:pointer;}
+  .envIz.bos{opacity:.28;border-style:dashed;}
+  .envEm{font-size:27px;}
+  .envB{position:absolute;left:4px;top:3px;font-size:10.5px;font-weight:900;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.9);}
+  .nitKutu{margin:10px 12px 14px;padding:6px 10px;border:1px solid #33301f;border-radius:12px;
+    background:rgba(22,20,12,.55);}
+  .nitKutu .nSatir{font-size:11.5px;padding:3px 0;}
+  #solRay,#sagRay{position:fixed;top:24%;display:flex;flex-direction:column;gap:9px;z-index:22;}
+  #solRay{left:7px;} #sagRay{right:7px;}
+  .ozelRay{position:relative;width:44px;height:44px;border-radius:11px;border:1px solid #2a2010;
+    background:linear-gradient(180deg,#2b2312 0%,#191309 60%,#100c06 100%);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:inset 0 0 0 1.5px rgba(201,162,77,.55), inset 0 1px 0 rgba(255,230,170,.15),
+      0 3px 9px rgba(0,0,0,.55);}
+  .sy.syL{font-size:15px;font-weight:900;letter-spacing:1.6px;
+    text-shadow:0 2px 6px rgba(0,0,0,.9), 0 0 12px currentColor;}
+  .sarjDolu{animation:sarjNabiz 0.9s ease-in-out infinite;}
+  @keyframes sarjNabiz{0%,100%{filter:brightness(1);}50%{filter:brightness(1.9) saturate(1.5);}}
+  .ozelRay.kapali{opacity:.42;filter:grayscale(.85);}
+  .ozelRay svg{filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));}
+  .rayBtn{position:relative;width:44px;height:44px;border-radius:11px;border:1px solid #2a2010;
+    background:linear-gradient(180deg,#2b2312 0%,#191309 60%,#100c06 100%);font-size:19px;cursor:pointer;
+    box-shadow:inset 0 0 0 1.5px rgba(201,162,77,.55), inset 0 1px 0 rgba(255,230,170,.15),
+      0 3px 9px rgba(0,0,0,.55);}
+  .rayBtn{display:flex;align-items:center;justify-content:center;}
+  .rayBtn svg{filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));}
+  #orsAc{display:flex;align-items:center;justify-content:center;}
+  #orsAc svg{filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));}
+  .rayBtn.hazir::after{content:'';position:absolute;right:3px;top:3px;width:9px;height:9px;
+    border-radius:50%;background:#7dde8a;border:1px solid #1c3a20;}
+  .sekme[data-s="nitelikler"],.sekme[data-s="basarimlar"],.sekme[data-s="dukkan"],
+  .sekme[data-s="yukseltme"]{display:none;}
+  #pKhSec{display:inline-flex;gap:5px;margin-left:10px;vertical-align:middle;}
+  #pKhSec .hoKh{padding:3px 8px;font-size:10px;flex:none;}
+  #hoBar{position:relative;height:13px;margin-top:6px;border-radius:7px;overflow:hidden;
+    background:linear-gradient(180deg,#5a2020,#3a1414);border:1px solid #6b3030;display:none;}
+  #hoYesil{position:absolute;left:0;top:0;bottom:0;border-radius:7px 0 0 7px;
+    background:linear-gradient(180deg,#4fae5c,#2c7a38);}
+  #hoIbre{position:absolute;top:-1px;bottom:-1px;width:3px;background:#fff;
+    box-shadow:0 0 6px 1px #fff;display:none;}
+  #hoBar.ok{box-shadow:0 0 12px 2px #6de07a;border-color:#6de07a;}
+  #hoBar.fail{animation:hoFail .5s ease-in-out 2;}
+  @keyframes hoFail{0%,100%{box-shadow:none;}50%{box-shadow:0 0 16px 4px #ff4040;border-color:#ff6060;}}
+  #hizliOrs.sars{animation:hoSars .45s ease-in-out;}
+  @keyframes hoSars{0%,100%{transform:none;}20%{transform:translateX(-7px);}40%{transform:translateX(6px);}
+    60%{transform:translateX(-4px);}80%{transform:translateX(3px);}}
+  #vinyet{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0;
+    box-shadow:inset 0 0 110px 42px rgba(255,30,30,.85);transition:opacity .18s;}
+  .hoKh.oto{flex:none;padding:4px 9px;border-color:#6b5a2a;}
+  .hoKh.oto.aktif{border-color:#7dde8a;color:#7dde8a;background:#16260f;}
+  .orsUst{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:13px;
+    color:#e8d9b8;border-bottom:1px solid #3a3324;margin-bottom:4px;}
+  .orsMesaj{padding:5px 12px;font-size:11.5px;color:#ffd97a;}
+  .orsSatir{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid #262130;}
+  .orsSatir.bos{opacity:.4;}
+  .orsAd{flex:1;font-size:12px;font-weight:700;}
+  .orsNot{font-size:10.5px;color:#9aa3b5;}
+  .basBtn{padding:5px 13px;border-radius:8px;border:1px solid #8a7440;background:#2c2416;
+    color:#ffd97a;font-size:11px;font-weight:800;cursor:pointer;}
+  .basBtn:disabled{opacity:.35;cursor:default;}
+  #duyuru{position:fixed;top:34%;left:0;right:0;text-align:center;font-size:26px;font-weight:900;
+    color:#ffe6a8;text-shadow:0 2px 12px rgba(0,0,0,.8);opacity:0;transition:opacity .5s;
+    pointer-events:none;z-index:40;letter-spacing:1px;}
+  #sayilar{position:fixed;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
+  .sy{position:absolute;font-weight:900;transform:translate(-50%,-50%);white-space:nowrap;
+    text-shadow:0 1px 4px rgba(0,0,0,.85);will-change:transform,opacity;}
+  .syN{color:#f1f4f8;font-size:13px;}
+  .syK{color:#ffd23e;font-size:18px;-webkit-text-stroke:.6px #7a4b00;}
+  .syH{color:#ff6e63;font-size:13px;}
+  .syI{color:#7dde8a;font-size:13px;}
+  .syB{color:#9fd4ff;font-size:12px;letter-spacing:1px;}
+  #sekmeler{display:flex;gap:4px;padding:0 10px 8px;overflow-x:auto;scrollbar-width:none;}
+  #sekmeler::-webkit-scrollbar{display:none;}
+  .sekme{flex:0 0 auto;padding:7px 13px;border-radius:9px 9px 0 0;border:1px solid #4a3f26;
+    border-bottom:none;background:rgba(26,22,14,.85);color:#9a8a60;
+    font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .sekme.aktif{background:linear-gradient(180deg,#3a2f1a,#241e10);color:#e8c46a;border-color:#8a7440;}
+  #panelIc{flex:1;overflow-y:auto;padding:12px;border-top:1px solid #4a3f26;}
+  .yakinda{color:#7a6f52;text-align:center;margin-top:60px;font-size:14px;font-style:italic;}
+  /* item kartları (referans stil) */
+  #envGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:420px;margin:0 auto;}
+  .itemKart{background:linear-gradient(180deg,#131a28,#0d1320);border:1.5px solid #2a3a55;
+    border-radius:10px;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 3px 12px rgba(0,0,0,.55);}
+  .itemGorsel{height:92px;display:flex;align-items:center;justify-content:center;
+    font-size:56px;background:radial-gradient(circle at 50% 38%,#232e46,#0b101c 78%);
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.55));text-shadow:0 0 18px rgba(224,196,120,.35);}
+  .itemAd{display:flex;align-items:center;gap:6px;padding:6px 9px 2px;
+    color:#e8e2d0;font-size:13px;font-weight:800;}
+  .nadirlik{padding:1px 9px 4px;font-size:10px;font-weight:800;letter-spacing:1.2px;}
+  .nadirlik.taban{color:#9aa4ad;}
+  .itemStat{display:flex;align-items:baseline;gap:6px;padding:3px 9px 0;}
+  .itemStat b{color:#fff;font-size:21px;font-weight:900;}
+  .itemStat span{color:#c8b88a;font-size:11px;font-style:italic;}
+  .itemSatir{padding:2px 9px;color:#7fa8d8;font-size:10.5px;line-height:1.35;}
+  .itemSoz{padding:4px 9px 8px;color:#6f8a5f;font-size:10px;font-style:italic;}
+  .bosKart{background:rgba(16,20,14,.7);border:1px dashed #3d3categorized522;border:1px dashed #4a3f26;
+    border-radius:10px;min-height:120px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:5px;}
+  .bosAd{color:#8a7d58;font-size:12px;font-weight:700;}
+  .bosNot{color:#5d543c;font-size:10px;font-style:italic;}
+  @keyframes artiNabiz{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.12)}}
+  /* yükleme perdesi */
+  #perde{position:fixed;inset:0;background:#141c10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;z-index:20;color:#e8d9a8;}
+  #perde h1{margin:0;font-size:22px;font-weight:700;letter-spacing:1px;}
+  #yukCubukKutu{width:220px;height:8px;background:#28321f;border-radius:5px;overflow:hidden;}
+  #yukCubuk{height:100%;width:0%;background:#d6b25e;border-radius:5px;transition:width .2s;}
+  #yukYazi{font-size:12px;opacity:.7;}
+  /* ölüm perdesi */
+  #olum{position:fixed;inset:0;background:rgba(10,6,4,.82);display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:20px;z-index:15;color:#e8c9a8;}
+  #olum h2{margin:0;font-size:26px;letter-spacing:1px;}
+  #olum .oz{font-size:14px;opacity:.8;}
+  #tekrar{background:linear-gradient(180deg,#d6b25e,#a37f2e);color:#241a08;border:none;
+    border-radius:12px;padding:14px 42px;font-size:17px;font-weight:700;letter-spacing:.5px;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);}
+  #tekrar:active{transform:scale(.96);}
+/* ═══ C-paketi: Mobil Savaş UX Revizyonu (p158) ═══ */
+.kartIkon{width:46px;height:46px;}
+.barKutu{height:16px;}
+.barYazi{font-size:11px;letter-spacing:.2px;}
+.skillKutu{width:18px;height:18px;opacity:.78;}                 /* ikincil önem */
+.sevYazi{left:38px;}
+.ultiBtn{width:50px;height:50px;top:-56px;left:calc(50% + 40px);border-width:3px;}
+.ultiBtn svg{width:26px;height:26px;}
+.artiBtn{left:calc(50% - 30px);top:-50px;}                      /* ulti ile çakışma yapısal olarak bitti */
+.kart.olu{filter:grayscale(1) brightness(.62);border-color:#8a2a20;
+    box-shadow:inset 0 0 0 1px rgba(200,60,40,.5), 0 2px 6px rgba(0,0,0,.5);}
+.kart.olu::after{content:'✝';position:absolute;right:5px;top:2px;font-size:15px;
+    color:#ff9a86;text-shadow:0 1px 2px #000;}
+#menuIzgara{position:fixed;right:58px;top:20%;z-index:23;display:none;
+    grid-template-columns:repeat(2,56px);gap:10px;padding:12px;
+    background:rgba(14,11,6,.96);border:1px solid #6b5426;border-radius:14px;
+    box-shadow:0 6px 24px rgba(0,0,0,.6);}
+#menuIzgara.acik{display:grid;}
+#menuIzgara .rayBtn{width:56px;height:56px;}
+#expKutu{padding:3px 8px;gap:2px;opacity:.92;}
+#expKutu #expSv{font-size:10px;}
+#expBarKutu{height:5px;width:84px;}
+#ust .rozet{font-size:10.5px;padding:3px 8px;}
+#hizliOrs{left:0;right:0;bottom:0;border-radius:16px 16px 0 0;z-index:30;
+    max-height:46vh;overflow-y:auto;border-bottom:none;
+    padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px);
+    box-shadow:0 -6px 24px rgba(0,0,0,.55);}                    /* C7: bottom-sheet */
+#orsAc{bottom:128px;}
+#kahramanHud{gap:7px;}
+
+/* ═══ D-paketi: dar ekran çakışma düzeltmesi ═══
+   C-paketi mobil revizyonu geniş ekrana göre ayarlanmıştı; 375–460px
+   arasında iki yapısal çakışma üretiyordu. Ölçülen değerler 375×812'de:
+
+   1) ÜST ŞERİT — #expKutu (x 12→116, position:fixed/left) ile
+      .rozetKutu (x 74→172, #ust içinde ortalanmış) 42px üst üste
+      biniyordu. İkisi birbirinden habersiz yerleşiyor: biri sol kenara
+      sabit, öteki tam genişlikte ortalanmış. Bölüm yazısı seviye
+      kutusunun altında kalıyordu.
+      Çözüm: #ust soldan seviye kutusu kadar pay ayırır; içeriğini
+      KALAN alanda ortalar. Geniş ekranda görünüm eskisi gibi kalır.
+
+   2) KAHRAMAN KARTI — kart 86px, ama .kartIkon 46px + boşluk + iç
+      kenar 66px'i yiyordu; .barlar'a 18px kalıyordu. "170/170" yazısı
+      16px kutuya sıkışıp okunmaz oluyor, .skillSira 18px içinde üç
+      adet 18px kutu tutmaya çalışıyordu. .sevYazi rozeti de ikonun
+      üstüne biniyordu.
+      Çözüm: kart flex→grid. İkon iki bar satırını kaplar, skill sırası
+      KENDİ satırına inip tam genişliği kullanır. Yerleşim konsept
+      maketiyle aynı: küçük portre solda, barlar sağda, skiller altta. */
+
+#ust{
+  padding-left:min(126px, 34vw); padding-right:12px; box-sizing:border-box;
+  gap:6px; align-items:flex-start;
+}
+#expKutu{ max-width:114px; }
+
+.kart{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:3px 5px;
+  padding:5px 6px;
+}
+.kartIkon{ width:30px; height:30px; grid-row:1 / span 2; }
+.barlar{ display:contents; }                    /* çocuklar doğrudan grid'e */
+.skillSira{ grid-column:1 / -1; margin-top:1px; gap:3px; justify-content:space-between; }
+.barKutu{ height:14px; }
+.barYazi{ font-size:clamp(7px, 1.95vw, 11px); letter-spacing:0; }
+     /* Sabit punto dar ekranda tasiyordu ("260/260" 32px > kutu 29px).
+        Kart genisligi viewport ile olcekleniyor, yazi da olcekleniyor. */
+.skillKutu{ width:19px; height:19px; }
+.sevYazi{ left:-2px; top:-12px; }   /* kart köşesine asılı rozet (konsept maketiyle aynı) */
+
+/* ≤374px (iPhone SE ve dar Androidler): kart daralıyor, 32px ikon
+   tek başına içeriğin yarısını yiyor ve bar 21px'e iniyor — "260/260"
+   hiçbir puntoda sığmıyor. Seviye kutusu da bölüm rozetine yeniden
+   biniyor. Bu eşikte ikon küçülür, üst pay oranı artar. */
+@media (max-width: 374px){
+  #ust{ padding-left:min(126px, 36vw); padding-right:8px; }
+  #expKutu{ max-width:96px; }
+  #expBarKutu{ width:68px; }
+  #ust .rozet{ font-size:9.5px; padding:3px 6px; }
+  .kartIkon{ width:22px; height:22px; }
+  .skillKutu{ width:17px; height:17px; }
+  #kahramanHud{ gap:5px; }
+}
+
+/* ═══ E-paketi: örs yerleşimi + kahraman paneli başlığı ═══ */
+
+/* ÖRS — C-paketi bunu bottom:0 tam genişlik bottom-sheet yapmıştı; 46vh
+   yüksekliğiyle 494→915 aralığını kaplıyor, altındaki kahraman kartlarını
+   (833→905) VE kendi aç/kapa düğmesini (745→787) örtüyordu. Düğme örtülünce
+   paneli kapatmanın yolu kalmıyordu.
+   Çözüm: panel kartların üstünde biten yüzen bir kart olur; ayrıca kendi
+   kapatma düğmesini taşır (#hoKapat). */
+#hizliOrs{
+  left:8px; right:8px;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 92px);   /* kart yüksekliği 72 + 10 alt + 10 pay */
+  border-radius:16px;
+  max-height:42vh;
+  padding:10px 12px 12px;
+  border-bottom:1px solid #4a4432;
+  box-shadow:0 8px 28px rgba(0,0,0,.66);
+}
+#hoKapat{
+  position:absolute; right:8px; top:8px; z-index:2;
+  width:30px; height:30px; border-radius:9px;
+  border:1px solid #6b5426; background:rgba(30,25,14,.94);
+  color:#e8c46a; font-size:15px; font-weight:800; line-height:1;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+#hoKahraman{ padding-right:36px; }        /* kapatma düğmesine yer aç */
+body.ors-acik #orsAc{ display:none; }     /* panelin kendi ✕'i var; düğme açıkken
+                                             son ekipman yuvasını örtüyordu */
+
+/* KAHRAMAN PANELİ BAŞLIĞI — tek satırda ikon(44)+ad+seçici(215)+dil(34)+✕(30)
+   ve boşluklar 410px istiyordu; panel 284px. Sonuç: seçici 67px, dil 111px,
+   ✕ ise 157px panel dışında kalıyordu ve overflow:hidden yüzünden kapatma
+   düğmesi hiç görünmüyordu.
+   Çözüm: başlık sarmalanır, kahraman seçici KENDİ satırına iner. */
+#panelBas{ flex-wrap:wrap; row-gap:6px; }
+#panelAd{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#panelIkon, #dilBtn, #panelX{ flex:0 0 auto; }
+#pKhSec{
+  order:10; flex:1 0 100%; margin-left:0;
+  overflow-x:auto; scrollbar-width:none; padding-bottom:2px;
+}
+#pKhSec::-webkit-scrollbar{ display:none; }
+
+/* Dar ekranda panel kenar boşluğu 64px'ti — 412px cihazda panele yalnız
+   284px kalıyordu. Kenarlar daraltılıp okunur genişlik kazanılır. */
+@media (max-width: 480px){
+  /* Kenar 64px çok genişti (412px cihazda panele 284px kalıyordu), 12px ise
+     ekranı neredeyse tamamen kapladı. 26px ortası: okunur genişlik, arkadaki
+     savaş görünür kalır.
+     Yükseklik de sabit top/bottom ile 646px'e geriliyordu; içeriğin 196px'i
+     boştu. bottom:auto + max-height ile panel İÇERİĞİ KADAR uzar, tavanı
+     aşınca #panelIc kendi içinde kayar. */
+  #panel{
+    left:26px; right:26px;
+    bottom:auto;
+    max-height:min(62vh, calc(100vh - 13% - 150px));
+  }
+  #dilBtn{ width:40px; height:34px; font-size:12px; margin-right:2px; }
+  #panelX{ width:34px; height:34px; font-size:17px; }
+  #panelIkon{ width:36px; height:36px; }
+  #panelAd{ font-size:16px; }
+}
+
+/* Kahraman paneli MODAL'dır (arkasında #panelArka perdesi var) ama katman
+   sırası tersti: raylar z22, örs z30, menü ızgarası z23 — hepsi panelin
+   z21'inin ÜSTÜNDE. 64px kenar boşluğu bu yüzden vardı: panel raylardan
+   kaçınıyordu. Kenarlar daralınca çakışma görünür oldu.
+   Doğrusu modalın hepsinin üstünde olması; kenar payı da böylece serbest
+   kalır. Perde tıklamayı yutar, raylar panel açıkken erişilemez olur. */
+#panelArka{ z-index:32; }
+#panel{ z-index:33; }
+
+/* ═══ F-paketi: kahraman geçişi alt kartlardan ═══
+   Başlıktaki kahraman seçici (#pKhSec) kaldırıldı — kullanıcı kararı.
+   Geçiş artık alttaki kahraman kartlarına basarak yapılır; kartların
+   zaten panelAc(KIMLER[i]) çağıran tıklama işleyicisi vardı.
+   Bunun çalışması için kartların modal perdesinin (z32) ÜSTÜNDE
+   kalması gerekir, yoksa tıklama perdeye gidip paneli kapatır. */
+#pKhSec{ display:none; }
+body:has(#panel.acik) #kahramanHud{ z-index:34; }
+
+/* Panelde açık olan kahramanın kartı işaretlenir. */
+.kart.panelde{
+  border-color:#ffd95e;
+  box-shadow:inset 0 0 0 1px rgba(255,217,94,.55),
+             inset 0 1px 0 rgba(255,240,190,.20),
+             0 0 0 2px rgba(255,217,94,.42),
+             0 3px 12px rgba(0,0,0,.62);
+}
+
+/* ═══ G-paketi: kahraman kartı sadeleştirmesi ═══
+   Can ve ulti barları karakterlerin BAŞ ÜSTÜNE taşındı (kullanıcı kararı).
+   Kartta dört kahraman × iki bar × iki sayı vardı; 86px genişlikte bu
+   okunmaz bir yığındı. Kartta artık yalnız KİMLİK ve EYLEM kalır:
+   portre, seviye rozeti, skill yuvaları. Durum bilgisi sahnededir. */
+.kart{
+  grid-template-columns:minmax(0,1fr);
+  justify-items:center;
+  gap:4px;
+  padding:6px 6px 5px;
+}
+.kartIkon{ grid-row:1; grid-column:1; width:38px; height:38px; }
+.barKutu{ display:none; }                  /* can + ulti artık sahnede */
+.skillSira{ grid-row:2; grid-column:1; width:100%; margin-top:0; }
+.sevYazi{ left:2px; top:-10px; }

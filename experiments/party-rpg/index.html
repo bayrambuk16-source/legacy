@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Legacy">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0d08">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Legacy 3D — P2</title>
+<link rel="stylesheet" href="./styles/hud.css">
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="sahne"></div>
+<div id="expKutu"><b id="expSv">Seviye 1</b><div id="expBarKutu"><div id="expBar"></div></div></div>
+<div id="ust"><div class="rozetKutu"><div class="rozet" id="rozet">1-1 · 0/20</div><div id="serit"><i></i><i></i><i></i><i></i><i></i><b>☠</b><s id="seritBar"></s></div></div><div class="rozet" id="gucRozet">⚔</div><div class="rozet" id="altinRozet">🪙 0</div></div>
+<div id="bossBar"><b id="bossAd"></b><div id="bossBarKutu"><div id="bossBarIc"></div></div></div>
+<div id="bossGiris"></div>
+<div id="duyuru"></div>
+<div id="sayilar"></div>
+<div id="panelArka"></div>
+<div id="vinyet"></div>
+<button id="orsAc"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#e3c06a" d="M2.5 7h12.8c3.2 0 5.3-1 6.7-2.7v3.2c-1.5 1.5-3.4 2.3-5.8 2.4v2.7h2.5v2.5h3v3.4H4.3v-3.4h3v-2.5H9.8V9.9H6.2C4 9.9 2.5 8.8 2.5 7z"/><path fill="#8a6a2c" d="M4.3 18.5h16.4v2.6H4.3z"/></svg></button>
+<div id="solRay">
+  <button class="rayBtn" data-p="dukkan"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#8a6a2c" d="M12 2c1 3-3 4.5-3 8 0 1.6.8 2.8 1.8 3.6C10.3 12 11 10.6 12 9.6c2.6 1.8 4 4 4 6 0 3.4-2.2 5.4-4 5.4s-6-1.6-6-6.4C6 9 10.5 6.8 12 2z"/><path fill="#e3c06a" d="M12 9.6c2.6 1.8 4 4 4 6 0 3.4-2.2 5.4-4 5.4-1.4 0-3-1.3-3-3.6 0-2.5 1.6-4.6 3-7.8z"/></svg></button>
+  <button class="rayBtn" data-p="takimdepo"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#8a6a2c" d="M3 8l9-4 9 4v9l-9 4-9-4V8z"/><path fill="#e3c06a" d="M3 8l9 4 9-4-9-4-9 4z"/><path fill="#5d4a1e" d="M12 12v9l9-4V8l-9 4z"/><rect x="10.6" y="10.6" width="2.8" height="4.4" rx="0.5" fill="#e3c06a"/></svg></button>
+  <button class="rayBtn" data-p="klan"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#8a6a2c" d="M3 21V8h4V4h3.2v4h3.6V4H17v4h4v13H3z"/><path fill="#e3c06a" d="M3 8h18v3.4H3z"/><path fill="#241c0c" d="M9.6 21v-5.2c0-1.4 1-2.4 2.4-2.4s2.4 1 2.4 2.4V21H9.6z"/></svg></button>
+  <button class="ozelRay" id="autoBtn" title="AUTO"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="none" stroke="#e3c06a" stroke-width="2.4" d="M20 12a8 8 0 11-2.4-5.7"/><path fill="#e3c06a" d="M20.5 2.5v6h-6z"/><text x="12" y="15.5" font-size="9" font-weight="800" fill="#e3c06a" text-anchor="middle">A</text></svg></button>
+  <button class="ozelRay" id="durusBtn" title="Duruş"></button>
+  <button class="rayBtn" data-p="arena"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#e3c06a" d="M5 3l8.5 8.5-1.8 1.8L3.2 4.8 3 3h2z"/><path fill="#e3c06a" d="M19 3h2l-.2 1.8-8.5 8.5-1.8-1.8L19 3z"/><path fill="#8a6a2c" d="M7.6 14.6l1.8 1.8-3 3L8 21l-2-.4L4.4 19l-.4-2 1.6 1.6 2-2-1.6-1.6 1.6-.4zM16.4 14.6l1.6.4L16.4 16.6l2 2L20 17l-.4 2-1.6 1.6-2 .4 1.6-1.6-3-3 1.8-1.8z"/></svg></button>
+</div>
+<div id="sagRay">
+  <button class="ozelRay" id="menuBtn" title="Menü"><svg viewBox="0 0 24 24" width="22" height="22"><g fill="#e3c06a"><rect x="4" y="5" width="16" height="2.6" rx="1.3"/><rect x="4" y="10.7" width="16" height="2.6" rx="1.3"/><rect x="4" y="16.4" width="16" height="2.6" rx="1.3"/></g></svg></button>
+  <button class="rayBtn" data-p="nitelikler"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="4" y="12" width="4" height="8" rx="1" fill="#8a6a2c"/><rect x="10" y="7" width="4" height="13" rx="1" fill="#e3c06a"/><rect x="16" y="10" width="4" height="10" rx="1" fill="#8a6a2c"/></svg></button>
+  <button class="rayBtn" data-p="basarimlar"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#e3c06a" d="M7 4h10v3c0 3.5-2 6.5-5 6.5S7 10.5 7 7V4z"/><path fill="#8a6a2c" d="M7 5H4c0 3 1.5 5 4 5.4M17 5h3c0 3-1.5 5-4 5.4"/><path fill="#8a6a2c" d="M11 13h2v3h-2z"/><path fill="#e3c06a" d="M8 18h8v2.5H8z"/><rect x="9.5" y="16" width="5" height="2.4" fill="#8a6a2c"/></svg></button>
+  <button class="rayBtn" data-p="zindan"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="6" cy="12" r="3.4" fill="none" stroke="#e3c06a" stroke-width="2.4"/><rect x="9" y="10.8" width="12.5" height="2.4" rx="1" fill="#e3c06a"/><rect x="15.5" y="13" width="2.2" height="3.6" rx="0.7" fill="#8a6a2c"/><rect x="19.3" y="13" width="2.2" height="4.6" rx="0.7" fill="#8a6a2c"/></svg></button>
+  <button class="rayBtn" data-p="ayarlar"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g fill="#8a6a2c"><rect x="10.6" y="2" width="2.8" height="5" rx="1"/><rect x="10.6" y="17" width="2.8" height="5" rx="1"/><rect x="2" y="10.6" width="5" height="2.8" rx="1"/><rect x="17" y="10.6" width="5" height="2.8" rx="1"/><rect x="4.2" y="4.2" width="4.4" height="2.8" rx="1" transform="rotate(45 6.4 5.6)"/><rect x="15.4" y="4.2" width="4.4" height="2.8" rx="1" transform="rotate(-45 17.6 5.6)"/><rect x="4.2" y="17" width="4.4" height="2.8" rx="1" transform="rotate(-45 6.4 18.4)"/><rect x="15.4" y="17" width="4.4" height="2.8" rx="1" transform="rotate(45 17.6 18.4)"/></g><circle cx="12" cy="12" r="5.4" fill="#e3c06a"/><circle cx="12" cy="12" r="2.4" fill="#241c0c"/></svg></button>
+</div>
+<div id="menuIzgara"></div>
+<div id="hizliOrs" style="display:none">
+  <button id="hoKapat" aria-label="Kapat">✕</button>
+  <div id="hoKahraman"></div>
+  <div id="hoItemler"></div>
+  <div id="hoOnizleme"></div>
+  <div id="hoBar"><div id="hoYesil"></div><div id="hoIbre"></div></div>
+</div>
+<div id="slotEkran" style="display:none">
+  <div id="slotBaslik">PROJECT LEGACY</div>
+  <div id="slotListe"></div>
+</div>
+<div id="panel">
+  <div id="panelBas">
+    <img id="panelIkon" src="" alt="">
+    <b id="panelAd"></b>
+    <span id="pKhSec"></span>
+    <button id="dilBtn">EN</button>
+    <button id="panelX">✕</button>
+  </div>
+  <div id="sekmeler">
+    <div class="sekme aktif" data-s="envanter">Ekipman</div>
+    <div class="sekme" data-s="depo">Depo</div>
+    <div class="sekme" data-s="skiller">Skiller</div>
+    <div class="sekme" data-s="nitelikler">Nitelikler</div>
+    <div class="sekme" data-s="yukseltme">Yükseltme</div>
+    <div class="sekme" data-s="basarimlar">Başarımlar</div>
+    <div class="sekme" data-s="dukkan">Dükkân</div>
+  </div>
+  <div id="panelIc"></div>
+</div>
+<div id="kahramanHud">
+  <div class="kart">
+    <img class="kartIkon" src="../../public/assets/party/portraits/okcu.svg" alt=""><b class="sevYazi">1</b><button class="artiBtn" data-kim="okcu">+</button><button class="ultiBtn" data-kim="okcu"><svg viewBox="0 0 24 24" width="17" height="17"><path fill="#241c08" d="M13.5 2L6 13h4.4L9 22l8.6-12h-4.8L15.5 2h-2z"/></svg></button>
+    <div class="barlar">
+      <div class="barKutu"><div class="bar can" id="okCan"></div><b class="barYazi" id="okCanY"></b></div>
+      <div class="barKutu"><div class="bar sarj" id="okSarj"></div><b class="barYazi" id="okSarjY"></b></div>
+      <div class="skillSira">
+        <div class="skillKutu kilitli" data-kim="okcu" data-s="1"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M20 4l-2 7-2.4-2.4L7 17.2 4.8 15l8.6-8.6L11 4l7-2 2 2z"/><path fill="#8a6a2c" d="M6.5 15.1l2.4 2.4L5 21l-2-2 3.5-3.9z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="okcu" data-s="2"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#8a6a2c" stroke-width="2.4"/><circle cx="12" cy="12" r="4.6" fill="none" stroke="#e3c06a" stroke-width="2.4"/><circle cx="12" cy="12" r="1.7" fill="#e3c06a"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="okcu" data-s="3"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M7 4a5 5 0 019.6 1.4A4 4 0 0116.5 13H7a4.5 4.5 0 010-9z"/><path fill="#8a6a2c" d="M8 15l-1.6 5 2 .6L10 15.6 8 15zm4.6 0l-1.6 5 2 .6 1.6-5-2-.6zm4.6 0l-1.6 5 2 .6 1.6-5-2-.6z"/></svg></span><b class="cdYazi"></b></div>
+      </div>
+    </div>
+  </div>
+  <div class="kart">
+    <img class="kartIkon" src="../../public/assets/party/portraits/brute.svg" alt=""><b class="sevYazi">1</b><button class="artiBtn" data-kim="brute">+</button><button class="ultiBtn" data-kim="brute"><svg viewBox="0 0 24 24" width="17" height="17"><path fill="#241c08" d="M13.5 2L6 13h4.4L9 22l8.6-12h-4.8L15.5 2h-2z"/></svg></button>
+    <div class="barlar">
+      <div class="barKutu"><div class="bar can" id="brCan"></div><b class="barYazi" id="brCanY"></b></div>
+      <div class="barKutu"><div class="bar sarj" id="brSarj"></div><b class="barYazi" id="brSarjY"></b></div>
+      <div class="skillSira">
+        <div class="skillKutu kilitli" data-kim="brute" data-s="1"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M12 2l2.2 5.4L20 5.2l-3.2 4.9L22 12l-5.2 1.9L20 18.8l-5.8-2.2L12 22l-2.2-5.4L4 18.8l3.2-4.9L2 12l5.2-1.9L4 5.2l5.8 2.2L12 2z"/><circle cx="12" cy="12" r="3" fill="#8a6a2c"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="brute" data-s="2"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#8a6a2c" d="M9 2h4v9.5l5.5 4.2-1.8 2.6L11 14V2z" transform="rotate(14 12 12)"/><path fill="#e3c06a" d="M5 17h9.5l3.5 3v2H5a2 2 0 01-2-2v-1a2 2 0 012-2z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="brute" data-s="3"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M3 10l11-5v14L3 14v-4z"/><path fill="#8a6a2c" d="M14 6.5c4 .8 6.5 3 6.5 5.5S18 16.7 14 17.5v-11z"/><rect x="3" y="14.5" width="3.4" height="6" rx="1.2" fill="#8a6a2c"/></svg></span><b class="cdYazi"></b></div>
+      </div>
+    </div>
+  </div>
+  <div class="kart">
+    <img class="kartIkon" src="../../public/assets/party/portraits/mage.svg" alt=""><b class="sevYazi">1</b><button class="artiBtn" data-kim="mage">+</button><button class="ultiBtn" data-kim="mage"><svg viewBox="0 0 24 24" width="17" height="17"><path fill="#241c08" d="M13.5 2L6 13h4.4L9 22l8.6-12h-4.8L15.5 2h-2z"/></svg></button>
+    <div class="barlar">
+      <div class="barKutu"><div class="bar can" id="mgCan"></div><b class="barYazi" id="mgCanY"></b></div>
+      <div class="barKutu"><div class="bar sarj" id="mgSarj"></div><b class="barYazi" id="mgSarjY"></b></div>
+      <div class="skillSira">
+        <div class="skillKutu kilitli" data-kim="mage" data-s="1"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><circle cx="8" cy="16" r="5.4" fill="#e3c06a"/><path fill="#8a6a2c" d="M11.5 12.5L22 2c-1.2 5-3.6 9.3-7.4 12.2l-3.1-1.7z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="mage" data-s="2"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M13.5 2L6 13h4.4L9 22l8.6-12h-4.8L15.5 2h-2z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="mage" data-s="3"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><g stroke="#e3c06a" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/></g><circle cx="12" cy="12" r="2.2" fill="#8a6a2c"/></svg></span><b class="cdYazi"></b></div>
+      </div>
+    </div>
+  </div>
+  <div class="kart">
+    <img class="kartIkon" src="../../public/assets/party/portraits/priest.svg" alt=""><b class="sevYazi">1</b><button class="artiBtn" data-kim="priest">+</button><button class="ultiBtn" data-kim="priest"><svg viewBox="0 0 24 24" width="17" height="17"><path fill="#241c08" d="M13.5 2L6 13h4.4L9 22l8.6-12h-4.8L15.5 2h-2z"/></svg></button>
+    <div class="barlar">
+      <div class="barKutu"><div class="bar can" id="prCan"></div><b class="barYazi" id="prCanY"></b></div>
+      <div class="barKutu"><div class="bar sarj" id="prSarj"></div><b class="barYazi" id="prSarjY"></b></div>
+      <div class="skillSira">
+        <div class="skillKutu kilitli" data-kim="priest" data-s="1"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5V3z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="priest" data-s="2"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M4 12c3-1 5-3.5 6-7 1.5 2 4 3.2 7 3-1 2-1 4 .5 6-2.5.3-4.5 1.5-6 3.5C10 14.5 7.5 12.8 4 12z"/><path fill="#8a6a2c" d="M14 15.5c1.8 1.2 3.8 1.7 6 1.5-1.4 1.8-3.2 3-5.4 3.4-.5-1.7-.7-3.3-.6-4.9z"/></svg></span><b class="cdYazi"></b></div>
+        <div class="skillKutu kilitli" data-kim="priest" data-s="3"><span><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#e3c06a" d="M12 2l8 3v6c0 5-3.2 8.8-8 11-4.8-2.2-8-6-8-11V5l8-3z"/><path fill="#8a6a2c" d="M12 4.2l6 2.2v4.8c0 3.9-2.4 6.9-6 8.8V4.2z"/></svg></span><b class="cdYazi"></b></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="olum">
+  <h2>Yenildin</h2>
+  <div class="oz" id="olumOz"></div>
+  <button id="tekrar">Tekrar Dene</button>
+</div>
+<div id="perde">
+  <h1>PROJECT LEGACY 3D</h1>
+  <div id="yukCubukKutu"><div id="yukCubuk"></div></div>
+  <div id="yukYazi">Varlıklar yükleniyor…</div>
+</div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>
