@@ -12,7 +12,7 @@ const AYAR = {
   okcuYawEk: 0,          // okçu hedefe bakarken ek dönüş
   mobYawEk: 0,           // tüm moblar için ortak ek dönüş
   mobYaw: {              // tür bazlı ek dönüş (ortak yeterli gelmezse)
-    goblin:0, kecoon:0, crab:0, monsterx:0, mutant:0, rhino:0, spike:0
+    goblin:0, kecoon:0, crab:0, monsterx:0, mutant:0, rhino:0, spike:0, ork:0
   }
 };
 
@@ -103,21 +103,30 @@ const TURLER = {
   monsterx:{olc:1.00, can:75,  hiz:2.0, vurus:9,  yuru:'03_WALK', vur:'05_ATTACK_1', olum:'12_DEATH'},
   spike:   {olc:0.85, can:95,  hiz:1.7, vurus:11, yuru:'03_WALK', vur:'05_ATTACK_1', olum:'12_DEATH'},
   mutant:  {olc:0.95, can:130, hiz:1.4, vurus:14, yuru:'03_WALK', vur:'05_ATTACK_SWIPE', olum:'08_DEATH'},
-  rhino:   {olc:0.80, can:170, hiz:1.2, vurus:17, yuru:'03_WALK', vur:'05_ATTACK_1', olum:'12_DEATH'}
+  rhino:   {olc:0.80, can:170, hiz:1.2, vurus:17, yuru:'03_WALK', vur:'05_ATTACK_1', olum:'12_DEATH'},
+  /* Ork: Meshy rig + kendi animasyonlari. Model 2.0 birim; olc 1.30 ile ekranda
+     2.60 oluyor — rhino'nun 2.15'inden belirgin iri, kadronun en heybetlisi
+     (kullanici istegi). Boy denk gelsin isterseniz 1.07'ye donun. */
+  ork:     {olc:1.30, can:140, hiz:1.5, vurus:15, yuru:'03_WALK', vur:'05_ATTACK_1', olum:'12_DEATH'}
 };
-const TUR_SIRA = ['goblin','kecoon','crab','monsterx','spike','mutant','rhino'];
+/* Ork istilasi konsepti: crab/monsterx/mutant kadrodan cikti (siluet konsepte
+   uymuyordu). Tanimlari ve ozel mekanikleri kodda DURUYOR — dogmadiklari icin
+   tetiklenmiyorlar, geri almak tek satir. */
+const TUR_SIRA = ['goblin','kecoon','spike','rhino','ork'];
 /* ═══ ENCOUNTER DIRECTOR: her bölüm tasarlanmış bir savaş ═══
    ana = bölgenin imza mobu (bölgeyle döner), iki = yardımcısı */
-function anaTur(){ return TUR_SIRA[(D.bolge-1) % 7]; }
-function bossTur(n){ return TUR_SIRA[((D.bolge-1)+(n||0)) % 7]; }   /* ENC-3: boss = bölge imzası */
-function ikiTur(){ return TUR_SIRA[D.bolge % 7]; }
+/* Modulo TUR_SIRA.length'e bagli: kadro degisince (tur eklenince/cikinca)
+   sabit 7 undefined indeks dondurup mobDogur'u cokertiyordu. */
+function anaTur(){ return TUR_SIRA[(D.bolge-1) % TUR_SIRA.length]; }
+function bossTur(n){ return TUR_SIRA[((D.bolge-1)+(n||0)) % TUR_SIRA.length]; }   /* ENC-3: boss = bölge imzası */
+function ikiTur(){ return TUR_SIRA[D.bolge % TUR_SIRA.length]; }
 const ENC_SABLON = [
   null,
   {ana:70, iki:20, goblin:10},                             /* B1 Tanışma */
   {goblin:45, kecoon:35, ana:20},                          /* B2 Sürü Baskını — frenzy sahnesi */
-  {crab:30, spike:35, rhino:15, ana:20},                   /* B3 Zırhlı Hat — ön zırh + arka diken */
-  {rhino:35, mutant:35, ana:20, spike:10},                 /* B4 Ağır Baskı — az ama tok */
-  {ana:30, mutant:25, rhino:20, spike:15, goblin:10}       /* B5 Muhafız Eskortu — boss hazırlığı */
+  {ork:30, spike:35, rhino:15, ana:20},                    /* B3 Zırhlı Hat — ön zırh (crab yerine ork) + arka diken */
+  {rhino:35, ork:35, ana:20, spike:10},                    /* B4 Ağır Baskı — az ama tok (mutant yerine ork) */
+  {ana:30, ork:25, rhino:20, spike:15, goblin:10}          /* B5 Muhafız Eskortu — boss hazırlığı */
 ];
 function encounterSec(){
   if(D.zindan) return TUR_SIRA[Math.random()*TUR_SIRA.length|0];   /* zindanlar serbest karışım */
@@ -604,7 +613,9 @@ function temaSur(){
 
 /* ═══════════ VARLIK YÜKLEME ═══════════ */
 /* Modeller ../../public/assets/party/models/ altinda .gltf olarak durur (kendi kendine yeterli). */
-const VARLIK = ['okcu','ok','goblin','kecoon','crab','monsterx','spike','mutant','rhino','brute','mage','priest'];
+/* Kadro disi turler (crab/monsterx/mutant) yuklenmiyor — ~2.4 MB indirme tasarrufu.
+   Dosyalari public/assets/party/models/ altinda duruyor, geri almak isim eklemek. */
+const VARLIK = ['okcu','ok','goblin','kecoon','spike','rhino','ork','brute','mage','priest'];
 const loader = new GLTFLoader();
 const yukCubuk = document.getElementById('yukCubuk');
 const yukYazi = document.getElementById('yukYazi');
@@ -808,7 +819,7 @@ const DIL = {
   encAd: ['Tanışma','Sürü Baskını','Zırhlı Hat','Ağır Baskı','Muhafız Eskortu'],
   durusAd: {normal:'Dengeli Duruş', saldirgan:'Saldırgan Duruş', savunmaci:'Savunmacı Duruş'},
   bossTur: {goblin:'Sürü Kralı', kecoon:'Gölge Sıçrayan', crab:'Kadim Kabuk', monsterx:'Kararsız Dev',
-            spike:'Diken Ana', mutant:'Kadim Öfke', rhino:'Demir Boynuz'},
+            spike:'Diken Ana', mutant:'Kadim Öfke', rhino:'Demir Boynuz', ork:'Ork Reisi'},
      oto:{dur:'OTO durdu — düşme!', esit:'⚖ Eşit', odak:'🎯 Odak'},
      skillAd:{okcu:['Delici Ok','Şarjlı Atış','Ok Yağmuru','Çoklu Atış','Zehirli Ok','Sakatlayan Ok','Keskin Nişancı','Geri Takla','Yaylım'],
               brute:['Sıçrama','Savurma Tekmesi','Savaş Narası','Yatay Biçme','Yıkıcı Darbe','Kasırga','Kombo Zinciri','Kalkan Duvarı','Yere Vuruş'],
@@ -905,7 +916,7 @@ const DIL = {
   encAd: ['First Contact','Swarm Raid','Armored Line','Heavy Pressure','Guard Escort'],
   durusAd: {normal:'Balanced Stance', saldirgan:'Aggressive Stance', savunmaci:'Defensive Stance'},
   bossTur: {goblin:'Swarm King', kecoon:'Shadow Pouncer', crab:'Ancient Shell', monsterx:'Unstable Colossus',
-            spike:'Thorn Mother', mutant:'Elder Wrath', rhino:'Iron Horn'},
+            spike:'Thorn Mother', mutant:'Elder Wrath', rhino:'Iron Horn', ork:'Orc Chieftain'},
      oto:{dur:'AUTO stopped — downgrade!', esit:'⚖ Even', odak:'🎯 Focus'},
      skillAd:{okcu:['Piercing Arrow','Charged Shot','Arrow Rain','Multishot','Venom Arrow','Crippling Shot','Deadeye','Disengage','Volley'],
               brute:['Leap','Sweeping Kick','Battle Cry','Cleave Swing','Crushing Blow','Whirlwind','Combo Chain','Shield Wall','Ground Thump'],
@@ -5668,7 +5679,7 @@ if(new URLSearchParams(location.search).has('dbg')){
       get MAGE_CAN(){ return MAGE_CAN; }, get PRIEST_CAN(){ return PRIEST_CAN; },
       DIRILME_SN, DOGUM_ARALIK, AZAMI_MOB, VUR_MESAFE, HIZ,
       TURLER, TUR_SIRA, ENC_SABLON, BASMA, BASMA_MAX, OCAK_TABLO, OCAK_MAX,
-      ITEM_FIYAT, ULTI_ESIK, SILAH2, TABAN_ITEM, KIMLER, SKILL9, DEPO_KAP },
+      ITEM_FIYAT, ULTI_ESIK, SILAH2, TABAN_ITEM, KIMLER, SKILL9, DEPO_KAP, VARLIK },
     /* saf fonksiyonlar */
     fn: { zk, zkBolumBasi, sevEsik, encounterSec, anaTur, ikiTur, bossTur,
       takimGucu, onerilenGuc, bireyselGuc, esyaGucu, nadirlikSec, bossOdul,

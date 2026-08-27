@@ -91,6 +91,42 @@ Headless Chromium sekmeyi görünür sayar, bu yüzden `requestAnimationFrame`
 çalışır ve **gerçek FPS ölçülebilir** — Claude Code'un kendi browser
 paneli gizliyken rAF durur, o yolda FPS ölçümü geçersizdir.
 
+## Model seçimi — göreve göre en hafifi
+
+**Modeli Claude kendisi değiştiremez** — seçim kullanıcıdadır (uygulamanın model
+seçicisi veya `/model`). Bu bölüm hangi işin hangi modele düştüğünü söyler;
+yanlış modeldeysen bunu SÖYLE, sessizce devam etme.
+
+**Sonnet — varsayılan.** Küçük/orta bug fix · UI · CSS/HUD · item-skill-mob
+değer ayarı · yeni basit mob · basit AI davranışı · asset/GLB/texture bağlama ·
+ses · Playwright ve regression testleri · save/load düzeltmesi · küçük
+refactor · tek ya da birkaç dosya · doğrulanmış sistem üzerine geliştirme.
+
+**Opus — yalnız zor problem.** Kök nedeni bilinmeyen runtime bug · uzun süredir
+çözülemeyen hata · çok sistemi etkileyen state problemi · büyük mimari
+değişiklik · kapsamlı refactor · combat AI veya save mimarisi · ciddi
+performans/memory problemi · race condition · çok dosyalı neden-sonuç analizi ·
+Sonnet aynı problemde 2 kez başarısızsa. **Opus çözünce Sonnet'e dön.**
+
+**Fable — yalnız çok uzun, bağımsız ajan görevleri.** Three.js→Godot gibi büyük
+migration · onlarca dosyalık dönüşüm · saatler süren çok aşamalı iş. Tek mob,
+tek skill, test, küçük refactor için KULLANMA.
+
+Yükseltme sırası: Sonnet → (çözemezse analiz et) → Opus → (yalnız gerçekten
+uzun-horizon ise) Fable. **Görev zor GÖRÜNDÜĞÜ için yükseltme.**
+
+**2 deneme kuralı:** Sonnet aynı problemi iki kontrollü denemede çözemezse aynı
+düzeltmeyi tekrarlama — log ve stack trace topla, problem alanını daralt, sonra
+Opus'a çık.
+
+Öncelik sırası: **1) doğruluk · 2) çalışan sistemi bozmamak · 3) az token/kredi ·
+4) kısa süre.**
+
+Örnekler: "Ork okçu ekle" → Sonnet · "HUD kartlarını yeniden düzenle" → Sonnet ·
+"50 maddelik regression koş" → Sonnet · "Boss sonrası kamera bazen bozuluyor,
+neden bilinmiyor" → önce Sonnet, 2 başarısızlıktan sonra Opus · "30 dk sonra
+rastgele AI state bozuluyor" → Opus · "Godot'a taşı" → Fable.
+
 ## Bu proje nedir
 
 Knight Online'dan ilham alan mobil RPG. Aktif geliştirme

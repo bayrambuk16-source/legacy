@@ -16,11 +16,22 @@ test('regression: açılış → savaş → ilerleme → kayıt', async ({ page 
   expect(await page.locator('#sahne canvas').count(), 'canvas yok').toBe(1);
   expect(await page.locator('.slotKart').count(), 'slot ekranı gelmedi').toBe(6);
 
-  const varliklar = await page.evaluate(() => ({
-    model: Object.keys(window.__PARTY.MODEL).length,
-    doku: Object.keys(window.__PARTY.DOKU).length,
-  }));
-  expect(varliklar.model, '12 GLTF modeli yüklenmeli').toBe(12);
+  /* Sabit sayı yerine KADROYA bağlı: mob kadrosu değiştiğinde (tür eklenip
+     çıktığında) test kendiliğinden doğru kalsın, sihirli sayı bakım yükü olmasın. */
+  const varliklar = await page.evaluate(() => {
+    const P = window.__PARTY;
+    const yuklu = Object.keys(P.MODEL);
+    return {
+      yuklu, beyan: P.sabit.VARLIK,
+      eksik: P.sabit.VARLIK.filter((a) => !P.MODEL[a]),
+      modelsizTur: P.sabit.TUR_SIRA.filter((t) => !P.MODEL[t]),
+      statsizTur: P.sabit.TUR_SIRA.filter((t) => !P.sabit.TURLER[t]),
+      doku: Object.keys(P.DOKU).length,
+    };
+  });
+  expect(varliklar.eksik, `yüklenmeyen varlık: ${varliklar.eksik.join(', ')}`).toEqual([]);
+  expect(varliklar.modelsizTur, `modeli olmayan mob türü: ${varliklar.modelsizTur.join(', ')}`).toEqual([]);
+  expect(varliklar.statsizTur, `statı olmayan mob türü: ${varliklar.statsizTur.join(', ')}`).toEqual([]);
   expect(varliklar.doku, '19 VFX dokusu yüklenmeli').toBe(19);
 
   await basla(page, 1);
@@ -32,7 +43,14 @@ test('regression: açılış → savaş → ilerleme → kayıt', async ({ page 
   /* ── combat loop / mob spawn / target selection ── */
   await kos(page, 12);
   m = await olc(page);
-  expect(m.sure, 'oyun döngüsü ilerlemiyor').toBeGreaterThan(5);
+  /* Döngünün İLERLEDİĞİNİ doğrula, HIZINI değil: "12 sn'de en az 5 sn" iddiası
+     makine yükü altında haksız düşüyordu (dt 0.05'te kırpılıyor). FPS ölçümü
+     uzun koşu testinin işi. Burada iki örnek alıp artışa bakmak yeterli. */
+  const sure1 = m.sure;
+  expect(sure1, 'oyun döngüsü hiç ilerlemedi').toBeGreaterThan(1);
+  await kos(page, 2);
+  const sure2 = (await olc(page)).sure;
+  expect(sure2, 'oyun döngüsü durdu').toBeGreaterThan(sure1);
   expect(m.mob, 'mob doğmadı').toBeGreaterThan(0);
   expect(m.mob, 'AZAMI_MOB aşıldı').toBeLessThanOrEqual(12);
 

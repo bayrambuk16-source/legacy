@@ -40,9 +40,10 @@ tuzağa düşüldü (aşağıda "GPU kaynak sızıntısı" maddesi).
 
     index.html        kabuk: head, importmap, HUD markup (140 satır)
     styles/hud.css    tüm arayüz (483 satır, paket paket ekli — aşağıya bak)
-    main.js           oyun kodu, TEK DOSYA (5704 satır, 30 bölüm başlığı taşır)
+    main.js           oyun kodu, TEK DOSYA (5715 satır, 30 bölüm başlığı taşır)
 
-Varlıklar `public/assets/party/`: `models/` 12 .gltf · `vfx/` 19 .png ·
+Varlıklar `public/assets/party/`: `models/` 13 .gltf (10'u yükleniyor —
+bkz. mob kadrosu) · `vfx/` 19 .png ·
 `portraits/` 4 .svg (sınıf ikonları).
 
 ## Neden tek dosya — modül bölmesi YAPILMADI
@@ -78,6 +79,47 @@ refactor (bağımlılık tersine çevirme / paylaşılan bağlam) gerekir.
 
 Doğrulanmış genişlikler: **320 / 345 / 360 / 374 / 375 / 393 / 412 / 430 / 768**
 — çakışma, yazı taşması, yatay kaydırma yok.
+
+## Mob kadrosu — ork istilası (Ağu 2026)
+
+`TUR_SIRA` artık **5 tür**: goblin · kecoon · spike · rhino · **ork**.
+crab / monsterx / mutant konsepte uymadığı için kadrodan ÇIKTI — `TURLER`
+tanımları ve özel mekanikleri kodda DURUYOR, sadece doğmuyorlar. `VARLIK`'tan
+da çıkarıldılar (~2,4 MB daha az indirme); geri almak isim eklemek.
+
+- **`ork.gltf` nasıl üretildi:** Meshy görevi `orc-enemy-3d` → remesh 30k →
+  auto-rig (24 kemik, Mixamo düzeni) → 3 özel animasyon (action_id 4 Attack,
+  8 Dead, 178 Hit_Reaction). Blender'da tek iskelette birleştirildi, klipler
+  oyunun adlarına çevrildi, 7k'ya decimate edildi, doku 512'ye indirildi.
+  Toplam 19 Meshy kredisi.
+- **Doku tonlandı:** doygunluk ×0,62 · parlaklık ×0,80 ("çok parlak" geldi).
+  Bu ayar doku PİKSELLERİ üzerinde yapılır; `baseColorFactor` sadece karartır,
+  doygunluğu almaz.
+- **Ork'un imza boss yeteneği ve giriş jesti YOK.** `bossOzel40` ve
+  `bossGirisJest` else'siz zincir — bilinmeyen tür sessizce atlanır, çökmez.
+- **Kaybolan mekanikler:** crab kabuk zırhı, mutant öfke yığma, monsterx
+  patlaması. Kod duruyor; mutant'ın öfkesi ork berserker'a taşınabilir.
+
+**TUZAK — modulo kadroya bağlı olmalı.** `anaTur`/`bossTur`/`ikiTur` içinde
+modulo SABİT 7 idi. Kadro 5'e inince 5-6. indeks `undefined` dönüp `mobDogur`'u
+çökertiyordu. `% TUR_SIRA.length` yapıldı — kadro artık serbestçe değişir.
+
+**TUZAK — Blender ihracında aksiyon adı çakışması.** Önceki oturumdan kalan
+`03_WALK` gibi adlar `bpy.data.actions`'ta duruyorsa yeni import `03_WALK.001`
+alır ve dosyaya 8 klip gider; oyun `.001` adlarını TANIMAZ. İhraçtan önce
+fake_user dahil TÜM aksiyonları silip taze import et.
+
+**TUZAK — `GLTF_EMBEDDED` artık yok.** Blender 5.2'de kaldırıldı (`GLB` ve
+`GLTF_SEPARATE` kaldı). Oyun gömülü `.gltf` istiyor (blob adresleri
+engellenebiliyor), o yüzden SEPARATE ihraç edilip `.bin` ve doku `data:` URI
+olarak elle gömülüyor. Ayrıca `KHR_materials_specular` / `_ior` uzantıları
+kaldırılmazsa three `MeshPhysicalMaterial` üretir — diğer tüm modeller
+`MeshStandardMaterial`, mobilde de o daha ucuz.
+
+**TUZAK — hedef kilidini elle bozma.** `okcu.kilit` yalnız hedef `durum==='olu'`
+olunca ya da `combatStateReset()` ile bırakılır. Testte mobları ölü İŞARETLEMEDEN
+`D.moblar`'dan silerseniz kilit hayalete takılı kalır ve okçu görünmez bir
+noktaya atmaya devam eder — oyun hatası sanılır. Normal oyunda bu yol yok.
 
 ## Bilinen açık uçlar
 
