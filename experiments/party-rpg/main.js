@@ -4998,7 +4998,7 @@ function cizdir(){
     if(!besteci) postKur();
     besteci.render();
   } else {
-    cizdir();
+    renderer.render(sahne, kamera);   /* dusuk kalite: bloom yok, dogrudan ciz */
   }
 }
 
@@ -5525,7 +5525,7 @@ function adim(){
   zindanSur(dt);
   yeniSkillSur(dt);
   sayiGuncelle(dt);
-  renderer.render(sahne, kamera);
+  cizdir();                          /* tek cizim kapisi: kaliteye gore besteci ya da renderer */
   if(_sx || _sy){ kamera.position.x -= _sx; kamera.position.y -= _sy; }
 }
 function enYakinMob(){

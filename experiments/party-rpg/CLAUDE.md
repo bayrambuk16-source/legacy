@@ -29,8 +29,12 @@ testi ancak böyle yazılabiliyor. **Silmeyin**, bir dahaki teste lazım.
 
 Deterministik koşum kalıbı: `requestAnimationFrame` boşa alınır,
 `saat.getDelta` sabitlenir, `adim()` elle N kez çağrılır. Böylece sekme
-görünmeden ve gerçek zaman beklemeden dakikalarca oyun simüle edilebilir
-(uzun süre / sızıntı testleri bu şekilde koşuldu).
+görünmeden ve gerçek zaman beklemeden dakikalarca oyun simüle edilebilir.
+
+**Hızlandırmak için `renderer.render`'ı boşa ALMAYIN.** Çok cazip ve çok
+yanıltıcı: `renderer.info.memory` yalnız GPU'ya yüklenmiş kaynağı sayar,
+çizim yoksa sayaçlar sabit kalır ve sızıntı görünmez olur. Bir kez bu
+tuzağa düşüldü (aşağıda "GPU kaynak sızıntısı" maddesi).
 
 ## Yapı
 
@@ -80,22 +84,34 @@ Doğrulanmış genişlikler: **320 / 345 / 360 / 374 / 375 / 393 / 412 / 430 / 7
 - **three sürümü:** importmap CDN'den `0.160.1`; repo'da `vendor/three`
   **0.169.0**. Bilerek dokunulmadı — sürüm atlatmak davranış değiştirir.
   Build hattına (`tools/build.mjs`) bu yüzden bağlanmadı.
-- **Post-processing HİÇ ÇALIŞMIYOR — ölü kod.** Daha önce buraya "etkisi
-  sönük" yazılmıştı; ölçüm bunu çürüttü. `cizdir()` (main.js ~4996)
-  hiçbir yerden çağrılmıyor; `adim()` sonunda doğrudan
-  `renderer.render(sahne, kamera)` var. Çalışma zamanında doğrulandı:
-  `besteci === null`, EffectComposer hiç kurulmuyor. Yani bloom eşiğini
-  (0.82) ayarlamanın şu an hiçbir etkisi yok — önce çizim kapısı
-  `cizdir()`'e bağlanmalı.
-- **`cizdir()` sonsuz özyineleme içeriyor** (main.js ~5001): `else` dalı
-  `renderer.render(...)` yerine kendini çağırıyor. Ölü kod olduğu için
-  şimdilik patlamıyor. Üstteki maddeyi düzeltip `adim()`'i `cizdir()`'e
-  bağlarsanız `dusuk` kalitede ANINDA stack overflow olur — ikisi tek
-  seferde düzeltilmeli, ayrı ayrı değil.
+- **Post-processing ARTIK AÇIK** (önce ölü koddu: `cizdir()` hiçbir
+  yerden çağrılmıyordu, `besteci === null` idi). `adim()` sonu artık
+  `cizdir()` çağırıyor; `dusuk` kalitede doğrudan renderer, üstünde
+  RenderPass → UnrealBloomPass(0.46 / 0.70 / **eşik 0.82**) → OutputPass.
+  Ton eşlemesi TEK kez uygulanıyor (doğrulandı: opak piksel iki yolda da
+  birebir aynı). **Bloom ilk kez gerçekten çalıştığı için eşik/güç henüz
+  hiç ayarlanmadı** — gerçek cihazda bakılmalı.
+- **Bloomlu yol ortalama ~%5 daha koyu ölçüldü** (sabit kalitede, tek
+  değişken çizim yolu: 64.06 → 60.54; buna karşılık >200 parlak piksel
+  4 → 10). Kurulum hatası DEĞİL: hedef boyutu canvas'la birebir
+  (911×910), HalfFloat + lineer, resample yok. En olası sebep saydam/
+  toplamalı VFX'in artık ton eşlemesinden ÖNCE lineer uzayda
+  harmanlanması — fiziksel olarak doğrusu bu, ama görsel bir değişiklik.
+  Gözle onaylanmadı; ekranda bakılması gereken ilk şey bu.
 - **Görsel tavan payı:** materyaller hâlâ `MeshLambertMaterial` —
   `MeshStandardMaterial` + IBL (`PMREMGenerator` + `RoomEnvironment`)
-  geçişi duruyor. Bloom gerçekten devreye girmeden bunu değerlendirmek
-  anlamsız; sıra yukarıdaki iki maddeden sonra.
+  geçişi duruyor. Artık bloom canlı olduğuna göre değerlendirilebilir.
+- **GPU kaynak sızıntısı — AÇIK, düzeltilmedi.** Efektler sahneden
+  çıkarılıyor ama geometri/doku `dispose()` edilmiyor:
+  `renderer.info.memory` sürekli tırmanıyor (~1,3 geo/sn ve ~0,9 doku/sn;
+  ×10 slotunda daha hızlı). `D.efektler` ve `sahne.children` sınırlı
+  kalıyor, yani sorun sahne grafiğinde değil GPU kaynaklarında.
+  **Çizim yolundan bağımsız** — kontrollü testte hem doğrudan renderer
+  hem besteci yolunda aynı şekilde büyüyor, yani post-processing'in
+  ürünü değil, önceden mevcut.
+  UYARI: `renderer.info.memory` yalnız GPU'ya YÜKLENMİŞ kaynağı sayar.
+  `renderer.render` boşa alınarak yapılan ölçüm sızıntıyı GÖREMEZ —
+  daha önce "sızıntı yok" sonucu bu yüzden yanlış çıkmıştı.
 - **Sanat üretimi:** kullanıcı ChatGPT ile konsept görsel üretiyor. Karar:
   parçaları TEK TEK, düz macenta/siyah zeminde, 512px+ istemek; tek sahne
   üretip kesmek değil. Tutarlılık için ilgili ikonları tek ızgarada iste.
