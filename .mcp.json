@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@0.0.79"],
+      "env": {}
+    },
+    "meshy": {
+      "command": "npx",
+      "args": ["-y", "@meshy-ai/meshy-mcp-server@0.5.1"],
+      "env": {}
+    },
+    "blender": {
+      "command": "uvx",
+      "args": ["blender-mcp"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}
