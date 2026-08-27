@@ -28,7 +28,10 @@
     "verify:three": "tsx tools/verify-vendor.mjs",
     "telemetry:render": "tsx experiments/eternal-ko-prototype/tools/render-telemetry.ts",
     "serve": "node tools/serve.mjs",
-    "dev:party": "node tools/serve.mjs"
+    "dev:party": "node tools/serve.mjs",
+    "test:party": "playwright test",
+    "test:party:ui": "playwright test --project=ui-320x568 --project=ui-375x667 --project=ui-390x844 --project=ui-430x932",
+    "test:party:uzun": "playwright test --project=regression -g uzun"
   },
   "notes": {
     "toolchain": "Kurulum: npm install (devDependencies tam surum olarak pinlidir) → npm run verify. npm script calisirken node_modules/.bin PATH basina eklendigi icin tsc/tsx/esbuild YEREL pinli surumden calisir.",
@@ -42,6 +45,7 @@
     "node": ">=22.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/node": "25.6.2",
     "esbuild": "0.27.7",
     "tsx": "4.21.0",

@@ -5,6 +5,92 @@ Kullanıcı **Türkçe** konuşur; yanıtlar ve kod yorumları Türkçe olmalıd
 
 ---
 
+## Çalışma döngüsü — ZORUNLU
+
+**Temel kural:** yeni özellik veya düzeltme, oyun gerçek tarayıcıda
+çalıştırılıp test edilmeden TAMAMLANDI sayılmaz.
+
+Her görevde bu sıra:
+
+1. İstenen değişikliği analiz et.
+2. Yalnız gerekli dosyalara müdahale et.
+3. Oyunu başlat.
+4. Gerçek tarayıcı testi çalıştır.
+5. Browser console error/warning kayıtlarını kontrol et.
+6. Kritik savaş akışını test et.
+7. UI değiştiyse portrait çözünürlüklerde ekran görüntüsü al.
+8. Save/load etkileniyorsa oyunu kapatıp tekrar açarak doğrula.
+9. Hata varsa düzelt.
+10. Testi yeniden çalıştır.
+11. Regression başarısızsa görevi TAMAMLANDI SAYMA.
+
+### Regression listesi — her geliştirmeden sonra
+
+game startup · character spawn · mob spawn · combat loop · target
+selection · skills · ultimate · heal/support · death/resurrection · boss ·
+stage progression · EXP/level · item drops · inventory · equipment ·
+upgrade · save/load · UI · camera · animation · VFX · audio ·
+console errors · memory growth
+
+### Hata toleransı — hepsi SIFIR olmalı
+
+uncaught error · unhandled promise rejection · NaN gameplay değeri ·
+camera drift · save corruption · broken asset load
+
+### Görsel değişiklik
+
+UI veya sahne görseli değiştiyse ekran görüntüsü üret. Portrait test
+çözünürlükleri: **320×568 · 375×667 · 390×844 · 430×932**
+
+### Performans
+
+Büyük değişiklikten sonra en az **10 dakika** otomatik savaş testi.
+Yeni mob/VFX/render sistemi değişikliğinde **30 dakika**.
+İzlenecekler: FPS degradation · memory growth · active mob count ·
+geometry count · texture count · console error count
+
+### Git
+
+Büyük görevden önce çalışan state'i koru. Başarılı regression'dan SONRA
+commit. Bozuk sürümü ana branch'e taşıma.
+
+### Maliyet
+
+Aynı dosyaları gereksiz tekrar analiz etme; önce mevcut source-map ve son
+doğrulanmış test raporunu kullan. Küçük görevlerde tam proje audit'i
+yapma. 5-6 ilgili değişiklikten sonra toplu regression uygula.
+
+### Test altyapısı — Playwright (Ağu 2026)
+
+`@playwright/test` 1.62.1 pinli devDependency; Chromium kullanıcı
+önbelleğinde (`~/AppData/Local/ms-playwright`), repo dışında.
+Yeni ortamda bir kez: `npx playwright install chromium`.
+
+```
+npm run test:party         # tam takım: regression + 4 portrait UI
+npm run test:party:ui      # yalnız UI, dört portrait çözünürlük
+UZUN=1 npm run test:party:uzun          # 10 dk otomatik savaş
+UZUN=1 UZUN_DK=30 npm run test:party:uzun   # render değişikliğinde 30 dk
+```
+
+- `experiments/party-rpg/tests/regression.spec.js` — regression listesinin
+  tamamı tek savaş oturumunda + save/load (gerçek kapat-aç) + uzun koşu.
+- `experiments/party-rpg/tests/ui.spec.js` — dört portrait çözünürlük.
+- `tests/yardim.js` — oyunu açma/başlatma, console+pageerror+404 toplayıcı,
+  NaN taraması, kamera ve GPU sayaç ölçümü.
+
+Testler `?dbg=1` kancasını kullanır; kanca silinirse hepsi düşer.
+Uzun koşu varsayılan olarak ATLANIR — her görevde 10 dk beklemek pahalı.
+
+Ekran görüntüleri `test-results/ekran/` altına SABİT yola yazılır
+(gitignore'da). Sadece `testInfo.attach` kullanmayın: `list` reporter'da
+attachment kalıcı olmaz, geçen testin çıktı klasörü silinir ve elinizde
+görüntü kalmaz.
+
+Headless Chromium sekmeyi görünür sayar, bu yüzden `requestAnimationFrame`
+çalışır ve **gerçek FPS ölçülebilir** — Claude Code'un kendi browser
+paneli gizliyken rAF durur, o yolda FPS ölçümü geçersizdir.
+
 ## Bu proje nedir
 
 Knight Online'dan ilham alan mobil RPG. Aktif geliştirme
