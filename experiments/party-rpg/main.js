@@ -362,7 +362,20 @@ const BOLGE_TEMA = [
   { cim:'#8494a2', patika:'#9aa6ae', cimB:[150,165,185], topB:[165,175,185], kenar:'rgba(52,66,84,.5)',
     sis:0x2c3a48, gokU:0xd8e6f2, gokA:0x4a5866, kaya:0x67727f, agac:0x3c5a52, govde:0x4a3f38, cali:0x50707f, cimH:168 },
   { cim:'#4b4438', patika:'#7d6748', cimB:[80,68,58], topB:[115,95,72], kenar:'rgba(30,24,34,.5)',
-    sis:0x221a28, gokU:0xc8b8d4, gokA:0x3e3644, kaya:0x564a5e, agac:0x453b52, govde:0x3a3040, cali:0x4e4260, cimH:82 }
+    sis:0x221a28, gokU:0xc8b8d4, gokA:0x3e3644, kaya:0x564a5e, agac:0x453b52, govde:0x3a3040, cali:0x4e4260, cimH:82 },
+  /* ═══ 10 harita: 6 yeni bölge, ork istilası ilerledikçe (Ağu 2026) ═══ */
+  { cim:'#4a4a2e', cimB:[58,58,34], patika:'#5c4a32', topB:[92,78,52], kenar:'rgba(20,22,10,.5)',           /* 5: Kanlı Bataklık */
+    sis:0x1c2010, gokU:0x9aac7a, gokA:0x2c3018, kaya:0x4a4638, agac:0x33402a, govde:0x2c2418, cali:0x3a4428, cimH:74 },
+  { cim:'#3a2620', cimB:[70,40,30], patika:'#241814', topB:[90,55,40], kenar:'rgba(40,14,8,.55)',           /* 6: Volkan Yamacı */
+    sis:0x2c140a, gokU:0xffa060, gokA:0x401a10, kaya:0x362420, agac:0x2a1a16, govde:0x1c1210, cali:0x40201a, cimH:14 },
+  { cim:'#233246', cimB:[55,70,95], patika:'#33445c', topB:[80,100,140], kenar:'rgba(10,16,30,.55)',        /* 7: Kristal Mağara */
+    sis:0x0e1626, gokU:0x6ad4e8, gokA:0x18243a, kaya:0x3c5a72, agac:0x4a6a8a, govde:0x24405a, cali:0x386080, cimH:200 },
+  { cim:'#8a7040', cimB:[190,165,110], patika:'#c4a468', topB:[220,195,140], kenar:'rgba(90,60,20,.4)',     /* 8: Çorak Çöl */
+    sis:0x50361a, gokU:0xffd090, gokA:0x60401e, kaya:0x9a8256, agac:0x6a5230, govde:0x4a3a20, cali:0x7a6234, cimH:42 },
+  { cim:'#3a2440', cimB:[70,40,90], patika:'#2a1a34', topB:[90,55,110], kenar:'rgba(30,10,40,.55)',         /* 9: Lanetli Orman */
+    sis:0x1a0e26, gokU:0xb070d0, gokA:0x2a1636, kaya:0x463250, agac:0x2e1a3a, govde:0x1e1226, cali:0x3a2246, cimH:285 },
+  { cim:'#c8d8e8', cimB:[235,242,250], patika:'#a8c0d8', topB:[245,248,255], kenar:'rgba(120,150,180,.4)',  /* 10: Buz Doruğu */
+    sis:0xd8e8f4, gokU:0xeaf4ff, gokA:0x8ab0d0, kaya:0xa8bcc8, agac:0x5a7868, govde:0x3e2e22, cali:0x6a8878, cimH:195 }
 ];
 function zeminDoku(T3){
   const c = document.createElement('canvas'); c.width=512; c.height=1024;
@@ -490,41 +503,83 @@ function kayaYap(s, mat, seed){                    /* referans görsel: yüzlü 
   mesh.add(kenar);
   return mesh;
 }
+/* Sketchfab kaya/ağaç modelinden tema renkli TEK malzeme klonu üretir; tüm
+   örnekler bu ayni malzemeyi paylaşır (mob barı sızıntısından çıkarılan ders:
+   malzeme cevreKur() başına YENİDEN üretilir, bu yüzden dispose edilmesi
+   doğrudur — ama GEOMETRİ MODEL'in kendi kopyası, ASLA dispose edilmez). */
+function envMatKlon(kaynakMesh, renk){
+  const m = kaynakMesh.material.clone();
+  m.color.set(renk);
+  return m;
+}
+function envMeshEkle(hedefGrup, geometri, mat, poz, olcek, donusY){
+  const mesh = new THREE.Mesh(geometri, mat);
+  mesh.position.copy(poz);
+  if(olcek!=null) mesh.scale.setScalar(olcek);
+  if(donusY!=null) mesh.rotation.y = donusY;
+  mesh.castShadow = true;
+  mesh.userData.paylasimliGeo = true;   /* MODEL.env_* kaynaklı — dispose etme */
+  hedefGrup.add(mesh);
+  return mesh;
+}
 function cevreKur(T3){
   if(cevreG){
     /* isLine de gerekli: kaya kenar hatlari LineSegments, isMesh degil —
-       yalniz isMesh bakilinca EdgesGeometry'ler her tema kurulumunda sizardi. */
-    cevreG.traverse(o=>{ if(o.isMesh || o.isLine){ o.geometry.dispose(); if(o.material.dispose) o.material.dispose(); } });
+       yalniz isMesh bakilinca EdgesGeometry'ler her tema kurulumunda sizardi.
+       paylasimliGeo isaretli meshlerin GEOMETRISI MODEL'e ait, dispose edilmez —
+       yalniz o cagrida uretilen tema-renkli malzeme klonu dispose edilir. */
+    cevreG.traverse(o=>{
+      if(o.isMesh || o.isLine){
+        if(!o.userData.paylasimliGeo) o.geometry.dispose();
+        if(o.material && o.material.dispose) o.material.dispose();
+      }
+    });
     sahne.remove(cevreG);
   }
   cevreG = new THREE.Group();
-  const kayaM = new THREE.MeshLambertMaterial({color: T3.kaya, flatShading: true});
-  const agacM = new THREE.MeshLambertMaterial({color: T3.agac});
+  const kayaM = new THREE.MeshLambertMaterial({color: T3.kaya, flatShading: true});   /* yalniz arka plan siluetleri icin */
+  const agacM = new THREE.MeshLambertMaterial({color: T3.agac});                      /* yalniz arka plan siluetleri icin */
   const govdeM = new THREE.MeshLambertMaterial({color: T3.govde});
   const caliM = new THREE.MeshLambertMaterial({color: T3.cali});
   const R = (i)=> (Math.sin(i*127.1 + D.bolge*311.7)*43758.5453) % 1 * 0.5 + 0.5;
-  for(let i=0;i<14;i++){                                     /* kayalar: yüzlü + kenar hatlı */
-    const s = 0.9 + R(i)*1.4;
-    const k = kayaYap(s, kayaM, i*13 + D.bolge*7);
+
+  /* ═══ gerçek kaya/ağaç modelleri (Sketchfab, CC Attribution — bkz CLAUDE.md) ═══
+     Tema rengine boyanır: gerçek çatlak/doku dokusu (kaya) veya duz renk (agac)
+     korunur, yalnız ton bölgeye göre kayar. */
+  const kayaVaryant = MODEL.env_kaya.scene.children;                  // 6 KAYA_N mesh
+  const kayaGercekM = envMatKlon(kayaVaryant[0], T3.kaya);
+  const agacGrup = MODEL.env_agac.scene.children;                     // 7 AGAC_N grup (yaprak+govde)
+  const yaprakKaynak = agacGrup[0].children.find(c=>c.name.includes('_01'));
+  const govdeKaynak  = agacGrup[0].children.find(c=>c.name.includes('_02'));
+  const agacYaprakM = envMatKlon(yaprakKaynak, T3.agac);
+  const agacGovdeM  = envMatKlon(govdeKaynak, T3.govde);
+
+  for(let i=0;i<14;i++){                                     /* kayalar: gerçek model, tema renkli */
+    const kaya = kayaVaryant[i % kayaVaryant.length];
+    /* kaya.scale.x: Blender'da bu varyanta ozel normalize duzeltmesi (gerçek
+       dünya boyutuna getiren sabit) — geometri KENDI BASINA cok buyuk ham
+       veri; bu carpani atlarsak model devasa gorunur (yasandi, duzeltildi). */
+    const s = (0.9 + R(i)*1.1) * kaya.scale.x;
     const yan = i%2 ? 1 : -1;
-    k.position.set(yan*(4.6+R(i+50)*2.2), s*0.34, SAHNE_Z + 2 - i*3.1 - R(i+90)*1.5);
-    k.rotation.y = R(i+3)*3.14;
-    k.castShadow = true;
-    cevreG.add(k);
+    const poz = new THREE.Vector3(yan*(4.6+R(i+50)*2.2), 0, SAHNE_Z + 2 - i*3.1 - R(i+90)*1.5);
+    envMeshEkle(cevreG, kaya.geometry, kayaGercekM, poz, s, R(i+3)*6.28);
   }
   const agacN = kaliteAl()==='dusuk' ? 7 : 12;
-  for(let i=0;i<agacN;i++){                                  /* ağaçlar: gövde + iki kademe taç */
+  for(let i=0;i<agacN;i++){                                  /* ağaçlar: gerçek çam modeli, tema renkli */
+    const grp = agacGrup[i % agacGrup.length];
     const yan = i%2 ? 1 : -1;
     const ax = yan*(YOL_YARIM + 2.6 + R(i+10)*3.2);
     const az = SAHNE_Z + 1 - i*3.4 - R(i+20)*2;
-    const olc = 0.85 + R(i+30)*0.5;
-    const gv = new THREE.Mesh(new THREE.CylinderGeometry(0.11*olc, 0.17*olc, 1.1*olc, 6), govdeM);
-    gv.position.set(ax, 0.55*olc, az); gv.castShadow = true;
-    const t1 = new THREE.Mesh(new THREE.ConeGeometry(0.9*olc, 1.5*olc, 7), agacM);
-    t1.position.set(ax, 1.6*olc, az); t1.castShadow = true;
-    const t2 = new THREE.Mesh(new THREE.ConeGeometry(0.62*olc, 1.1*olc, 7), agacM);
-    t2.position.set(ax, 2.35*olc, az);
-    cevreG.add(gv, t1, t2);
+    /* grp.scale.x: agac grubunun kendi normalize duzeltmesi — cocuk mesh'ler
+       (yaprak/govde) scale=1, gercek boyut yalniz ust grupta. */
+    const olc = (0.85 + R(i+30)*0.5) * grp.scale.x;
+    /* yaprak+govde cocuklarinin yerel ofseti ihmal edilebilir (dogrulandi:
+       hepsi <0.00001) — ikisi de govde tabanina, tek ortak donusle yerlesir. */
+    const donus = R(i+31)*6.28;
+    for(const c of grp.children){
+      const mat = c.name.includes('_02') ? agacGovdeM : agacYaprakM;
+      envMeshEkle(cevreG, c.geometry, mat, new THREE.Vector3(ax, 0, az), olc, donus);
+    }
   }
   for(let i=0;i<10;i++){                                     /* çalılar */
     const yan = i%2 ? 1 : -1;
@@ -597,7 +652,7 @@ let sonTema = -1;
 let kaliteIlk = false;
 function temaUygula(){
   if(!kaliteIlk){ kaliteIlk = true; kaliteUygula(); }
-  const T3 = BOLGE_TEMA[(D.bolge-1) % 4];
+  const T3 = BOLGE_TEMA[(D.bolge-1) % BOLGE_TEMA.length];
   sahne.fog = new THREE.Fog(T3.sis, 18, 50);
   gok.color.set(T3.gokU); gok.groundColor.set(T3.gokA);
   const eskiMap = zemin.material.map;
@@ -607,7 +662,7 @@ function temaUygula(){
   cevreKur(T3);
 }
 function temaSur(){
-  const i = (D.bolge-1) % 4;
+  const i = (D.bolge-1) % BOLGE_TEMA.length;
   if(i !== sonTema){ sonTema = i; temaUygula(); }
 }
 
@@ -615,7 +670,7 @@ function temaSur(){
 /* Modeller ../../public/assets/party/models/ altinda .gltf olarak durur (kendi kendine yeterli). */
 /* Kadro disi turler (crab/monsterx/mutant) yuklenmiyor — ~2.4 MB indirme tasarrufu.
    Dosyalari public/assets/party/models/ altinda duruyor, geri almak isim eklemek. */
-const VARLIK = ['okcu','ok','goblin','kecoon','spike','rhino','ork','brute','mage','priest'];
+const VARLIK = ['okcu','ok','goblin','kecoon','spike','rhino','ork','brute','mage','priest','env_kaya','env_agac'];
 const loader = new GLTFLoader();
 const yukCubuk = document.getElementById('yukCubuk');
 const yukYazi = document.getElementById('yukYazi');
@@ -788,7 +843,7 @@ const DIL = {
      genelAd:{dukkan:'Şans Ocağı', takimdepo:'Takım Deposu', klan:'Klan', arena:'Arena',
               zindan:'Zindanlar', nitelikler:'Nitelikler', basarimlar:'Başarımlar', ayarlar:'Ayarlar', bolumsec:'Bölüm Seç', uniqav:'Unique Avı'},
      bsec:{bolge:'Bölge', git:'GİT', not:'Rozete dokunarak buraya gelirsin — geri dönüp farm yapabilirsin.'},
-     bolgeAd:['Yeşilorman','Kül Geçidi','Buzul Vadisi','Kadim Harabeler'],
+     bolgeAd:['Yeşilorman','Kül Geçidi','Buzul Vadisi','Kadim Harabeler','Kanlı Bataklık','Volkan Yamacı','Kristal Mağara','Çorak Çöl','Lanetli Orman','Buz Doruğu'],
      bossAd:'Bölge Muhafızı',
      uq:{pity:'Acıma', odak:'Düşürdüğü slotlar', dustu:'✦ UNIQUE DÜŞTÜ! ✦',
          kacti:'Süre doldu — boss kaçtı', oldun:'Takım düştü — kazanç yok',
@@ -885,7 +940,7 @@ const DIL = {
      genelAd:{dukkan:'Lucky Forge', takimdepo:'Team Storage', klan:'Clan', arena:'Arena',
               zindan:'Dungeons', nitelikler:'Attributes', basarimlar:'Achievements', ayarlar:'Settings', bolumsec:'Stage Select', uniqav:'Unique Hunt'},
      bsec:{bolge:'Region', git:'GO', not:'Tap the badge to open this — go back and farm earlier regions.'},
-     bolgeAd:['Greenwood','Ash Pass','Frozen Vale','Ancient Ruins'],
+     bolgeAd:['Greenwood','Ash Pass','Frozen Vale','Ancient Ruins','Blood Marsh','Volcanic Slope','Crystal Cavern','Desert Wastes','Cursed Forest','Frozen Peak'],
      bossAd:'Region Guardian',
      uq:{pity:'Pity', odak:'Drops for slots', dustu:'✦ UNIQUE DROPPED! ✦',
          kacti:'Time up — the boss escaped', oldun:'Team fell — no reward',
@@ -1655,7 +1710,7 @@ function sayiGuncelle(dt){
 function bolumDuyur(bossMu){
   const bMob2 = bossMu ? D.moblar.filter(m2=>m2.bossMu).pop() : null;
   duyuruE.textContent = bossMu ? ('☠ ' + ((bMob2 && T().bossTur[bMob2.tur]) || 'BOSS') + ' ☠')
-    : `${T().bolgeAd[(D.bolge-1)%4]} · ${D.bolge}-${D.bolum} · ${T().encAd[Math.min(5,Math.max(1,D.bolum))-1]}`;
+    : `${T().bolgeAd[(D.bolge-1)%BOLGE_TEMA.length]} · ${D.bolge}-${D.bolum} · ${T().encAd[Math.min(5,Math.max(1,D.bolum))-1]}`;
   duyuruE.style.opacity = '1';
   clearTimeout(duyuruE._t);
   duyuruE._t = setTimeout(()=>{ duyuruE.style.opacity = '0'; }, 1800);
@@ -3736,7 +3791,7 @@ function hudGuncelle(){
       document.getElementById('bossAd').textContent =
         D.zindan && D.zindan.tip==='uniq' ? '👑 ' + L2.uq.boss[(D.zindan.bolge-1)%10]
         : D.zindan && D.zindan.tip==='boss' ? '👑 ' + (5-D.zindan.bossKalan+1) + '/5'
-        : '☠ ' + ((L2.bossTur && L2.bossTur[bMob.tur]) || L2.bossAd) + ' — ' + L2.bolgeAd[(D.bolge-1)%4];
+        : '☠ ' + ((L2.bossTur && L2.bossTur[bMob.tur]) || L2.bossAd) + ' — ' + L2.bolgeAd[(D.bolge-1)%BOLGE_TEMA.length];
       document.getElementById('bossBarIc').style.width = (Math.max(0, bMob.can/bMob.azami)*100) + '%';
     } else { bb.classList.remove('acik'); droneDur(); }
   }
@@ -5677,7 +5732,7 @@ if(new URLSearchParams(location.search).has('dbg')){
     /* sabitler */
     sabit: { OK_HASAR, OK_ARALIK, OK_HIZ, OK_MENZIL, OKCU_CAN, BRUTE_CAN,
       get MAGE_CAN(){ return MAGE_CAN; }, get PRIEST_CAN(){ return PRIEST_CAN; },
-      DIRILME_SN, DOGUM_ARALIK, AZAMI_MOB, VUR_MESAFE, HIZ,
+      DIRILME_SN, DOGUM_ARALIK, AZAMI_MOB, VUR_MESAFE, HIZ, BOLGE_TEMA,
       TURLER, TUR_SIRA, ENC_SABLON, BASMA, BASMA_MAX, OCAK_TABLO, OCAK_MAX,
       ITEM_FIYAT, ULTI_ESIK, SILAH2, TABAN_ITEM, KIMLER, SKILL9, DEPO_KAP, VARLIK },
     /* saf fonksiyonlar */

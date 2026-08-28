@@ -112,14 +112,23 @@ test('regression: açılış → savaş → ilerleme → kayıt', async ({ page 
   });
   expect(heal.tepe, `iyileştirme çalışmıyor (priestÖlü=${heal.priestOlu})`).toBeGreaterThan(heal.once);
 
-  /* ── death / resurrection ── */
+  /* ── death / resurrection ──
+     DIRILME_SN=10 OYUN saniyesi, gerçek saniye değil. Sahne ağırlaştıkça
+     (gerçek kaya/ağaç modelleri sonrası) Playwright'ın CPU kısıtlı
+     ortamında kare hızı düşüp gerçek-zaman/oyun-zamanı oranı bozulabiliyor
+     — sabit 12000ms bekleme bu yüzden flaky oldu (aynı ders: heal testi).
+     Sabit bekleme yerine cömert bir tavana kadar YOKLA. */
   const olum = await page.evaluate(async () => {
     const P = window.__PARTY;
     P.et.kahramanaVur('mage', 99999);
     await new Promise((r) => setTimeout(r, 500));
     const olduMu = !!(P.mage && P.mage.olu);
-    await new Promise((r) => setTimeout(r, 12000));
-    return { olduMu, dirildi: !!(P.mage && !P.mage.olu), can: P.D.mageCan };
+    let dirildi = false;
+    for (let i = 0; i < 60 && !dirildi; i++) {           /* en çok 30 sn gerçek zaman */
+      await new Promise((r) => setTimeout(r, 500));
+      dirildi = !!(P.mage && !P.mage.olu);
+    }
+    return { olduMu, dirildi, can: P.D.mageCan };
   });
   expect(olum.olduMu, 'kahraman ölmedi').toBe(true);
   expect(olum.dirildi, 'kahraman dirilmedi').toBe(true);

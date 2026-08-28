@@ -40,11 +40,11 @@ tuzağa düşüldü (aşağıda "GPU kaynak sızıntısı" maddesi).
 
     index.html        kabuk: head, importmap, HUD markup (140 satır)
     styles/hud.css    tüm arayüz (483 satır, paket paket ekli — aşağıya bak)
-    main.js           oyun kodu, TEK DOSYA (5715 satır, 30 bölüm başlığı taşır)
+    main.js           oyun kodu, TEK DOSYA (5770 satır, 30 bölüm başlığı taşır)
 
-Varlıklar `public/assets/party/`: `models/` 13 .gltf (10'u yükleniyor —
-bkz. mob kadrosu) · `vfx/` 19 .png ·
-`portraits/` 4 .svg (sınıf ikonları).
+Varlıklar `public/assets/party/`: `models/` 15 .gltf (10 mob/kahraman +
+`env_kaya` + `env_agac` yükleniyor, 3'ü kadro dışı duruyor — bkz. mob
+kadrosu) · `vfx/` 19 .png · `portraits/` 4 .svg (sınıf ikonları).
 
 ## Neden tek dosya — modül bölmesi YAPILMADI
 
@@ -120,6 +120,54 @@ kaldırılmazsa three `MeshPhysicalMaterial` üretir — diğer tüm modeller
 olunca ya da `combatStateReset()` ile bırakılır. Testte mobları ölü İŞARETLEMEDEN
 `D.moblar`'dan silerseniz kilit hayalete takılı kalır ve okçu görünmez bir
 noktaya atmaya devam eder — oyun hatası sanılır. Normal oyunda bu yol yok.
+
+## Harita/çevre sistemi — 10 bölge teması (Ağu 2026)
+
+`BOLGE_TEMA` 4'ten **10 temaya** çıktı: Yeşilorman · Kül Geçidi · Buzul
+Vadisi · Kadim Harabeler · Kanlı Bataklık · Volkan Yamacı · Kristal Mağara ·
+Çorak Çöl · Lanetli Orman · Buz Doruğu. `D.bolge` ilerledikçe tema
+`(D.bolge-1) % BOLGE_TEMA.length` ile döner — asla `BOLGE_TEMA.length`'i
+SABİT 4/10 yazma, dizi büyüklüğü değişebilir diye tüm kullanım yerleri
+`.length`'e bağlandı (4 yer: `temaUygula`, `temaSur`, iki `bolgeAd[...]`
+okuması). Yeni tema eklemek: `BOLGE_TEMA`'ya bir obje + `bolgeAd` dizisine
+(TR ve EN, aynı sırada) bir isim eklemek yeterli.
+
+- **Gerçek kaya/ağaç modelleri** (`env_kaya.gltf` 6 varyant, `env_agac.gltf`
+  7 çam) Sketchfab'den geldi — kaynak: "Low poly/Stylized Rocks #1"
+  (luukezor) ve "🌲 Pine Trees Collection 🌲" (Raul-DGS), ikisi de **CC
+  Attribution** (atıf gerekir, dağıtırken kaynak belirtilmeli). Eski
+  prosedürel `kayaYap()`/koni-ağaç hâlâ kodda duruyor, yalnız **arka plan
+  siluetleri** (sis içindeki uzak tepecikler) için kullanılıyor — yakın
+  alan artık gerçek model.
+- **Tema renklendirme dokuyu BOZMADAN çalışır.** Kaya malzemesi
+  (`MeshStandardMaterial`, gerçek çatlak dokusu) klonlanıp `.color`'ı
+  `T3.kaya`'ya ayarlanıyor — three.js'te `color × map` çarpımı olduğu için
+  doku detayı kalır, yalnız ton kayar. Ağaç malzemeleri dokusuz düz renk
+  (Blender tarafında flat color), `.color` doğrudan `T3.agac`/`T3.govde`
+  ile DEĞİŞTİRİLİYOR (çarpım değil) — 14 mesh için tek malzeme klonu
+  paylaşılıyor (bölge başına 1 kez üretilip tüm örnekler referans alıyor).
+- **TUZAK — kaynak model kendi normalize ölçeğini taşır.** Blender'da her
+  kaya/ağaç varyantı FARKLI ham geometri boyutunda; ihraç sırasında
+  gerçek-dünya boyutuna getiren düzeltme `obj.node.scale`'de duruyor
+  (kaya ~×0,39, ağaç grubu ~×0,03), geometri BUFFER'ının kendisinde değil.
+  `envMeshEkle()` yalnız `kaya.geometry`'yi alıp KENDİ örnek ölçeğini
+  uygularsa (kaynağın `.scale.x`'ini çarpmadan) model **30-50 kat**
+  büyük basılır — ekranı dolduran dev düz renkli üçgenler olarak görünür,
+  hatasız ama tamamen yanlış. Yaşandı, düzeltisi: `s * kaya.scale.x` /
+  `olc * grp.scale.x`. Yeni bir Sketchfab modeli eklerken bu adımı atlama.
+- **TUZAK — `Box3.setFromObject` ölçüm scripti.** İki katmanlı hiyerarşide
+  (grup → mesh) `updateMatrixWorld(true)` çağrılmadan `new
+  THREE.Box3().setFromObject(mesh)` YANLIŞ (küçük/tutarsız) boyut
+  döndürebilir. Doğrulama scripti yazarken önce `sahne.updateMatrixWorld
+  (true)` (ya da ölçülecek kökte) çağır, yoksa "doğru" görünen ama yanlış
+  bir ölçümle kendi kendini kandırırsın (bu oturumda oldu: gerçek export
+  doğruydu, ölçüm scripti yanlış alarm verdi).
+- **Grass/çim değişmedi.** Sketchfab'da 3D çim kümesi bulundu ama
+  entegre edilmedi — mevcut prosedürel billboard (2 kesişen düzlem +
+  canvas doku) zaten ucuz (tek küçük doku, ~40 örnek) ve tema başına
+  `cimH` ile renk değişiyor; gerçek 3D çim kümesi (756 poligon × 40
+  örnek ≈ 30k üçgen) sadece "çim" için bütçeyi katlardı, karşılığı
+  düşük görüldü.
 
 ## Bilinen açık uçlar
 
